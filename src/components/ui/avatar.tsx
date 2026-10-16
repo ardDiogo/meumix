@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { cn, initials } from "@/lib/utils";
 
 const sizes = {
@@ -8,7 +11,7 @@ const sizes = {
   xl: "size-20 text-2xl",
 };
 
-/** Avatar com fallback de iniciais. Imagens externas (ex.: Steam) entram via `src`. */
+/** Avatar com fallback de iniciais (também quando a imagem externa, ex.: Steam, não carrega). */
 export function Avatar({
   name,
   src,
@@ -20,6 +23,8 @@ export function Avatar({
   size?: keyof typeof sizes;
   className?: string;
 }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const show = !!src && failed !== src;
   return (
     <span
       className={cn(
@@ -27,11 +32,18 @@ export function Avatar({
         sizes[size],
         className,
       )}
-      aria-hidden={src ? undefined : true}
+      aria-hidden={show ? undefined : true}
     >
-      {src ? (
+      {show ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name} className="size-full object-cover" />
+        <img
+          src={src}
+          alt={name}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(src)}
+          className="size-full object-cover"
+        />
       ) : (
         initials(name)
       )}

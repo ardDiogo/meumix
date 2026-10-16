@@ -1,6 +1,7 @@
 import "server-only";
 import type { StatRow } from "@/lib/match-highlights";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { profileAvatars } from "./avatars";
 
 export interface MatchReport {
   platform: "manual" | "gc" | "faceit";
@@ -20,6 +21,9 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
     supabase.from("player_match_records").select("*").eq("match_id", matchId),
   ]);
   if (!match || error) return null;
+  const avatars = await profileAvatars(
+    (records ?? []).map((r) => r.user_id as string | null).filter((id): id is string => !!id),
+  );
   return {
     platform: (match.platform as MatchReport["platform"]) ?? "manual",
     rows: (records ?? []).map((r, i) => ({
@@ -28,6 +32,7 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
       name: r.player_name as string,
       team: r.team as "A" | "B",
       elo: num(r.elo_after) ?? num(r.elo_before),
+      avatarUrl: r.user_id ? (avatars.get(r.user_id as string)?.avatarUrl ?? null) : null,
       k: r.kills ?? 0,
       a: r.assists ?? 0,
       d: r.deaths ?? 0,

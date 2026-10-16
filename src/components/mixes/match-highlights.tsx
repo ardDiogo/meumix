@@ -1,6 +1,7 @@
 import { Crosshair, Crown, Skull, Target, TrendingDown, Trophy, Zap } from "lucide-react";
 import { kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
 import { cn } from "@/lib/utils";
+import { Avatar } from "../ui/avatar";
 import { Card, CardContent, CardHeader } from "../ui/card";
 
 const fmt2 = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -72,10 +73,12 @@ export function MatchHighlights({ rows }: { rows: StatRow[] }) {
             const s = STYLE[key];
             const Icon = s.icon;
             return (
-              <li key={key} className={cn("flex gap-3 rounded-lg border p-4", s.box)}>
-                <Icon className={cn("size-5 shrink-0", s.icon_)} aria-hidden />
+              <li key={key} className={cn("flex items-center gap-3 rounded-lg border p-4", s.box)}>
+                <Avatar name={row.name} src={row.avatarUrl} size="lg" className="rounded-lg" />
                 <div className="min-w-0">
-                  <div className="text-xs text-muted">{s.title}</div>
+                  <div className="flex items-center gap-1.5 text-xs text-muted">
+                    <Icon className={cn("size-4 shrink-0", s.icon_)} aria-hidden /> {s.title}
+                  </div>
                   <div className="truncate font-semibold" title={row.name}>
                     {row.name}
                   </div>

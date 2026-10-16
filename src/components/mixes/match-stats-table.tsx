@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { diffOf, kdrOf, type StatRow } from "@/lib/match-highlights";
 import { cn } from "@/lib/utils";
 import { LevelBadge } from "../players/level-badge";
+import { Avatar } from "../ui/avatar";
 import { TeamDot } from "./badges";
 
 type Col = {
@@ -117,6 +118,7 @@ export function MatchStatsTable({ rows }: { rows: StatRow[] }) {
               <td className="px-4 py-2.5">
                 <div className="flex items-center gap-2 font-semibold">
                   <TeamDot side={r.team} />
+                  <Avatar name={r.name} src={r.avatarUrl} size="sm" />
                   {r.userId ? (
                     <Link href={`/jogadores/${r.userId}`} className="max-w-44 truncate hover:text-brand">
                       {r.name}

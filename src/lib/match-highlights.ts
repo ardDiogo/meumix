@@ -7,6 +7,8 @@ export interface StatRow {
   name: string;
   team: "A" | "B";
   elo: number | null;
+  /** Foto do perfil Steam, se vinculado. */
+  avatarUrl: string | null;
   k: number;
   a: number;
   d: number;
