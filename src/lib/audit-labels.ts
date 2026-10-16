@@ -1,0 +1,67 @@
+/** Nomes em português das ações registradas no log. */
+export const AUDIT_LABELS: Record<string, string> = {
+  "registration.join": "Inscrição no mix",
+  "registration.leave": "Saiu do mix",
+  "vote.maps": "Votou nos mapas",
+  "vote.captains": "Votou nos capitães",
+  "vote.map_tiebreaker": "Votou no desempate de mapas",
+  "vote.team_suggestion": "Votou na sugestão de times",
+  "admin.remove_registration": "Removeu inscrição",
+  "admin.reset_mix": "Reiniciou o mix",
+  "admin.cancel_mix": "Deletou o mix",
+  "admin.force_start_draft": "Iniciou a seleção de equipes",
+  "admin.reset_draft": "Reiniciou a escolha de times",
+  "admin.reset_all": "Reiniciou escolha e votos",
+  "admin.force_close_tiebreaker": "Encerrou o desempate",
+  "admin.team_suggestion": "Decidiu a sugestão de times",
+  "admin.finalize_mix": "Finalizou o mix",
+  "admin.ocr_gc": "Leu print da GC com IA",
+  "admin.link_guests": "Vinculou convidados",
+  "admin.schedule_create": "Criou mix",
+  "admin.schedule_end": "Encerrou mix",
+  "admin.set_role": "Alterou papel (admin)",
+  "admin.user_edit": "Editou dados do jogador",
+  "admin.elo_edit": "Editou ELO",
+  "admin.set_gc_level": "Definiu nível GC",
+  "admin.password_reset": "Redefiniu senha",
+  "admin.user_delete": "Excluiu usuário",
+  "admin.bulk_create_users": "Cadastro em lote",
+  "admin.penalty_create": "Aplicou punição",
+  "admin.penalty_deactivate": "Removeu punição",
+  "admin.feature_toggle": "Ligou/desligou funcionalidade",
+  "admin.music": "Alterou a música de fundo",
+  "admin.map_add": "Adicionou mapa",
+  "admin.map_toggle": "Ativou/desativou mapa",
+  "admin.map_delete": "Excluiu mapa",
+  "admin.levels_save": "Alterou os níveis",
+  "badge.create": "Criou insígnia",
+  "badge.delete": "Excluiu insígnia",
+  "badge.grant": "Concedeu insígnia",
+  "badge.revoke": "Removeu insígnia",
+  "profile.steam_link": "Vinculou Steam",
+  "player.csrep_ai": "Análise do CSRep por IA",
+};
+
+export const AUDIT_CATEGORIES = {
+  registration: "Inscrições",
+  vote: "Votações",
+  admin: "Administração",
+  badge: "Insígnias",
+  profile: "Perfil",
+  player: "IA / CSRep",
+} as const;
+
+export const auditLabel = (action: string) => AUDIT_LABELS[action] ?? action;
+
+const OUTCOMES: Record<string, string> = {
+  success: "Sucesso",
+  error: "Erro",
+  too_early: "Antes da abertura",
+  closed: "Inscrições fechadas",
+  already_registered: "Já inscrito",
+  penalty: "Em punição",
+};
+export const outcomeLabel = (outcome: string) => OUTCOMES[outcome] ?? outcome;
+
+/** Resultado "ok" vs. recusado/erro. */
+export const isSuccess = (outcome: string) => outcome === "success";

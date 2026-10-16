@@ -15,5 +15,4 @@ export const MAPS: Record<MapId, GameMap> = {
 export const ACTIVE_MAP_POOL = Object.values(MAPS).filter((m) => m.active);
 
 /** Nome do mapa; mapas cadastrados no admin caem no id sem o prefixo "de_". */
-export const mapName = (id: MapId) =>
-  MAPS[id]?.name ?? id.replace(/^de_/, "").replace(/^\w/, (c) => c.toUpperCase());
+export const mapName = (id: MapId) => MAPS[id]?.name ?? id.replace(/^de_/, "").replace(/^\w/, (c) => c.toUpperCase());

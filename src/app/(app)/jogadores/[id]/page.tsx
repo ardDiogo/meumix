@@ -27,6 +27,8 @@ import { playerHref, playerSlug } from "@/lib/player-slug";
 import { CsrepCard } from "@/components/players/csrep-card";
 import { getPermissions } from "@/services/auth";
 import { getCsrepView } from "@/services/csrep";
+import { BadgeIcon } from "@/components/badges/badge-icon";
+import { playerBadges } from "@/services/badges";
 
 export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">): Promise<Metadata> {
   const profile = await resolvePlayerProfile((await params).id);
@@ -57,9 +59,10 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const series = toEloSeries(eloHistory, new Map(recentMixes.map((r) => [r.mix.id, r.mix.name])));
   const recentChange = eloChangeSince(eloHistory, new Date(ds.now().getTime() - 30 * 86_400_000));
   const steamUrl = steamProfileUrl(player.steamId);
-  const [{ session, canManageMixes }, csrep] = await Promise.all([
+  const [{ session, canManageMixes }, csrep, badges] = await Promise.all([
     getPermissions(),
     kind === "supabase" ? getCsrepView(player.id, player.steamId) : null,
+    playerBadges([player.id]),
   ]);
 
   return (
@@ -79,6 +82,21 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
               <h1 className="font-display text-2xl font-bold tracking-tight">{player.nickname}</h1>
               <DemoBadge kind={kind} />
             </div>
+            {badges.length > 0 && (
+              <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Insígnias">
+                {badges.map((b) => (
+                  <li
+                    key={b.id}
+                    title={[b.description, b.note].filter(Boolean).join(" · ") || b.name}
+                    className="flex items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-0.5 text-xs font-semibold"
+                    style={{ borderColor: `${b.color}55`, color: b.color }}
+                  >
+                    <BadgeIcon icon={b.icon} color={b.color} size="xs" className="rounded-full" />
+                    {b.name}
+                  </li>
+                ))}
+              </ul>
+            )}
             <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
               <div className="flex gap-1.5">
                 <dt className="text-muted">Steam ID</dt>

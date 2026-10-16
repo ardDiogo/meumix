@@ -37,15 +37,15 @@ Referência: [`regras-do-mix.md`](./regras-do-mix.md). Legenda: ✅ feito · �
 
 ## Fase 3 — Cargos e administração
 
-| Item                                                                           | Seção | Status                                   |
-| ------------------------------------------------------------------------------ | ----- | ---------------------------------------- |
-| Cargos master / admin / usuário                                                | 10    | 🟡 (super admin = master)                |
-| Punições (atraso na abertura, expiração automática, ícone piscando; só master) | 2, 10 | ✅                                       |
-| Reset de senha por admin/master                                                | 10    | ⬜                                       |
-| Insígnias                                                                      | 10    | ⬜                                       |
-| Chaves de funcionalidades                                                      | 10    | 🟡 (desempate de mapas; demais em breve) |
-| Música de fundo                                                                | 10    | ⬜                                       |
-| Tela de logs de auditoria                                                      | 10    | ⬜                                       |
+| Item                                                                           | Seção | Status                    |
+| ------------------------------------------------------------------------------ | ----- | ------------------------- |
+| Cargos master / admin / usuário                                                | 10    | 🟡 (super admin = master) |
+| Punições (atraso na abertura, expiração automática, ícone piscando; só master) | 2, 10 | ✅                        |
+| Reset de senha por admin/master                                                | 10    | ✅                        |
+| Insígnias                                                                      | 10    | ✅                        |
+| Chaves de funcionalidades                                                      | 10    | ✅                        |
+| Música de fundo                                                                | 10    | ✅                        |
+| Tela de logs de auditoria                                                      | 10    | ✅                        |
 
 ## Fase 4 — Finalização, ELO e histórico
 

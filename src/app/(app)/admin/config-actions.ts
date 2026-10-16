@@ -53,7 +53,8 @@ export async function addMap(name: string, shortName: string): Promise<ConfigRes
   if ("error" in auth) return { ok: false, message: auth.error! };
   const cleanName = name.trim().replace(/\s+/g, " ");
   const cleanShort = shortName.trim().slice(0, 8);
-  if (cleanName.length < 2 || cleanName.length > 30) return { ok: false, message: "Nome do mapa: de 2 a 30 caracteres." };
+  if (cleanName.length < 2 || cleanName.length > 30)
+    return { ok: false, message: "Nome do mapa: de 2 a 30 caracteres." };
   const s = slug(cleanName);
   if (!s) return { ok: false, message: "Nome do mapa inválido." };
   const id = `de_${s}`;
@@ -117,7 +118,12 @@ export async function reorderMaps(ids: string[]): Promise<ConfigResult> {
   if ("error" in auth) return { ok: false, message: auth.error! };
   if (!ids.length || new Set(ids).size !== ids.length) return { ok: false, message: "Ordem inválida." };
   const results = await Promise.all(
-    ids.map((id, i) => auth.admin.from("maps").update({ sort_order: i + 1 }).eq("id", id)),
+    ids.map((id, i) =>
+      auth.admin
+        .from("maps")
+        .update({ sort_order: i + 1 })
+        .eq("id", id),
+    ),
   );
   const failed = results.find((r) => r.error);
   if (failed?.error) return { ok: false, message: dbMessage(failed.error) };

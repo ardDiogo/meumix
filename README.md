@@ -106,7 +106,7 @@ O login usa **Supabase Auth** (e-mail e senha, confirmação por e-mail e recupe
 ### Ativando o login
 
 1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
-2. No **SQL Editor**, execute em ordem `supabase/migrations/0001_init.sql`, `0002_auth.sql`, `0003_registrations.sql`, `0004_votes_audit_realtime.sql`, `0005_draft.sql`, `0006_penalties_tiebreaker.sql`, `0007_elo_matches.sql`, `0008_full_name.sql`, `0009_steam.sql`, `0010_admin_config.sql`, `0011_match_stats.sql`, `0012_link_guests.sql`, `0013_csrep.sql` e `0014_team_suggestion.sql`.
+2. No **SQL Editor**, execute em ordem `supabase/migrations/0001_init.sql`, `0002_auth.sql`, `0003_registrations.sql`, `0004_votes_audit_realtime.sql`, `0005_draft.sql`, `0006_penalties_tiebreaker.sql`, `0007_elo_matches.sql`, `0008_full_name.sql`, `0009_steam.sql`, `0010_admin_config.sql`, `0011_match_stats.sql`, `0012_link_guests.sql`, `0013_csrep.sql`, `0014_team_suggestion.sql` e `0015_badges.sql`.
 3. Em **Authentication → URL Configuration**, defina **Site URL** como `https://meumix.vercel.app` e adicione `https://meumix.vercel.app/auth/callback` (e `http://localhost:3000/auth/callback`) em **Redirect URLs**.
 4. Na Vercel (**Settings → Environment Variables**), adicione `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` e `SUPER_ADMIN_EMAILS`, e faça um novo deploy.
 5. Opcional — leitura dos prints da GC por IA: adicione `GEMINI_API_KEY` (crie em https://aistudio.google.com/apikey). Envie um print por mapa com o nome do mapa no nome do arquivo (ex.: `mirage.png`).

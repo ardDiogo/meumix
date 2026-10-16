@@ -11,13 +11,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getDataSource } from "@/services";
 import { searchPlayers } from "@/services/queries";
 import { playerHref } from "@/lib/player-slug";
+import { BadgeIcon } from "@/components/badges/badge-icon";
+import { playerBadges } from "@/services/badges";
 
 export const metadata: Metadata = { title: "Jogadores" };
 
 export default async function PlayersPage({ searchParams }: PageProps<"/jogadores">) {
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.slice(0, 64) : "";
-  const results = await searchPlayers(query);
+  const [results, granted] = await Promise.all([searchPlayers(query), playerBadges()]);
+  const badgesOf = new Map<string, typeof granted>();
+  for (const b of granted) badgesOf.set(b.userId, [...(badgesOf.get(b.userId) ?? []), b]);
   const kind = getDataSource().kind;
 
   return (
@@ -45,7 +49,20 @@ export default async function PlayersPage({ searchParams }: PageProps<"/jogadore
                 <Avatar name={player.nickname} src={player.avatarUrl} size="md" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium group-hover:text-brand">{player.nickname}</div>
-                  <div className="text-xs text-muted">{player.steamId ? "Steam vinculada" : "Steam não vinculada"}</div>
+                  {badgesOf.get(player.id)?.length ? (
+                    <div className="mt-0.5 flex gap-1">
+                      {badgesOf
+                        .get(player.id)!
+                        .slice(0, 4)
+                        .map((b) => (
+                          <BadgeIcon key={b.id} icon={b.icon} color={b.color} size="xs" title={b.name} />
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted">
+                      {player.steamId ? "Steam vinculada" : "Steam não vinculada"}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right">
                   <div className="flex items-center gap-1.5">

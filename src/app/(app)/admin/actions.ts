@@ -57,6 +57,12 @@ export async function createMixSchedule(_prev: CreateMixState, formData: FormDat
     created_by: session!.id,
   });
   if (error) return { status: "error", message: "Não foi possível salvar o mix. Tente novamente." };
+  await audit({
+    action: "admin.schedule_create",
+    outcome: "success",
+    actorId: session!.id,
+    detail: { recorrencia: describeRecurrence(recurrence), horario: input.eventTime },
+  });
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
@@ -71,6 +77,7 @@ export async function deactivateSchedule(scheduleId: string): Promise<RoleChange
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
   const { error } = await admin.from("mix_schedules").update({ active: false }).eq("id", scheduleId);
   if (error) return { ok: false, message: "Não foi possível encerrar o mix." };
+  await audit({ action: "admin.schedule_end", outcome: "success", actorId: (await getSession())?.id, scheduleId });
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   return { ok: true, message: "Mix encerrado." };
@@ -99,6 +106,7 @@ export async function setUserRole(userId: string, role: PlatformRole): Promise<R
 
   const { error } = await admin.from("profiles").update({ role }).eq("id", userId);
   if (error) return { ok: false, message: "Não foi possível salvar a alteração." };
+  await audit({ action: "admin.set_role", outcome: "success", actorId: session!.id, detail: { userId, role } });
 
   revalidatePath("/admin");
   const name = target.user.email ?? "usuário";
@@ -173,7 +181,10 @@ export async function deactivatePenalty(penaltyId: string): Promise<RoleChangeRe
 /* ------------------------ Chaves de funcionalidades ----------------------- */
 
 /** Liga/desliga uma funcionalidade (admin). */
-export async function setFeature(key: "map_tiebreaker" | "team_suggestion", enabled: boolean): Promise<RoleChangeResult> {
+export async function setFeature(
+  key: "map_tiebreaker" | "team_suggestion",
+  enabled: boolean,
+): Promise<RoleChangeResult> {
   const session = await getSession();
   if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem alterar funcionalidades." };
   if (key !== "map_tiebreaker" && key !== "team_suggestion") {

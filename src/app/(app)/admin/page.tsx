@@ -5,6 +5,7 @@ import {
   KeyRound,
   Map as MapIcon,
   Music,
+  ScrollText,
   LockKeyhole,
   LogIn,
   Settings,
@@ -16,6 +17,11 @@ import {
 import type { Metadata } from "next";
 import { cache } from "react";
 import { BulkUsersForm } from "@/components/admin/bulk-users-form";
+import { AuditLogTable } from "@/components/admin/audit-log-table";
+import { BadgesAdmin } from "@/components/admin/badges-admin";
+import { AUDIT_CATEGORIES } from "@/lib/audit-labels";
+import { listAuditLog } from "@/services/audit-log";
+import { listBadges, playerBadges } from "@/services/badges";
 import { CreateMixForm } from "@/components/admin/create-mix-form";
 import { DeleteMixButton } from "@/components/admin/delete-mix-button";
 import { FinalizeSection } from "@/components/admin/finalize-section";
@@ -55,6 +61,7 @@ const TABS = {
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
   usuarios: { label: "Jogadores", icon: UsersRound },
+  logs: { label: "Logs", icon: ScrollText },
 } as const;
 type Tab = keyof typeof TABS;
 
@@ -86,7 +93,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
     );
   }
 
-  const { aba: rawTab } = await searchParams;
+  const params = await searchParams;
+  const rawTab = params.aba;
   // Punições agora ficam em Configurações (links antigos continuam funcionando).
   const aba = rawTab === "punicoes" ? "configuracoes" : rawTab;
   const visibleTabs = Object.keys(TABS) as Tab[];
@@ -149,14 +157,14 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           </div>
         </div>
       )}
-      {tab === "insignias" && (
-        <Card>
-          <EmptyState
-            icon={Award}
-            title="Insígnias ainda não implementadas"
-            description="Aqui você poderá criar insígnias e concedê-las aos jogadores por conquistas nos mixes."
-          />
-        </Card>
+      {tab === "insignias" && <BadgesTab />}
+      {tab === "logs" && (
+        <LogsTab
+          categoria={typeof params.categoria === "string" ? params.categoria : undefined}
+          resultado={typeof params.resultado === "string" ? params.resultado : undefined}
+          jogador={typeof params.jogador === "string" ? params.jogador : undefined}
+          pagina={typeof params.pagina === "string" ? Number(params.pagina) || 1 : 1}
+        />
       )}
       {tab === "usuarios" && (
         <div className="space-y-4">
@@ -197,6 +205,69 @@ async function UsersPanel({ canManageAdmins, currentUserId }: { canManageAdmins:
         />
       )}
     </Card>
+  );
+}
+
+async function BadgesTab() {
+  const [badges, granted, players] = await Promise.all([listBadges(), playerBadges(), getDataSource().listPlayers()]);
+  if (!badges) {
+    return (
+      <Card>
+        <EmptyState
+          icon={Award}
+          title="Insígnias não configuradas"
+          description="Rode a migração 0015_badges.sql no Supabase para criar e conceder insígnias."
+        />
+      </Card>
+    );
+  }
+  return (
+    <BadgesAdmin
+      badges={badges}
+      granted={granted}
+      players={players.map((p) => ({ id: p.id, name: p.nickname })).sort((a, b) => a.name.localeCompare(b.name))}
+    />
+  );
+}
+
+async function LogsTab({
+  categoria,
+  resultado,
+  jogador,
+  pagina,
+}: {
+  categoria?: string;
+  resultado?: string;
+  jogador?: string;
+  pagina: number;
+}) {
+  const category = categoria && categoria in AUDIT_CATEGORIES ? categoria : undefined;
+  const outcome = resultado === "sucesso" ? "success" : resultado === "recusado" ? "other" : undefined;
+  const actorId = jogador && /^[0-9a-f-]{36}$/i.test(jogador) ? jogador : undefined;
+  const [result, players] = await Promise.all([
+    listAuditLog({ category, outcome, actorId, page: pagina }),
+    getDataSource().listPlayers(),
+  ]);
+  if (!result) {
+    return (
+      <Card>
+        <EmptyState
+          icon={ScrollText}
+          title="Logs indisponíveis"
+          description="Defina SUPABASE_SECRET_KEY na Vercel para ver os logs."
+        />
+      </Card>
+    );
+  }
+  return (
+    <AuditLogTable
+      rows={result.rows}
+      names={result.names}
+      hasMore={result.hasMore}
+      page={pagina}
+      filters={{ categoria: category, resultado, jogador: actorId }}
+      players={players.map((p) => ({ id: p.id, name: p.nickname })).sort((a, b) => a.name.localeCompare(b.name))}
+    />
   );
 }
 
