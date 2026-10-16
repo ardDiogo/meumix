@@ -4,12 +4,12 @@ import { AlertCircle, CalendarPlus, Info, Loader2 } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createMixSchedule, type CreateMixState } from "@/app/(app)/admin/actions";
-import { describeRecurrence, nextOccurrence, parseSchedule, WEEKDAYS } from "@/lib/mix-schedule";
+import { communityToday, describeRecurrence, nextOccurrence, parseSchedule, WEEKDAYS } from "@/lib/mix-schedule";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { Input, Label, Select } from "../ui/input";
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+const todayISO = () => communityToday(new Date());
 
 export function CreateMixForm() {
   const [state, action, pending] = useActionState<CreateMixState, FormData>(createMixSchedule, { status: "idle" });
@@ -19,8 +19,8 @@ export function CreateMixForm() {
   const [registrationOpensAt, setRegistrationOpensAt] = useState("12:00");
 
   useEffect(() => {
-    if (state.status === "not_persisted") toast.info("Mix validado, mas não foi salvo", { description: state.message });
-    if (state.status === "denied") toast.error(state.message);
+    if (state.status === "saved") toast.success(state.message);
+    if (state.status === "error") toast.error(state.message);
   }, [state]);
 
   const errors = state.status === "invalid" ? state.errors : {};
@@ -113,9 +113,6 @@ export function CreateMixForm() {
             {pending ? <Loader2 className="animate-spin" /> : <CalendarPlus />}
             {pending ? "Criando…" : "Criar mix"}
           </Button>
-          <p className="text-center text-xs text-subtle">
-            O salvamento será habilitado quando o banco de dados for conectado.
-          </p>
         </form>
       </CardContent>
     </Card>

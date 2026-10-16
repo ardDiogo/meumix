@@ -100,7 +100,7 @@ O login usa **Supabase Auth** (e-mail e senha, confirmação por e-mail e recupe
 ### Ativando o login
 
 1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
-2. No **SQL Editor**, execute `supabase/migrations/0001_init.sql` e depois `0002_auth.sql`.
+2. No **SQL Editor**, execute em ordem `supabase/migrations/0001_init.sql`, `0002_auth.sql` e `0003_registrations.sql`.
 3. Em **Authentication → URL Configuration**, defina **Site URL** como `https://meumix.vercel.app` e adicione `https://meumix.vercel.app/auth/callback` (e `http://localhost:3000/auth/callback`) em **Redirect URLs**.
 4. Na Vercel (**Settings → Environment Variables**), adicione `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` e `SUPER_ADMIN_EMAILS`, e faça um novo deploy.
 

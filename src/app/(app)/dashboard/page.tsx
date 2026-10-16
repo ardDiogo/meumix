@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { DemoBadge } from "@/components/demo-notice";
 import { MixList } from "@/components/mixes/mix-list";
+import { NextMixPanel } from "@/components/registrations/next-mix-panel";
 import { PageHeader } from "@/components/page-header";
 import { Delta } from "@/components/stats/delta";
 import { EloChart } from "@/components/stats/elo-chart";
@@ -25,7 +26,10 @@ export const metadata: Metadata = { title: "Dashboard" };
 const RECENT_WINDOW = 10;
 
 export default async function DashboardPage() {
-  const [{ kind, profile, highlights }, { canManageMixes }] = await Promise.all([getDashboard(), getPermissions()]);
+  const [{ kind, profile, highlights }, { session, canManageMixes }] = await Promise.all([
+    getDashboard(),
+    getPermissions(),
+  ]);
 
   if (!profile || !highlights) {
     return (
@@ -55,7 +59,7 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader
-        eyebrow={`Olá, ${player.nickname}`}
+        eyebrow={session ? `Olá, ${session.displayName}` : undefined}
         title="Dashboard"
         description="Seu resumo competitivo na comunidade."
         actions={
@@ -71,6 +75,8 @@ export default async function DashboardPage() {
           </>
         }
       />
+
+      <NextMixPanel />
 
       {/* Resumo competitivo */}
       <section aria-label="Resumo competitivo" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">

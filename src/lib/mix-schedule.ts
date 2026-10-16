@@ -64,11 +64,79 @@ export function parseSchedule(
   return { recurrence, errors };
 }
 
-/** Próxima data (AAAA-MM-DD) do evento a partir de `from` (inclusive). */
+/* ------------------------------------------------------------------------ *
+ * Datas no fuso da comunidade. O Brasil não tem horário de verão desde 2019,
+ * então Brasília é sempre UTC−3.
+ * ------------------------------------------------------------------------ */
+export const COMMUNITY_UTC_OFFSET = "-03:00";
+const OFFSET_MS = -3 * 3_600_000;
+/** Por quanto tempo depois do início um mix continua sendo o "atual". */
+export const EVENT_GRACE_MS = 4 * 3_600_000;
+
+/** Data de hoje (AAAA-MM-DD) no fuso da comunidade. */
+export function communityToday(now: Date) {
+  return new Date(now.getTime() + OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Converte data + hora locais da comunidade em um instante. */
+export function communityInstant(date: string, hhmm: string) {
+  return new Date(`${date}T${hhmm.slice(0, 5)}:00${COMMUNITY_UTC_OFFSET}`);
+}
+
+function addDays(date: string, days: number) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Próxima data (AAAA-MM-DD) do evento a partir de hoje (inclusive), no fuso da comunidade. */
 export function nextOccurrence(r: MixRecurrence, from: Date): string {
   if (r.kind === "once") return r.date;
-  const d = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
-  const diff = (r.weekday - d.getUTCDay() + 7) % 7;
-  d.setUTCDate(d.getUTCDate() + diff);
-  return d.toISOString().slice(0, 10);
+  const today = communityToday(from);
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  return addDays(today, (r.weekday - weekday + 7) % 7);
+}
+
+export interface Occurrence {
+  date: string;
+  eventAt: Date;
+  opensAt: Date;
+}
+
+/**
+ * Ocorrência "atual" de uma agenda: a próxima ainda não encerrada (um mix
+ * continua atual por `EVENT_GRACE_MS` após o início). `null` se não houver.
+ */
+export function currentOccurrence(
+  schedule: { recurrence: MixRecurrence; eventTime: string; registrationOpensAt: string },
+  now: Date,
+): Occurrence | null {
+  const build = (date: string): Occurrence => ({
+    date,
+    eventAt: communityInstant(date, schedule.eventTime),
+    opensAt: communityInstant(date, schedule.registrationOpensAt),
+  });
+  const ended = (o: Occurrence) => now.getTime() > o.eventAt.getTime() + EVENT_GRACE_MS;
+
+  if (schedule.recurrence.kind === "once") {
+    const o = build(schedule.recurrence.date);
+    return ended(o) ? null : o;
+  }
+  // Começa pela ocorrência de ontem para cobrir mixes que viram a meia-noite.
+  let date = nextOccurrence(schedule.recurrence, new Date(now.getTime() - 86_400_000));
+  for (let i = 0; i < 3; i++) {
+    const o = build(date);
+    if (!ended(o)) return o;
+    date = addDays(date, 7);
+  }
+  return null;
+}
+
+export type RegistrationWindow = "not_open" | "open" | "closed";
+
+/** Inscrições: abrem em `opensAt` e fecham no início do evento. */
+export function registrationWindow(o: Occurrence, now: Date): RegistrationWindow {
+  if (now < o.opensAt) return "not_open";
+  if (now < o.eventAt) return "open";
+  return "closed";
 }

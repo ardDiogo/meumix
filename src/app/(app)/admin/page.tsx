@@ -1,6 +1,7 @@
 import { Award, CalendarClock, KeyRound, LockKeyhole, LogIn, Settings, Swords, UsersRound } from "lucide-react";
 import type { Metadata } from "next";
 import { CreateMixForm } from "@/components/admin/create-mix-form";
+import { ScheduleList } from "@/components/admin/schedule-list";
 import { UsersTable } from "@/components/admin/users-table";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -14,6 +15,7 @@ import { mapName } from "@/lib/maps";
 import { getDataSource } from "@/services";
 import { listManagedUsers } from "@/services/admin-users";
 import { getPermissions } from "@/services/auth";
+import { listSchedules } from "@/services/mix-events";
 
 export const metadata: Metadata = { title: "Painel administrativo" };
 
@@ -56,7 +58,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const { aba } = await searchParams;
   const visibleTabs = (Object.keys(TABS) as Tab[]).filter((t) => t !== "usuarios" || canManageAdmins);
   const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
-  const upcoming = await getDataSource().listMixes({ status: ["scheduled", "live"] });
+  const [schedules, upcoming] = await Promise.all([
+    listSchedules(),
+    getDataSource().listMixes({ status: ["scheduled", "live"] }),
+  ]);
 
   return (
     <>
@@ -79,8 +84,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
           <CreateMixForm />
           <Card className="self-start">
-            <CardHeader title="Mixes agendados" />
-            {upcoming.length ? (
+            <CardHeader title="Mixes ativos" />
+            {schedules ? (
+              <ScheduleList schedules={schedules} />
+            ) : upcoming.length ? (
               <ul className="divide-y divide-border">
                 {upcoming.map((m) => (
                   <li key={m.id}>

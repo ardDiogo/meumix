@@ -2,15 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { canManageAdmins, canManageMixes, isSuperAdminEmail, type PlatformRole } from "@/lib/auth/permissions";
-import { parseSchedule, type ScheduleErrors } from "@/lib/mix-schedule";
+import { communityToday, describeRecurrence, parseSchedule, type ScheduleErrors } from "@/lib/mix-schedule";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSession } from "@/services/auth";
+import { DEFAULT_COMMUNITY_SLUG } from "@/services/mix-events";
 
 export type CreateMixState =
   | { status: "idle" }
   | { status: "invalid"; errors: ScheduleErrors }
-  | { status: "denied"; message: string }
-  | { status: "not_persisted"; message: string };
+  | { status: "error"; message: string }
+  | { status: "saved"; message: string };
 
 /**
  * Cria um evento de mix. A permissão é SEMPRE verificada aqui no servidor —
@@ -19,26 +20,55 @@ export type CreateMixState =
 export async function createMixSchedule(_prev: CreateMixState, formData: FormData): Promise<CreateMixState> {
   const session = await getSession();
   if (!canManageMixes(session)) {
-    return { status: "denied", message: "Apenas administradores podem criar mixes." };
+    return { status: "error", message: "Apenas administradores podem criar mixes." };
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const { errors } = parseSchedule(
-    {
-      recurrence: String(formData.get("recurrence") ?? ""),
-      date: String(formData.get("date") ?? ""),
-      eventTime: String(formData.get("eventTime") ?? ""),
-      registrationOpensAt: String(formData.get("registrationOpensAt") ?? ""),
-    },
-    today,
-  );
+  const input = {
+    recurrence: String(formData.get("recurrence") ?? ""),
+    date: String(formData.get("date") ?? ""),
+    eventTime: String(formData.get("eventTime") ?? ""),
+    registrationOpensAt: String(formData.get("registrationOpensAt") ?? ""),
+  };
+  const { recurrence, errors } = parseSchedule(input, communityToday(new Date()));
   if (Object.keys(errors).length) return { status: "invalid", errors };
 
-  // TODO: gravar em `mix_schedules` quando a fonte Supabase estiver implementada.
-  return {
-    status: "not_persisted",
-    message: "Dados válidos, mas o mix não foi salvo: o banco de dados ainda não está conectado.",
-  };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { status: "error", message: "O banco de dados não está configurado no servidor." };
+
+  const { data: community } = await admin
+    .from("communities")
+    .select("id")
+    .eq("slug", DEFAULT_COMMUNITY_SLUG)
+    .maybeSingle();
+  if (!community) return { status: "error", message: "Comunidade padrão não encontrada. Rode a migração 0003." };
+
+  const { error } = await admin.from("mix_schedules").insert({
+    community_id: community.id,
+    recurrence_kind: recurrence.kind,
+    weekday: recurrence.kind === "weekly" ? recurrence.weekday : null,
+    event_date: recurrence.kind === "once" ? recurrence.date : null,
+    event_time: input.eventTime,
+    registration_opens_at: input.registrationOpensAt,
+    created_by: session!.id,
+  });
+  if (error) return { status: "error", message: "Não foi possível salvar o mix. Tente novamente." };
+
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  return { status: "saved", message: `Mix criado: ${describeRecurrence(recurrence)} às ${input.eventTime}.` };
+}
+
+/** Desativa uma agenda de mix (deixa de aparecer para inscrições). */
+export async function deactivateSchedule(scheduleId: string): Promise<RoleChangeResult> {
+  if (!canManageMixes(await getSession()))
+    return { ok: false, message: "Apenas administradores podem encerrar mixes." };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
+  const { error } = await admin.from("mix_schedules").update({ active: false }).eq("id", scheduleId);
+  if (error) return { ok: false, message: "Não foi possível encerrar o mix." };
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Mix encerrado." };
 }
 
 export type RoleChangeResult = { ok: true; message: string } | { ok: false; message: string };
