@@ -110,6 +110,8 @@ export interface Occurrence {
 export function currentOccurrence(
   schedule: { recurrence: MixRecurrence; eventTime: string; registrationOpensAt: string },
   now: Date,
+  /** Datas a pular (ex.: mix deletado pelo admin). */
+  skip: (date: string) => boolean = () => false,
 ): Occurrence | null {
   const build = (date: string): Occurrence => ({
     date,
@@ -120,13 +122,13 @@ export function currentOccurrence(
 
   if (schedule.recurrence.kind === "once") {
     const o = build(schedule.recurrence.date);
-    return ended(o) ? null : o;
+    return ended(o) || skip(o.date) ? null : o;
   }
   // Começa pela ocorrência de ontem para cobrir mixes que viram a meia-noite.
   let date = nextOccurrence(schedule.recurrence, new Date(now.getTime() - 86_400_000));
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const o = build(date);
-    if (!ended(o)) return o;
+    if (!ended(o) && !skip(date)) return o;
     date = addDays(date, 7);
   }
   return null;

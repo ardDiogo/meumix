@@ -62,3 +62,26 @@ export async function activePenalties(userIds?: string[]): Promise<Map<string, P
   }
   return result;
 }
+
+export interface PenaltyHistoryEntry extends Penalty {
+  isActive: boolean;
+  appliedBy: string | null;
+}
+
+/** Todas as punições (ativas e encerradas), da mais recente para a mais antiga. */
+export async function penaltyHistory(limit = 100): Promise<PenaltyHistoryEntry[]> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return [];
+  const { data, error } = await admin
+    .from("user_penalties")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return [];
+  const now = Date.now();
+  return (data as (Row & { is_active: boolean; applied_by: string | null })[]).map((r) => ({
+    ...toPenalty(r),
+    isActive: r.is_active && !(r.expires_at && new Date(r.expires_at).getTime() < now),
+    appliedBy: r.applied_by,
+  }));
+}

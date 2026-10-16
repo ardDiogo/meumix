@@ -1,9 +1,12 @@
+"use client";
+
 import { levelForElo } from "@/lib/levels";
 import { cn } from "@/lib/utils";
+import { useLevels } from "./levels-context";
 
-/** Selo do nível (1–10) calculado pelo ELO. */
+/** Selo do nível (1–10) calculado pelo ELO com as faixas do admin. */
 export function LevelBadge({ elo, className, size = "sm" }: { elo: number; className?: string; size?: "sm" | "md" }) {
-  const l = levelForElo(elo);
+  const l = levelForElo(elo, useLevels());
   return (
     <span
       title={`Nível ${l.level} (${l.min}–${l.max} de ELO)`}

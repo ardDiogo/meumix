@@ -1,15 +1,16 @@
 "use client";
 
-import { ImageUp, Loader2, Sparkles, X } from "lucide-react";
+import { Loader2, Upload, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { analyzeGcPrint } from "@/app/(app)/admin/finalizar/ocr";
 import { mapIdFromName, mergeMaps, type MergedResult, type OcrMap } from "@/lib/gc-ocr";
+import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardHeader } from "../ui/card";
 
 const MAX_FILES = 5;
 const MAX_SIDE = 1800;
+const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
 
 /** Reduz a imagem no navegador (máx. 1800px, JPEG) e devolve base64 sem prefixo. */
 async function compress(file: File): Promise<{ mimeType: string; data: string }> {
@@ -23,21 +24,31 @@ async function compress(file: File): Promise<{ mimeType: string; data: string }>
   return { mimeType: "image/jpeg", data: dataUrl.slice(dataUrl.indexOf(",") + 1) };
 }
 
-/**
- * Envio dos prints do placar da GC (um por mapa, na ordem da série).
- * Cada print é lido pela IA no servidor; a junção dos mapas é feita aqui.
- */
 const baseName = (file: File) => file.name.replace(/\.[^.]+$/, "");
 
+/**
+ * Envio dos prints do placar da GC (um por mapa, na ordem da série): arraste
+ * ou clique. Cada print é lido pela IA no servidor; a junção é feita aqui.
+ */
 export function GcImport({
   maps: knownMaps,
   onImported,
 }: {
-  maps: { id: string; name: string }[];
+  maps: { id: string; name: string; shortName?: string | null }[];
   onImported: (result: MergedResult) => void;
 }) {
   const [files, setFiles] = useState<File[]>([]);
   const [progress, setProgress] = useState<string | null>(null);
+  const [over, setOver] = useState(false);
+
+  function pick(list: FileList | File[]) {
+    const images = [...list].filter((f) => ACCEPTED.includes(f.type));
+    if (images.length < [...list].length) toast.error("Envie apenas imagens PNG, JPG ou WEBP.");
+    if (!images.length) return;
+    const next = [...files, ...images].slice(0, MAX_FILES);
+    if (files.length + images.length > MAX_FILES) toast.error(`No máximo ${MAX_FILES} prints (um por mapa).`);
+    setFiles(next);
+  }
 
   async function run() {
     const maps: OcrMap[] = [];
@@ -66,67 +77,80 @@ export function GcImport({
   }
 
   return (
-    <Card>
-      <CardHeader
-        title="Importar prints da Gamers Club"
-        description="Envie o print do placar de cada mapa, na ordem da série, com o nome do mapa no nome do arquivo (ex.: mirage.png). A IA preenche placar e estatísticas — confira antes de finalizar."
-        action={<Sparkles className="size-4 text-brand" aria-hidden />}
-      />
-      <CardContent className="space-y-3">
-        <label className="flex cursor-pointer flex-col items-center gap-2 rounded-md border border-dashed border-border-strong bg-surface-2/50 px-4 py-6 text-center text-sm text-muted transition-colors hover:border-brand hover:text-fg">
-          <ImageUp className="size-6" aria-hidden />
-          <span>
-            <span className="font-medium text-fg">Escolher prints</span> (PNG ou JPG, até {MAX_FILES})
-          </span>
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            multiple
-            className="sr-only"
-            onChange={(e) => {
-              const picked = [...(e.target.files ?? [])].slice(0, MAX_FILES);
-              setFiles(picked);
-              e.target.value = "";
-            }}
-          />
-        </label>
-        {files.length > 0 && (
+    <div className="space-y-3">
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          if (!progress) pick(e.dataTransfer.files);
+        }}
+        className={cn(
+          "flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-4 py-10 text-center transition-colors",
+          over ? "border-brand bg-brand/5" : "border-border-strong bg-surface-2/40 hover:border-brand/60",
+        )}
+      >
+        <Upload className={cn("size-10", over ? "text-brand" : "text-muted")} aria-hidden />
+        <span className="font-display text-lg font-semibold">Enviar prints do placar</span>
+        <span className="text-sm text-muted">Arraste e solte ou clique para enviar várias imagens</span>
+        <span className="text-xs font-medium text-brand">
+          JPG, PNG ou WEBP · até {MAX_FILES} · nome do arquivo = nome do mapa (ex.: mirage.png)
+        </span>
+        <input
+          type="file"
+          accept={ACCEPTED.join(",")}
+          multiple
+          className="sr-only"
+          disabled={!!progress}
+          onChange={(e) => {
+            pick(e.target.files ?? []);
+            e.target.value = "";
+          }}
+        />
+      </label>
+      {files.length > 0 && (
+        <>
           <ol className="space-y-1 text-sm">
-            {files.map((f, i) => (
-              <li
-                key={`${f.name}-${i}`}
-                className="flex items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-1.5"
-              >
-                <span className="truncate">
-                  <span className="mr-2 text-xs font-semibold text-muted">Mapa {i + 1}</span>
-                  {f.name}
-                  {(() => {
-                    const id = mapIdFromName(baseName(f), knownMaps);
-                    const name = knownMaps.find((m) => m.id === id)?.name;
-                    return name ? (
+            {files.map((f, i) => {
+              const id = mapIdFromName(baseName(f), knownMaps);
+              const name = knownMaps.find((m) => m.id === id)?.name;
+              return (
+                <li
+                  key={`${f.name}-${i}`}
+                  className="flex items-center justify-between gap-2 rounded-md bg-surface-2 px-3 py-1.5"
+                >
+                  <span className="truncate">
+                    <span className="mr-2 text-xs font-semibold text-muted">Mapa {i + 1}</span>
+                    {f.name}
+                    {name ? (
                       <span className="ml-2 text-xs font-semibold text-win">→ {name}</span>
                     ) : (
                       <span className="ml-2 text-xs text-loss">mapa não reconhecido pelo nome</span>
-                    );
-                  })()}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Remover ${f.name}`}
-                  onClick={() => setFiles((l) => l.filter((_, j) => j !== i))}
-                  className="text-muted hover:text-loss"
-                >
-                  <X className="size-4" />
-                </button>
-              </li>
-            ))}
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Remover ${f.name}`}
+                    disabled={!!progress}
+                    onClick={() => setFiles((l) => l.filter((_, j) => j !== i))}
+                    className="text-muted hover:text-loss"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </li>
+              );
+            })}
           </ol>
-        )}
-        <Button variant="secondary" className="w-full" disabled={!files.length || !!progress} onClick={run}>
-          {progress ? <Loader2 className="animate-spin" /> : <Sparkles />}
-          {progress ?? "Ler prints com IA"}
-        </Button>
-      </CardContent>
-    </Card>
+          <Button variant="primary" className="w-full" disabled={!!progress} onClick={run}>
+            {progress ? <Loader2 className="animate-spin" /> : <Upload />}
+            {progress ?? `Ler ${files.length > 1 ? `${files.length} prints` : "print"} com IA`}
+          </Button>
+        </>
+      )}
+    </div>
   );
 }

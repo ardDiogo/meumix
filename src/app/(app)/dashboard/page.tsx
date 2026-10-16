@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { eloChangeSince, toEloSeries } from "@/lib/elo";
-import { ELO_CAP, LEVELS, levelForElo } from "@/lib/levels";
+import { ELO_CAP, levelForElo, type LevelDef } from "@/lib/levels";
+import { getLevels } from "@/services/levels";
 import { formatDate, formatDecimal, formatPercent } from "@/lib/format";
 import { mapName } from "@/lib/maps";
 import { aggregatePlayer } from "@/lib/stats";
@@ -74,6 +75,7 @@ export default async function DashboardPage() {
     player.id,
     recent.map((r) => r.mix),
   );
+  const levels = await getLevels();
   const elo30d = eloChangeSince(eloHistory, new Date(ds.now().getTime() - 30 * 86_400_000));
 
   return (
@@ -106,7 +108,7 @@ export default async function DashboardPage() {
           accent
           hint={
             <span className="flex items-center gap-1">
-              Nível {levelForElo(elo).level} · <Delta value={elo30d} /> 30d
+              Nível {levelForElo(elo, levels).level} · <Delta value={elo30d} /> 30d
             </span>
           }
         />
@@ -212,7 +214,7 @@ export default async function DashboardPage() {
         </Card>
 
         {/* Nível */}
-        <LevelCard elo={elo} />
+        <LevelCard elo={elo} levels={levels} />
       </div>
     </>
   );
@@ -289,9 +291,9 @@ function HighlightItem({
   );
 }
 
-function LevelCard({ elo }: { elo: number }) {
-  const current = levelForElo(elo);
-  const next = LEVELS.find((l) => l.level === current.level + 1);
+function LevelCard({ elo, levels }: { elo: number; levels: LevelDef[] }) {
+  const current = levelForElo(elo, levels);
+  const next = levels.find((l) => l.level === current.level + 1);
   const progress = next ? Math.round(((elo - current.min) / (next.min - current.min)) * 100) : 100;
   return (
     <Card>

@@ -16,7 +16,7 @@ insert into public.level_configs (level, elo_min, elo_max, color) values
   (4, 350, 499, '#eab308'), (5, 500, 659, '#eab308'), (6, 660, 829, '#eab308'),
   (7, 830, 1009, '#f97316'), (8, 1010, 1209, '#f97316'), (9, 1210, 1459, '#ef4444'),
   (10, 1460, 1600, '#ef4444')
-on conflict (level) do update set elo_min = excluded.elo_min, elo_max = excluded.elo_max, color = excluded.color;
+on conflict (level) do nothing;
 alter table public.level_configs enable row level security;
 drop policy if exists "leitura publica" on public.level_configs;
 create policy "leitura publica" on public.level_configs for select using (true);

@@ -3,16 +3,26 @@ import {
   CalendarClock,
   Flag,
   KeyRound,
+  Map as MapIcon,
+  Music,
   LockKeyhole,
   LogIn,
   Settings,
   ShieldAlert,
   Swords,
+  Trophy,
   UsersRound,
 } from "lucide-react";
 import type { Metadata } from "next";
+import { cache } from "react";
 import { BulkUsersForm } from "@/components/admin/bulk-users-form";
 import { CreateMixForm } from "@/components/admin/create-mix-form";
+import { DeleteMixButton } from "@/components/admin/delete-mix-button";
+import { FinalizeSection } from "@/components/admin/finalize-section";
+import { GcExample } from "@/components/admin/gc-example";
+import { LevelsEditor } from "@/components/admin/levels-editor";
+import { MapsManager } from "@/components/admin/maps-manager";
+import { MusicSettings } from "@/components/admin/music-settings";
 import { ScheduleList } from "@/components/admin/schedule-list";
 import { FeatureToggles } from "@/components/admin/feature-toggles";
 import { PenaltiesPanel } from "@/components/admin/penalties-panel";
@@ -21,7 +31,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { StatusBadge } from "@/components/mixes/badges";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterTabs } from "@/components/ui/filter-tabs";
 import { formatDateTime } from "@/lib/format";
@@ -29,18 +39,22 @@ import { mapName } from "@/lib/maps";
 import { getDataSource } from "@/services";
 import { listManagedUsers } from "@/services/admin-users";
 import { getFeatures } from "@/services/features";
-import { activePenalties } from "@/services/penalties";
+import { activePenalties, penaltyHistory } from "@/services/penalties";
+import { getLevels } from "@/services/levels";
+import { listAllMaps } from "@/services/maps";
+import { getAppSetting } from "@/services/settings";
 import { getPermissions } from "@/services/auth";
-import { listPendingFinalization, listSchedules } from "@/services/mix-events";
+import { getNextMix, listPendingFinalization, listSchedules } from "@/services/mix-events";
 
 export const metadata: Metadata = { title: "Painel administrativo" };
+// A leitura dos prints por IA (finalização no painel) pode levar alguns segundos por imagem.
+export const maxDuration = 60;
 
 const TABS = {
   mix: { label: "Controle de mix", icon: Swords },
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
   usuarios: { label: "Usuários", icon: UsersRound },
-  punicoes: { label: "Punições", icon: ShieldAlert },
 } as const;
 type Tab = keyof typeof TABS;
 
@@ -72,10 +86,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
     );
   }
 
-  const { aba } = await searchParams;
-  const visibleTabs = (Object.keys(TABS) as Tab[]).filter(
-    (t) => (t !== "usuarios" && t !== "punicoes") || canManageAdmins,
-  );
+  const { aba: rawTab } = await searchParams;
+  // Punições agora ficam em Configurações (links antigos continuam funcionando).
+  const aba = rawTab === "punicoes" ? "configuracoes" : rawTab;
+  const visibleTabs = (Object.keys(TABS) as Tab[]).filter((t) => t !== "usuarios" || canManageAdmins);
   const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
   const [schedules, upcoming] = await Promise.all([
     listSchedules(),
@@ -100,35 +114,39 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       />
 
       {tab === "mix" && (
-        <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
-          <div className="space-y-4">
-            <CreateMixForm />
-            <PendingFinalization />
+        <div className="space-y-4">
+          <CurrentMix viewerId={session!.id} />
+          <GcExample />
+          <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
+            <div className="space-y-4">
+              <CreateMixForm />
+              <PendingFinalization viewerId={session!.id} />
+            </div>
+            <Card className="self-start">
+              <CardHeader title="Mixes ativos" />
+              {schedules ? (
+                <ScheduleList schedules={schedules} />
+              ) : upcoming.length ? (
+                <ul className="divide-y divide-border">
+                  {upcoming.map((m) => (
+                    <li key={m.id}>
+                      <Link href={`/mixes/${m.id}`} className="block px-4 py-3 transition-colors hover:bg-surface-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium">{m.name}</span>
+                          <StatusBadge status={m.status} />
+                        </div>
+                        <div className="mt-0.5 text-xs text-muted">
+                          {formatDateTime(m.scheduledAt)} · {m.maps.map((x) => mapName(x.mapId)).join(", ")}
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <EmptyState icon={CalendarClock} title="Nenhum mix agendado" className="py-8" />
+              )}
+            </Card>
           </div>
-          <Card className="self-start">
-            <CardHeader title="Mixes ativos" />
-            {schedules ? (
-              <ScheduleList schedules={schedules} />
-            ) : upcoming.length ? (
-              <ul className="divide-y divide-border">
-                {upcoming.map((m) => (
-                  <li key={m.id}>
-                    <Link href={`/mixes/${m.id}`} className="block px-4 py-3 transition-colors hover:bg-surface-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{m.name}</span>
-                        <StatusBadge status={m.status} />
-                      </div>
-                      <div className="mt-0.5 text-xs text-muted">
-                        {formatDateTime(m.scheduledAt)} · {m.maps.map((x) => mapName(x.mapId)).join(", ")}
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState icon={CalendarClock} title="Nenhum mix agendado" className="py-8" />
-            )}
-          </Card>
         </div>
       )}
       {tab === "insignias" && (
@@ -146,13 +164,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           <UsersPanel />
         </div>
       )}
-      {tab === "punicoes" && <PenaltiesTab />}
-      {tab === "configuracoes" && (
-        <Card>
-          <CardHeader title="Funcionalidades" description="Ligue ou desligue recursos do mix." />
-          <FeatureToggles values={await getFeatures()} />
-        </Card>
-      )}
+      {tab === "configuracoes" && <SettingsTab canManageAdmins={canManageAdmins} />}
     </>
   );
 }
@@ -188,8 +200,69 @@ async function UsersPanel() {
   );
 }
 
-async function PenaltiesTab() {
-  const [users, penalties] = await Promise.all([listManagedUsers(), activePenalties()]);
+async function SettingsTab({ canManageAdmins }: { canManageAdmins: boolean }) {
+  const [features, musicUrl, maps, levels] = await Promise.all([
+    getFeatures(),
+    getAppSetting("music_url"),
+    listAllMaps(),
+    getLevels(),
+  ]);
+  const title = (Icon: typeof Settings, text: string, className?: string) => (
+    <span className="flex items-center gap-2">
+      <Icon className={className ?? "size-4 text-muted"} aria-hidden /> {text}
+    </span>
+  );
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader
+          title={title(UsersRound, "Funcionalidades do mix")}
+          description="Ative ou desative funcionalidades do mix."
+        />
+        <FeatureToggles values={features} />
+      </Card>
+      <Card>
+        <CardHeader
+          title={title(Music, "Música de fundo")}
+          description="Toca automaticamente uma música ao abrir o site. Alguns navegadores exigem um clique inicial antes de liberar o áudio."
+        />
+        <MusicSettings enabled={features.background_music} url={musicUrl} />
+      </Card>
+      {canManageAdmins && (
+        <div>
+          <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-bold">
+            <ShieldAlert className="size-5 text-loss" aria-hidden /> Punições
+          </h2>
+          <p className="mb-3 text-sm text-muted">Aplique um delay de inscrição como punição a jogadores específicos.</p>
+          <PenaltiesSection />
+        </div>
+      )}
+      <Card>
+        <CardHeader
+          title={title(MapIcon, "Gerenciamento de mapas")}
+          description="Configure os mapas disponíveis para votação nos mixes. Arraste para reordenar."
+        />
+        {maps.length ? (
+          <MapsManager maps={maps} />
+        ) : (
+          <CardContent>
+            <p className="text-sm text-muted">Banco de dados não configurado.</p>
+          </CardContent>
+        )}
+      </Card>
+      <Card>
+        <CardHeader
+          title={title(Trophy, "Configuração de níveis")}
+          description="Configure os níveis de ELO e suas faixas de pontuação. Os jogadores são classificados automaticamente com base no ELO acumulado nos resultados dos mixes."
+        />
+        <LevelsEditor levels={levels} canEdit={canManageAdmins} />
+      </Card>
+    </div>
+  );
+}
+
+async function PenaltiesSection() {
+  const [users, penalties, history] = await Promise.all([listManagedUsers(), activePenalties(), penaltyHistory()]);
   const list = users.status === "ok" ? users.users : [];
   const names = new Map(list.map((u) => [u.id, u.displayName]));
   return (
@@ -203,12 +276,93 @@ async function PenaltiesTab() {
         expiresAt: p.expiresAt,
         createdAt: p.createdAt,
       }))}
+      history={history.map((p) => ({
+        id: p.id,
+        userName: names.get(p.userId) ?? "Jogador",
+        delaySeconds: p.delaySeconds,
+        reason: p.reason,
+        expiresAt: p.expiresAt,
+        createdAt: p.createdAt,
+        isActive: p.isActive,
+        appliedBy: (p.appliedBy && names.get(p.appliedBy)) || "—",
+      }))}
     />
   );
 }
 
-async function PendingFinalization() {
-  const pending = await listPendingFinalization();
+const brDate = (date: string) => date.split("-").reverse().join("/");
+
+/** "Mix atual" (padrão do painel): evento, deletar e finalizar com os prints. */
+const resolveCurrentMix = cache(async (viewerId: string) => {
+  const [next, pending] = await Promise.all([getNextMix(viewerId), listPendingFinalization()]);
+  const current = next.status === "ok" ? next.mix : null;
+  const started = !!current && getDataSource().now().getTime() >= current.occurrence.eventAt.getTime();
+  const pendingOther = pending.find(
+    (p) => !(current && p.scheduleId === current.schedule.id && p.date === current.occurrence.date),
+  );
+  const target =
+    started && current && !current.finalizedMatchId
+      ? { scheduleId: current.schedule.id, date: current.occurrence.date }
+      : pendingOther
+        ? { scheduleId: pendingOther.scheduleId, date: pendingOther.date }
+        : null;
+  return { current, target, pending };
+});
+
+async function CurrentMix({ viewerId }: { viewerId: string }) {
+  const { current, target } = await resolveCurrentMix(viewerId);
+
+  return (
+    <Card className="border-win/40">
+      <CardHeader
+        title="Mix atual"
+        description={
+          current
+            ? `Evento: ${brDate(current.occurrence.date)} às ${current.schedule.eventTime} · ${current.registrations.length} inscritos`
+            : "Nenhum mix agendado no momento. Crie um mix abaixo."
+        }
+      />
+      <CardContent className="space-y-5">
+        {current && !current.finalizedMatchId && (
+          <DeleteMixButton
+            scheduleId={current.schedule.id}
+            date={current.occurrence.date}
+            label={`${brDate(current.occurrence.date)} às ${current.schedule.eventTime}`}
+          />
+        )}
+        {current?.finalizedMatchId && (
+          <Button variant="outline" className="w-full" asChild>
+            <Link href={`/mixes/${current.finalizedMatchId}`}>
+              <Flag /> Mix finalizado — ver resultado
+            </Link>
+          </Button>
+        )}
+        <div className="border-t border-border pt-4">
+          <h3 className="mb-1 font-semibold">Finalizar mix e salvar estatísticas</h3>
+          {target ? (
+            <>
+              {(!current || target.date !== current.occurrence.date) && (
+                <p className="mb-3 text-sm text-muted">Mix de {brDate(target.date)} aguardando finalização.</p>
+              )}
+              <FinalizeSection scheduleId={target.scheduleId} date={target.date} />
+            </>
+          ) : (
+            <p className="text-sm text-muted">
+              {current && !current.finalizedMatchId
+                ? `A finalização libera quando o mix começar (${brDate(current.occurrence.date)} às ${current.schedule.eventTime}).`
+                : "Nenhum mix aguardando finalização."}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Outros mixes sem resultado (o que está em "Mix atual" não se repete aqui). */
+async function PendingFinalization({ viewerId }: { viewerId: string }) {
+  const { pending: all, target } = await resolveCurrentMix(viewerId);
+  const pending = all.filter((p) => !(target && p.scheduleId === target.scheduleId && p.date === target.date));
   if (!pending.length) return null;
   return (
     <Card>

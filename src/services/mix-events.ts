@@ -8,6 +8,7 @@ import { activePenalties } from "./penalties";
 import { finalMaps, type RoundRow } from "./tiebreaker";
 import type { MixRecurrence, Weekday } from "@/types/domain";
 import { profileAvatars } from "./avatars";
+import { listAllMaps } from "./maps";
 
 export const DEFAULT_COMMUNITY_SLUG = "principal";
 
@@ -175,7 +176,7 @@ export async function listRegistrations(
     supabase.from("mix_registrations").select("id, user_id, created_at, device").match(match).order("created_at"),
     supabase.from("map_votes").select("user_id, map_id").match(match),
     supabase.from("captain_votes").select("voter_id, candidate_id").match(match),
-    supabase.from("maps").select("id, name").eq("active", true).order("name"),
+    listAllMaps().then((all) => ({ data: all.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name })) })),
   ]);
   if (regs.error) throw new Error(`Falha ao carregar inscrições: ${regs.error.message}`);
 
@@ -232,14 +233,27 @@ export async function listRegistrations(
   };
 }
 
+/** Datas de mix deletadas pelo admin ("agenda|data"). Falha aberta: sem a migração 0010, nada é pulado. */
+async function cancelledOccurrences(): Promise<Set<string>> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return new Set();
+  const { data, error } = await supabase.from("mix_cancellations").select("schedule_id, event_date");
+  if (error) return new Set();
+  return new Set((data ?? []).map((c) => `${c.schedule_id}|${c.event_date}`));
+}
+
 /** Próximo mix (a ocorrência atual mais próxima entre as agendas ativas). */
 export async function getNextMix(viewerId: string | null = null, now = new Date()): Promise<NextMixResult> {
   if (!isAuthConfigured()) return { status: "not_configured" };
   const schedules = await listSchedules();
   if (!schedules) return { status: "not_configured" };
 
+  const cancelled = await cancelledOccurrences();
   const upcoming = schedules
-    .map((schedule) => ({ schedule, occurrence: currentOccurrence(schedule, now) }))
+    .map((schedule) => ({
+      schedule,
+      occurrence: currentOccurrence(schedule, now, (date) => cancelled.has(`${schedule.id}|${date}`)),
+    }))
     .filter((x): x is { schedule: Schedule; occurrence: Occurrence } => x.occurrence !== null)
     .sort((a, b) => a.occurrence.eventAt.getTime() - b.occurrence.eventAt.getTime());
   const next = upcoming[0];

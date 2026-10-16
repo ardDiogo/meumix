@@ -338,8 +338,19 @@ export function matchProfiles(players: { aliases: string[] }[], profiles: { name
 }
 
 /** Converte o nome do mapa lido no print para o id cadastrado (ex.: "Mirage" → "de_mirage"). */
-export function mapIdFromName(name: string | null, maps: { id: string; name: string }[]) {
+export function mapIdFromName(
+  name: string | null,
+  maps: { id: string; name: string; shortName?: string | null }[],
+) {
   if (!name) return null;
   const n = normalizeNick(name.replace(/^de_/i, ""));
-  return maps.find((m) => normalizeNick(m.name) === n || normalizeNick(m.id.replace(/^de_/, "")) === n)?.id ?? null;
+  if (!n) return null;
+  return (
+    maps.find(
+      (m) =>
+        normalizeNick(m.name) === n ||
+        normalizeNick(m.id.replace(/^de_/, "")) === n ||
+        (!!m.shortName && normalizeNick(m.shortName) === n),
+    )?.id ?? null
+  );
 }

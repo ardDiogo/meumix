@@ -6,12 +6,13 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { finalizeMix, type FinalizeMap, type FinalizePlayer } from "@/app/(app)/admin/finalizar/actions";
 import { ELO_CAP, levelForElo } from "@/lib/levels";
+import { useLevels } from "../players/levels-context";
 import { mapIdFromName, matchProfiles, type MergedResult } from "@/lib/gc-ocr";
 import { pickMvpAndLanterna } from "@/lib/match-rules";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
-import { Input, Select } from "../ui/input";
+import { Input, Label, Select } from "../ui/input";
 import { TeamDot } from "../mixes/badges";
 import { GcImport } from "./gc-import";
 
@@ -46,10 +47,11 @@ export function FinalizeForm({
   initialMaps: string[];
   players: { userId: string; name: string; team: "A" | "B"; elo: number }[];
 }) {
+  const levels = useLevels();
   const router = useRouter();
   const [saving, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<"manual" | "gc">("manual");
+  const [platform, setPlatform] = useState<"manual" | "gc">("gc");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [mapRows, setMapRows] = useState<{ mapId: string; scoreA: string; scoreB: string }[]>(
     (initialMaps.length ? initialMaps : [maps[0]?.id ?? ""]).map((id) => ({ mapId: id, scoreA: "", scoreB: "" })),
@@ -213,7 +215,18 @@ export function FinalizeForm({
 
   return (
     <div className="space-y-4">
-      <GcImport maps={maps} onImported={applyImport} />
+      <div className="space-y-3">
+        <div>
+          <Label htmlFor="platform" className="text-brand">
+            Plataforma da partida
+          </Label>
+          <Select id="platform" value={platform} onChange={(e) => setPlatform(e.target.value as "manual" | "gc")}>
+            <option value="gc">GC (imagens das estatísticas)</option>
+            <option value="manual">Manual (digitar as estatísticas)</option>
+          </Select>
+        </div>
+        {platform === "gc" && <GcImport maps={maps} onImported={applyImport} />}
+      </div>
       {warnings.length > 0 && (
         <ul className="space-y-1 rounded-md border border-brand/40 bg-brand/5 px-4 py-3 text-sm">
           {warnings.map((w, i) => (
@@ -370,7 +383,7 @@ export function FinalizeForm({
                       ) : (
                         <>
                           {r.elo} → <span className="font-semibold text-fg">{after}</span>
-                          <span className="ml-1">(N{levelForElo(after ?? 0).level})</span>
+                          <span className="ml-1">(N{levelForElo(after ?? 0, levels).level})</span>
                         </>
                       )}
                     </td>

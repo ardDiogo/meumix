@@ -106,8 +106,9 @@ export default async function SettingsPage() {
           <CardContent className="space-y-3 text-sm">
             <Row label="Origem" value={ds.kind === "demo" ? "Demonstração (dados fictícios)" : "Supabase"} />
             <p className="text-muted">
-              Os dados exibidos são gerados localmente para demonstração. A conexão com o banco PostgreSQL (Supabase)
-              será configurada por variáveis de ambiente — veja o <code className="text-fg">README.md</code>.
+              {ds.kind === "demo"
+                ? "Os dados exibidos são gerados localmente para demonstração. Configure o Supabase nas variáveis de ambiente — veja o README.md."
+                : "Os dados vêm do banco PostgreSQL (Supabase) da comunidade."}
             </p>
           </CardContent>
         </Card>

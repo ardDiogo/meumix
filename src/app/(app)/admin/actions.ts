@@ -7,6 +7,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { validatePassword } from "@/lib/auth/validation";
 import { parseBulkUsers } from "@/lib/bulk-users";
 import { initialEloFromGc, levelForElo } from "@/lib/levels";
+import { getLevels } from "@/services/levels";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { DEFAULT_COMMUNITY_SLUG } from "@/services/mix-events";
@@ -172,9 +173,10 @@ export async function deactivatePenalty(penaltyId: string): Promise<RoleChangeRe
 /* ------------------------ Chaves de funcionalidades ----------------------- */
 
 /** Liga/desliga uma funcionalidade (admin). */
-export async function setFeature(key: "map_tiebreaker", enabled: boolean): Promise<RoleChangeResult> {
+export async function setFeature(key: "map_tiebreaker" | "team_suggestion", enabled: boolean): Promise<RoleChangeResult> {
   const session = await getSession();
   if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem alterar funcionalidades." };
+  if (key !== "map_tiebreaker") return { ok: false, message: "Funcionalidade ainda não disponível." };
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
   const { error } = await admin
@@ -262,7 +264,7 @@ export async function setGcLevel(userId: string, gcLevel: number): Promise<RoleC
     return { ok: false, message: "O jogador já tem partidas: o ELO agora é definido pelos mixes." };
   }
   const elo = initialEloFromGc(gcLevel);
-  const level = levelForElo(elo).level;
+  const level = levelForElo(elo, await getLevels()).level;
   const { error } = await admin.from("profiles").update({ gc_level: gcLevel, elo, level }).eq("id", userId);
   if (error) return { ok: false, message: "Não foi possível salvar." };
   await admin.from("elo_change_logs").insert({

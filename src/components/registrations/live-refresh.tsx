@@ -35,7 +35,7 @@ export function LiveRefresh({ scheduleId }: { scheduleId: string }) {
       channel.on("postgres_changes", { event: "DELETE", schema: "public", table }, refresh);
     }
     // Tabelas sem schedule_id (ou sem filtro útil): qualquer mudança atualiza.
-    for (const table of ["mix_schedules", "map_tiebreaker_votes", "feature_settings"]) {
+    for (const table of ["mix_schedules", "map_tiebreaker_votes", "feature_settings", "maps", "mix_cancellations"]) {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
     }
     channel.subscribe();
