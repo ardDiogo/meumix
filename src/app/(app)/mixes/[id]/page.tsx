@@ -20,6 +20,7 @@ import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
 import { LinkGuests } from "@/components/mixes/link-guests";
 import { ShareResult } from "@/components/mixes/share-result";
+import { DeleteMatchButton } from "@/components/mixes/delete-match-button";
 import { getPermissions } from "@/services/auth";
 import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +37,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const report = kind === "supabase" && mix.status === "finished" ? await getMatchReport(mix.id) : null;
   const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;
   const guests = report?.rows.filter((r) => !r.userId) ?? [];
-  const { canManageMixes } = guests.length ? await getPermissions() : { canManageMixes: false };
+  const { canManageMixes } = report ? await getPermissions() : { canManageMixes: false };
   const linked = new Set(report?.rows.map((r) => r.userId).filter(Boolean));
   const linkable =
     canManageMixes && guests.length
@@ -75,6 +76,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 }`}
               />
             ) : null}
+            {canManageMixes && report && <DeleteMatchButton matchId={mix.id} label={mix.name} redirectTo="/mixes" />}
             <DemoBadge kind={kind} />
             <StatusBadge status={mix.status} />
           </>

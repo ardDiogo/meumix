@@ -17,6 +17,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.finalize_mix": "Finalizou o mix",
   "admin.ocr_gc": "Leu print da GC com IA",
   "admin.link_guests": "Vinculou convidados",
+  "admin.delete_match": "Excluiu mix finalizado",
   "admin.schedule_create": "Criou mix",
   "admin.schedule_end": "Encerrou mix",
   "admin.set_role": "Alterou papel (admin)",

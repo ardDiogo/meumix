@@ -12,7 +12,18 @@ import { ResultBadge, StatusBadge, TeamDot } from "./badges";
  * Lista de mixes compacta. Com `perspectiveId`, mostra o resultado do ponto
  * de vista daquele jogador.
  */
-export function MixList({ mixes, perspectiveId, compact }: { mixes: Mix[]; perspectiveId?: ID; compact?: boolean }) {
+export function MixList({
+  mixes,
+  perspectiveId,
+  compact,
+  action,
+}: {
+  mixes: Mix[];
+  perspectiveId?: ID;
+  compact?: boolean;
+  /** Ação extra no fim da linha (ex.: excluir, para admins). */
+  action?: (mix: Mix) => React.ReactNode;
+}) {
   if (!mixes.length) {
     return (
       <EmptyState icon={Swords} title="Nenhum mix encontrado" description="Os mixes disputados aparecerão aqui." />
@@ -26,10 +37,10 @@ export function MixList({ mixes, perspectiveId, compact }: { mixes: Mix[]; persp
         const result = perspectiveId ? playerResult(mix, perspectiveId) : null;
         const [a, b] = mix.teams;
         return (
-          <li key={mix.id}>
+          <li key={mix.id} className="flex items-center">
             <Link
               href={`/mixes/${mix.id}`}
-              className="group grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-surface-2 sm:grid-cols-[9rem_1fr_auto_auto]"
+              className="group grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-surface-2 sm:grid-cols-[9rem_1fr_auto_auto]"
             >
               <div className="min-w-0">
                 <div className="font-medium text-fg">{mix.name}</div>
@@ -72,6 +83,7 @@ export function MixList({ mixes, perspectiveId, compact }: { mixes: Mix[]; persp
                 aria-hidden
               />
             </Link>
+            {action && <div className="pr-3">{action(mix)}</div>}
           </li>
         );
       })}

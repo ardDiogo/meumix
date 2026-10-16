@@ -1,5 +1,5 @@
 import "server-only";
-import { currentOccurrence, type Occurrence } from "@/lib/mix-schedule";
+import { currentOccurrence, describeRecurrence, type Occurrence } from "@/lib/mix-schedule";
 import { isAuthConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { tally } from "@/lib/mix-rules";
@@ -453,4 +453,57 @@ export async function getOccurrenceForFinalization(scheduleId: string, date: str
   ]);
   const tiebreaker = await loadTiebreaker(scheduleId, date, votes, draft, features.map_tiebreaker, null);
   return { schedule, registrations, votes, draft, tiebreaker, finalizedMatchId };
+}
+
+export interface UpcomingOccurrence {
+  scheduleId: string;
+  date: string;
+  eventAt: Date;
+  opensAt: Date;
+  eventTime: string;
+  recurrence: string;
+  maxPlayers: number;
+  players: number;
+}
+
+/** Próxima data de cada agenda ativa (sem as deletadas), da mais próxima para a mais distante. */
+export async function listUpcomingOccurrences(now = new Date()): Promise<UpcomingOccurrence[]> {
+  if (!isAuthConfigured()) return [];
+  const schedules = await listSchedules();
+  if (!schedules?.length) return [];
+  const cancelled = await cancelledOccurrences();
+  const list = schedules
+    .map((schedule) => ({
+      schedule,
+      occurrence: currentOccurrence(schedule, now, (date) => cancelled.has(`${schedule.id}|${date}`)),
+    }))
+    .filter((x): x is { schedule: Schedule; occurrence: Occurrence } => x.occurrence !== null);
+  if (!list.length) return [];
+
+  const supabase = await createSupabaseServerClient();
+  const { data: regs } = await supabase!
+    .from("mix_registrations")
+    .select("schedule_id, event_date")
+    .in(
+      "schedule_id",
+      list.map((x) => x.schedule.id),
+    )
+    .in("event_date", [...new Set(list.map((x) => x.occurrence.date))]);
+  const count = new Map<string, number>();
+  for (const r of regs ?? []) {
+    const key = `${r.schedule_id}|${r.event_date}`;
+    count.set(key, (count.get(key) ?? 0) + 1);
+  }
+  return list
+    .map(({ schedule, occurrence }) => ({
+      scheduleId: schedule.id,
+      date: occurrence.date,
+      eventAt: occurrence.eventAt,
+      opensAt: occurrence.opensAt,
+      eventTime: schedule.eventTime,
+      recurrence: describeRecurrence(schedule.recurrence),
+      maxPlayers: schedule.maxPlayers,
+      players: count.get(`${schedule.id}|${occurrence.date}`) ?? 0,
+    }))
+    .sort((a, b) => a.eventAt.getTime() - b.eventAt.getTime());
 }
