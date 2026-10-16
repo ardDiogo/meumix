@@ -54,7 +54,7 @@ const TABS = {
   mix: { label: "Controle de mix", icon: Swords },
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
-  usuarios: { label: "Usuários", icon: UsersRound },
+  usuarios: { label: "Jogadores", icon: UsersRound },
 } as const;
 type Tab = keyof typeof TABS;
 
@@ -89,7 +89,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const { aba: rawTab } = await searchParams;
   // Punições agora ficam em Configurações (links antigos continuam funcionando).
   const aba = rawTab === "punicoes" ? "configuracoes" : rawTab;
-  const visibleTabs = (Object.keys(TABS) as Tab[]).filter((t) => t !== "usuarios" || canManageAdmins);
+  const visibleTabs = Object.keys(TABS) as Tab[];
   const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
   const [schedules, upcoming] = await Promise.all([
     listSchedules(),
@@ -160,8 +160,8 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       )}
       {tab === "usuarios" && (
         <div className="space-y-4">
-          <BulkUsersForm />
-          <UsersPanel />
+          {canManageAdmins && <BulkUsersForm />}
+          <UsersPanel canManageAdmins={canManageAdmins} currentUserId={session!.id} />
         </div>
       )}
       {tab === "configuracoes" && <SettingsTab canManageAdmins={canManageAdmins} />}
@@ -169,17 +169,17 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   );
 }
 
-async function UsersPanel() {
+async function UsersPanel({ canManageAdmins, currentUserId }: { canManageAdmins: boolean; currentUserId: string }) {
   const result = await listManagedUsers();
   return (
     <Card>
       <CardHeader
-        title="Usuários e administradores"
-        description="Administradores podem criar e gerenciar mixes. Somente o super administrador concede ou remove esse papel."
+        title="Jogadores cadastrados"
+        description="Edite dados e Steam, ajuste o ELO, redefina a senha ou exclua contas. Somente o master concede ou remove o papel de administrador e altera outros administradores."
       />
       {result.status === "ok" ? (
         result.users.length ? (
-          <UsersTable users={result.users} />
+          <UsersTable users={result.users} canManageAdmins={canManageAdmins} currentUserId={currentUserId} />
         ) : (
           <EmptyState icon={UsersRound} title="Nenhum usuário cadastrado ainda" />
         )
