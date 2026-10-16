@@ -1,6 +1,7 @@
 import {
   Award,
   CalendarClock,
+  Flag,
   KeyRound,
   LockKeyhole,
   LogIn,
@@ -29,7 +30,7 @@ import { listManagedUsers } from "@/services/admin-users";
 import { getFeatures } from "@/services/features";
 import { activePenalties } from "@/services/penalties";
 import { getPermissions } from "@/services/auth";
-import { listSchedules } from "@/services/mix-events";
+import { listPendingFinalization, listSchedules } from "@/services/mix-events";
 
 export const metadata: Metadata = { title: "Painel administrativo" };
 
@@ -99,7 +100,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
       {tab === "mix" && (
         <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
-          <CreateMixForm />
+          <div className="space-y-4">
+            <CreateMixForm />
+            <PendingFinalization />
+          </div>
           <Card className="self-start">
             <CardHeader title="Mixes ativos" />
             {schedules ? (
@@ -194,5 +198,38 @@ async function PenaltiesTab() {
         createdAt: p.createdAt,
       }))}
     />
+  );
+}
+
+async function PendingFinalization() {
+  const pending = await listPendingFinalization();
+  if (!pending.length) return null;
+  return (
+    <Card>
+      <CardHeader
+        title="Mixes para finalizar"
+        description="Lance o placar e as estatísticas para atualizar o ELO e o ranking."
+      />
+      <ul className="divide-y divide-border">
+        {pending.map((p) => {
+          const [y, m, d] = p.date.split("-");
+          return (
+            <li key={`${p.scheduleId}-${p.date}`} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div>
+                <div className="font-medium">
+                  Mix de {d}/{m}/{y} {p.eventTime && <span className="text-muted">· {p.eventTime}</span>}
+                </div>
+                <div className="text-xs text-muted">{p.players} inscritos</div>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/admin/finalizar?agenda=${p.scheduleId}&data=${p.date}`}>
+                  <Flag /> Finalizar
+                </Link>
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }

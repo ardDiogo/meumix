@@ -1,5 +1,6 @@
-import { AlertTriangle, CalendarClock, Check, Crown, Monitor, Smartphone, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, Crown, Flag, Monitor, Smartphone, Users } from "lucide-react";
 import { headers } from "next/headers";
+import Link from "next/link";
 import { CAPTAINS, CAPTAIN_VOTES_PER_PLAYER, MAPS_IN_ROTATION } from "@/lib/mix-rules";
 import { registrationWindow } from "@/lib/mix-schedule";
 import { cn } from "@/lib/utils";
@@ -7,6 +8,7 @@ import { getPermissions } from "@/services/auth";
 import { getNextMix } from "@/services/mix-events";
 import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { Card, CardHeader } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
 import { Table, TD, TH, THead, TR } from "../ui/table";
@@ -177,12 +179,29 @@ export async function NextMixPanel() {
                 />
               )}
               {canManageMixes && full && !draft && <StartDraftButton scheduleId={schedule.id} date={occurrence.date} />}
+              {canManageMixes && draft?.status === "completed" && !result.mix.finalizedMatchId && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/admin/finalizar?agenda=${schedule.id}&data=${occurrence.date}`}>
+                    <Flag /> Finalizar mix
+                  </Link>
+                </Button>
+              )}
               {canManageMixes && registrations.length > 0 && (
                 <ResetButton scheduleId={schedule.id} date={occurrence.date} />
               )}
               <ShareMixButton message={message} />
             </div>
           </div>
+          {result.mix.finalizedMatchId && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-win/30 bg-win/10 px-3 py-2 text-sm">
+              <span className="flex items-center gap-2 font-medium text-win">
+                <Check className="size-4" /> Mix finalizado — ELO e ranking atualizados.
+              </span>
+              <Link href={`/mixes/${result.mix.finalizedMatchId}`} className="font-medium text-fg hover:text-brand">
+                Ver resultado →
+              </Link>
+            </div>
+          )}
           <JoinButton
             scheduleId={schedule.id}
             date={occurrence.date}

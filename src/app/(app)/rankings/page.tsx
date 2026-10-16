@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DemoBadge } from "@/components/demo-notice";
 import { PageHeader } from "@/components/page-header";
 import { Delta } from "@/components/stats/delta";
+import { LevelBadge } from "@/components/players/level-badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -111,7 +112,12 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
                       <span className="font-medium group-hover:text-brand">{r.player.nickname}</span>
                     </Link>
                   </TD>
-                  <TD className="text-right font-display text-base font-bold">{r.elo}</TD>
+                  <TD className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <LevelBadge elo={r.elo} />
+                      <span className="font-display text-base font-bold">{r.elo}</span>
+                    </div>
+                  </TD>
                   <TD className="text-right">
                     <Delta value={r.eloChange} />
                   </TD>

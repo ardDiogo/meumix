@@ -129,6 +129,8 @@ export interface NextMix {
   tiebreaker: TiebreakerView;
   /** Atraso (s) da punição ativa de quem está vendo, se houver. */
   myPenaltyDelay: number | null;
+  /** Partida finalizada desta ocorrência, se houver. */
+  finalizedMatchId: string | null;
 }
 
 export type NextMixResult = { status: "not_configured" } | { status: "none" } | { status: "ok"; mix: NextMix };
@@ -244,9 +246,10 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
   ]);
 
   const ids = [...new Set([...registrations.map((r) => r.userId), ...(viewerId ? [viewerId] : [])])];
-  const [penalties, tiebreaker] = await Promise.all([
+  const [penalties, tiebreaker, finalizedMatchId] = await Promise.all([
     activePenalties(ids),
     loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId),
+    loadFinalizedMatch(next.schedule.id, next.occurrence.date),
   ]);
   for (const r of registrations) {
     const p = penalties.get(r.userId);
@@ -262,11 +265,12 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
       draft,
       tiebreaker,
       myPenaltyDelay: viewerId ? (penalties.get(viewerId)?.delaySeconds ?? null) : null,
+      finalizedMatchId,
     },
   };
 }
 
-async function loadDraft(scheduleId: string, date: string): Promise<DraftView | null> {
+export async function loadDraft(scheduleId: string, date: string): Promise<DraftView | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
   const { data } = await supabase
@@ -294,7 +298,7 @@ async function loadDraft(scheduleId: string, date: string): Promise<DraftView | 
   };
 }
 
-async function loadTiebreaker(
+export async function loadTiebreaker(
   scheduleId: string,
   date: string,
   votes: VoteSummary,
@@ -350,4 +354,64 @@ async function loadTiebreaker(
       };
     }),
   };
+}
+
+async function loadFinalizedMatch(scheduleId: string, date: string) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from("mix_matches")
+    .select("id")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .maybeSingle();
+  return (data?.id as string | undefined) ?? null;
+}
+
+/** Ocorrências com inscritos ainda não finalizadas (mais recentes primeiro). */
+export async function listPendingFinalization(limit = 6) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [];
+  const [{ data: regs }, { data: matches }, { data: schedules }] = await Promise.all([
+    supabase
+      .from("mix_registrations")
+      .select("schedule_id, event_date")
+      .order("event_date", { ascending: false })
+      .limit(500),
+    supabase.from("mix_matches").select("schedule_id, event_date"),
+    supabase.from("mix_schedules").select(SCHEDULE_COLUMNS),
+  ]);
+  const done = new Set((matches ?? []).map((m) => `${m.schedule_id}|${m.event_date}`));
+  const byId = new Map(((schedules ?? []) as ScheduleRow[]).map((r) => [r.id, toSchedule(r)]));
+  const seen = new Map<string, { scheduleId: string; date: string; players: number; eventTime: string }>();
+  for (const r of regs ?? []) {
+    const key = `${r.schedule_id}|${r.event_date}`;
+    if (done.has(key)) continue;
+    const entry = seen.get(key);
+    if (entry) entry.players += 1;
+    else
+      seen.set(key, {
+        scheduleId: r.schedule_id as string,
+        date: r.event_date as string,
+        players: 1,
+        eventTime: byId.get(r.schedule_id as string)?.eventTime ?? "",
+      });
+  }
+  return [...seen.values()].slice(0, limit);
+}
+
+/** Dados de uma ocorrência específica (para a finalização). */
+export async function getOccurrenceForFinalization(scheduleId: string, date: string) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+  const { data } = await supabase.from("mix_schedules").select(SCHEDULE_COLUMNS).eq("id", scheduleId).maybeSingle();
+  if (!data) return null;
+  const schedule = toSchedule(data as ScheduleRow);
+  const [{ registrations, votes }, draft, features, finalizedMatchId] = await Promise.all([
+    listRegistrations(scheduleId, date, schedule.maxPlayers),
+    loadDraft(scheduleId, date),
+    getFeatures(),
+    loadFinalizedMatch(scheduleId, date),
+  ]);
+  const tiebreaker = await loadTiebreaker(scheduleId, date, votes, draft, features.map_tiebreaker, null);
+  return { schedule, registrations, votes, draft, tiebreaker, finalizedMatchId };
 }

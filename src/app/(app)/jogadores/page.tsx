@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DemoBadge } from "@/components/demo-notice";
 import { PlayerSearch } from "@/components/layout/player-search";
 import { PageHeader } from "@/components/page-header";
+import { LevelBadge } from "@/components/players/level-badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -46,7 +47,10 @@ export default async function PlayersPage({ searchParams }: PageProps<"/jogadore
                   <div className="text-xs text-muted">{player.steamId ? "Steam vinculada" : "Steam não vinculada"}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-display text-lg font-bold tabular">{elo}</div>
+                  <div className="flex items-center gap-1.5">
+                    <LevelBadge elo={elo} />
+                    <span className="font-display text-lg font-bold tabular">{elo}</span>
+                  </div>
                   <div className="text-[10px] tracking-wider text-subtle uppercase">ELO</div>
                 </div>
               </Link>

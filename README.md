@@ -2,7 +2,7 @@
 
 Plataforma web para organizar **mixes de Counter-Strike 2**, acompanhar o desempenho dos jogadores e construir comunidades competitivas.
 
-> **Status:** este é o MVP inicial. Todos os dados exibidos são **fictícios** (modo demonstração) e a aplicação mostra isso na interface. Ainda não há autenticação, banco de dados nem integrações externas.
+> **Status:** com o Supabase configurado, o site usa dados reais (inscrições, votações, partidas finalizadas, ELO e ranking). Sem ele, roda em modo demonstração com dados fictícios, sinalizados na interface.
 
 ## Documentação
 
@@ -106,7 +106,7 @@ O login usa **Supabase Auth** (e-mail e senha, confirmação por e-mail e recupe
 ### Ativando o login
 
 1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
-2. No **SQL Editor**, execute em ordem `supabase/migrations/0001_init.sql`, `0002_auth.sql`, `0003_registrations.sql`, `0004_votes_audit_realtime.sql`, `0005_draft.sql` e `0006_penalties_tiebreaker.sql`.
+2. No **SQL Editor**, execute em ordem `supabase/migrations/0001_init.sql`, `0002_auth.sql`, `0003_registrations.sql`, `0004_votes_audit_realtime.sql`, `0005_draft.sql`, `0006_penalties_tiebreaker.sql` e `0007_elo_matches.sql`.
 3. Em **Authentication → URL Configuration**, defina **Site URL** como `https://meumix.vercel.app` e adicione `https://meumix.vercel.app/auth/callback` (e `http://localhost:3000/auth/callback`) em **Redirect URLs**.
 4. Na Vercel (**Settings → Environment Variables**), adicione `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` e `SUPER_ADMIN_EMAILS`, e faça um novo deploy.
 

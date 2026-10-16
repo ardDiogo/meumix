@@ -4,6 +4,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useActionState, useState } from "react";
 import { requestPasswordReset, signIn, signUp, type AuthState } from "@/app/entrar/actions";
 import { PASSWORD_MIN } from "@/lib/auth/validation";
+import { initialEloFromGc } from "@/lib/levels";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { AuthField, FormMessage } from "./form-parts";
@@ -149,6 +150,33 @@ function SignUpForm({ disabled }: { disabled: boolean }) {
         disabled={disabled}
         required
       />
+      <div>
+        <label htmlFor="gcLevel" className="mb-1.5 block text-xs font-medium text-fg">
+          Nível na Gamers Club
+        </label>
+        <select
+          id="gcLevel"
+          name="gcLevel"
+          defaultValue=""
+          disabled={disabled}
+          aria-invalid={!!errors.gcLevel}
+          className="h-10 w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-fg transition-colors hover:border-border-strong focus:border-brand focus:outline-none aria-invalid:border-loss"
+        >
+          <option value="" disabled>
+            Selecione (0 a 20)
+          </option>
+          {Array.from({ length: 21 }, (_, gc) => (
+            <option key={gc} value={gc}>
+              Nível {gc} na GC → ELO inicial {initialEloFromGc(gc)}
+            </option>
+          ))}
+        </select>
+        {errors.gcLevel ? (
+          <p className="mt-1.5 text-xs text-loss">{errors.gcLevel}</p>
+        ) : (
+          <p className="mt-1.5 text-xs text-subtle">Define seu ELO inicial no MeuMix. Sem conta na GC, escolha 0.</p>
+        )}
+      </div>
       <AuthField
         id="email"
         label="E-mail"

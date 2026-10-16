@@ -53,6 +53,8 @@ export async function signIn(_prev: AuthState, fd: FormData): Promise<AuthState>
 
 export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState> {
   const displayName = str(fd, "displayName").trim();
+  const gcRaw = str(fd, "gcLevel");
+  const gcLevel = Number(gcRaw);
   const email = str(fd, "email").trim().toLowerCase();
   const password = str(fd, "password");
   const confirm = str(fd, "confirm");
@@ -62,6 +64,10 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
     email: validateEmail(email),
     password: validatePassword(password),
     confirm: password === confirm ? undefined : "As senhas não coincidem.",
+    gcLevel:
+      gcRaw !== "" && Number.isInteger(gcLevel) && gcLevel >= 0 && gcLevel <= 20
+        ? undefined
+        : "Selecione seu nível na GC.",
   };
   if (Object.values(fields).some(Boolean)) return { status: "error", fields, email };
 
@@ -72,7 +78,7 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
     email,
     password,
     options: {
-      data: { display_name: displayName },
+      data: { display_name: displayName, gc_level: gcLevel },
       emailRedirectTo: `${await origin()}/auth/callback?next=/dashboard`,
     },
   });

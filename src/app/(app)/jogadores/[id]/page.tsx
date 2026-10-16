@@ -9,6 +9,7 @@ import { EloChart } from "@/components/stats/elo-chart";
 import { FormStrip } from "@/components/stats/form-strip";
 import { StatCard } from "@/components/stats/stat-card";
 import { ComparePlayers } from "@/components/players/compare-players";
+import { LevelBadge } from "@/components/players/level-badge";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,10 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
           <div className="flex gap-6 sm:text-right">
             <div>
               <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">ELO</div>
-              <div className="font-display text-4xl font-bold text-brand tabular">{elo}</div>
+              <div className="flex items-center gap-2">
+                <LevelBadge elo={elo} size="md" />
+                <span className="font-display text-4xl font-bold text-brand tabular">{elo}</span>
+              </div>
               <Delta value={recentChange} className="mt-0.5" />
               <div className="text-[10px] text-subtle">em 30 dias</div>
             </div>

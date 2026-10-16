@@ -49,10 +49,11 @@ Referência: [`regras-do-mix.md`](./regras-do-mix.md). Legenda: ✅ feito · �
 
 ## Fase 4 — Finalização, ELO e histórico
 
-| Item                                                                    | Seção | Status                              |
-| ----------------------------------------------------------------------- | ----- | ----------------------------------- |
-| Níveis 1–10 por ELO e ELO inicial a partir do nível GC                  | 9     | ⬜                                  |
-| Finalização via Faceit (link/ID da partida)                             | 9     | ⬜                                  |
-| Finalização via prints da Gamers Club (leitura por IA)                  | 9     | ⬜                                  |
-| MVP, lanterna e cálculo de ELO                                          | 9     | ⬜                                  |
-| Estatísticas reais por jogador, ranking e histórico com filtro de datas | 9     | ⬜ (hoje são dados de demonstração) |
+| Item                                                                                         | Seção | Status |
+| -------------------------------------------------------------------------------------------- | ----- | ------ |
+| Níveis 1–10 por ELO e ELO inicial a partir do nível GC (no cadastro)                         | 9     | ✅     |
+| Finalização via Faceit (link/ID da partida)                                                  | 9     | ⬜     |
+| Finalização via prints da Gamers Club (leitura por IA)                                       | 9     | ⬜     |
+| MVP, lanterna e cálculo de ELO (finalização atômica no banco)                                | 9     | ✅     |
+| Estatísticas reais por jogador (trigger recalcula o perfil), ranking por período e histórico | 9     | ✅     |
+| Finalização manual pelo admin (placar + estatísticas)                                        | 9     | ✅     |

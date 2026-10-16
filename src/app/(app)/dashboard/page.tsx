@@ -1,8 +1,9 @@
-import { CalendarClock, Crosshair, Flame, Plus, ShieldCheck, Trophy, UserRoundX } from "lucide-react";
+import { Crosshair, Flame, Plus, ShieldCheck, Trophy, UserRoundX } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DemoBadge } from "@/components/demo-notice";
 import { MixList } from "@/components/mixes/mix-list";
+import { LevelBadge } from "@/components/players/level-badge";
 import { NextMixPanel } from "@/components/registrations/next-mix-panel";
 import { PageHeader } from "@/components/page-header";
 import { Delta } from "@/components/stats/delta";
@@ -13,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { eloChangeSince, toEloSeries } from "@/lib/elo";
-import { formatDate, formatDateTime, formatDecimal, formatPercent } from "@/lib/format";
+import { ELO_CAP, LEVELS, levelForElo } from "@/lib/levels";
+import { formatDate, formatDecimal, formatPercent } from "@/lib/format";
 import { mapName } from "@/lib/maps";
 import { aggregatePlayer } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -33,18 +35,36 @@ export default async function DashboardPage() {
 
   if (!profile || !highlights) {
     return (
-      <Card>
-        <EmptyState
-          icon={UserRoundX}
-          title="Nenhum jogador vinculado à sua conta"
-          description="Vincule um perfil de jogador para acompanhar seu desempenho."
+      <>
+        <PageHeader
+          eyebrow={session ? `Olá, ${session.displayName}` : undefined}
+          title="Dashboard"
+          description="Inscreva-se no próximo mix e acompanhe seu desempenho."
         />
-      </Card>
+        <NextMixPanel />
+        <Card>
+          <EmptyState
+            icon={UserRoundX}
+            title={session ? "Seu perfil ainda não foi encontrado" : "Entre para ver suas estatísticas"}
+            description={
+              session
+                ? "Recarregue a página em instantes. Se persistir, fale com um administrador."
+                : "Faça login ou crie sua conta para acompanhar ELO, nível e desempenho nos mixes."
+            }
+            action={
+              !session && (
+                <Button variant="primary" asChild>
+                  <Link href="/entrar">Entrar</Link>
+                </Button>
+              )
+            }
+          />
+        </Card>
+      </>
     );
   }
 
   const ds = getDataSource();
-  const [upcoming] = await ds.listMixes({ status: "scheduled", limit: 1 });
   const { player, stats, elo, position, totalPlayers, eloHistory, recentMixes } = profile;
 
   const mixNames = new Map(recentMixes.map((r) => [r.mix.id, r.mix.name]));
@@ -86,7 +106,7 @@ export default async function DashboardPage() {
           accent
           hint={
             <span className="flex items-center gap-1">
-              <Delta value={elo30d} /> em 30 dias
+              Nível {levelForElo(elo).level} · <Delta value={elo30d} /> 30d
             </span>
           }
         />
@@ -191,31 +211,8 @@ export default async function DashboardPage() {
           <MixList mixes={recentMixes.slice(0, 6).map((r) => r.mix)} perspectiveId={player.id} compact />
         </Card>
 
-        {/* Próximo mix */}
-        <Card>
-          <CardHeader title="Próximo mix" />
-          {upcoming ? (
-            <CardContent>
-              <div className="flex items-start gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-brand/12 text-brand">
-                  <CalendarClock className="size-5" aria-hidden />
-                </div>
-                <div className="min-w-0">
-                  <div className="font-medium">{upcoming.name}</div>
-                  <div className="text-sm text-muted">{formatDateTime(upcoming.scheduledAt)}</div>
-                  <div className="mt-1 text-xs text-subtle">
-                    {upcoming.maps.map((m) => mapName(m.mapId)).join(" · ")}
-                  </div>
-                </div>
-              </div>
-              <Button variant="secondary" className="mt-4 w-full" asChild>
-                <Link href={`/mixes/${upcoming.id}`}>Ver detalhes</Link>
-              </Button>
-            </CardContent>
-          ) : (
-            <EmptyState icon={CalendarClock} title="Nenhum mix agendado" className="py-8" />
-          )}
-        </Card>
+        {/* Nível */}
+        <LevelCard elo={elo} />
       </div>
     </>
   );
@@ -289,5 +286,34 @@ function HighlightItem({
         content
       )}
     </li>
+  );
+}
+
+function LevelCard({ elo }: { elo: number }) {
+  const current = levelForElo(elo);
+  const next = LEVELS.find((l) => l.level === current.level + 1);
+  const progress = next ? Math.round(((elo - current.min) / (next.min - current.min)) * 100) : 100;
+  return (
+    <Card>
+      <CardHeader title="Seu nível" />
+      <CardContent>
+        <div className="flex items-center gap-4">
+          <LevelBadge elo={elo} size="md" />
+          <div className="min-w-0 flex-1">
+            <div className="font-display text-lg font-bold">Nível {current.level}</div>
+            <div className="text-sm text-muted tabular">
+              {elo} de ELO {next ? `· faltam ${next.min - elo} para o nível ${next.level}` : "· nível máximo"}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-3" aria-hidden>
+          <div className="h-full rounded-full" style={{ width: `${progress}%`, background: current.color }} />
+        </div>
+        <div className="mt-1.5 flex justify-between text-[11px] text-subtle tabular">
+          <span>{current.min}</span>
+          <span>{next ? next.min : ELO_CAP}</span>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
