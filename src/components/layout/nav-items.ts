@@ -1,0 +1,31 @@
+import {
+  BarChart3,
+  Clapperboard,
+  LayoutDashboard,
+  Settings,
+  Swords,
+  Trophy,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+
+export interface NavItem {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  /** Descrição curta, usada como dica e para leitores de tela. */
+  description: string;
+}
+
+export const NAV_MAIN: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Seu resumo competitivo" },
+  { href: "/mixes", label: "Mixes", icon: Swords, description: "Criar e consultar mixes" },
+  { href: "/jogadores", label: "Jogadores", icon: Users, description: "Perfis e desempenho" },
+  { href: "/rankings", label: "Rankings", icon: Trophy, description: "Classificação por ELO" },
+  { href: "/estatisticas", label: "Estatísticas", icon: BarChart3, description: "Números da comunidade" },
+  { href: "/clipes", label: "Clipes", icon: Clapperboard, description: "Clipes e highlights" },
+];
+
+export const NAV_SECONDARY: NavItem[] = [
+  { href: "/configuracoes", label: "Configurações", icon: Settings, description: "Conta e integrações" },
+];
