@@ -34,7 +34,7 @@ export async function saveCsrepLink(userId: string, input: string): Promise<Csre
   if (input.trim() && !url) return { ok: false, message: "Link inválido. Ex.: https://csrep.gg/player/76561198…" };
   const { error } = await auth.admin.from("profiles").update({ csrep_url: url }).eq("id", userId);
   if (error) return { ok: false, message: isMissing(error.code) ? MIGRATION_HINT : "Não foi possível salvar." };
-  revalidatePath(`/jogadores/${userId}`);
+  revalidatePath("/jogadores/[id]", "page");
   return { ok: true, message: url ? "Link do CSRep salvo." : "Link do CSRep removido." };
 }
 
@@ -198,6 +198,6 @@ export async function analyzeCsrepPrint(
     actorId: session.id,
     detail: { userId, model: result.model },
   });
-  revalidatePath(`/jogadores/${userId}`);
+  revalidatePath("/jogadores/[id]", "page");
   return { ok: true, message: "Análise pronta!" };
 }

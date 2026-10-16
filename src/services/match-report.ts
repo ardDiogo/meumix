@@ -21,9 +21,12 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
     supabase.from("player_match_records").select("*").eq("match_id", matchId),
   ]);
   if (!match || error) return null;
-  const avatars = await profileAvatars(
-    (records ?? []).map((r) => r.user_id as string | null).filter((id): id is string => !!id),
-  );
+  const ids = (records ?? []).map((r) => r.user_id as string | null).filter((id): id is string => !!id);
+  const [avatars, { data: nicks }] = await Promise.all([
+    profileAvatars(ids),
+    ids.length ? supabase.from("profiles").select("id, display_name").in("id", ids) : Promise.resolve({ data: [] }),
+  ]);
+  const nickOf = new Map((nicks ?? []).map((p) => [p.id as string, p.display_name as string]));
   return {
     platform: (match.platform as MatchReport["platform"]) ?? "manual",
     rows: (records ?? []).map((r, i) => ({
@@ -32,6 +35,7 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
       name: r.player_name as string,
       team: r.team as "A" | "B",
       elo: num(r.elo_after) ?? num(r.elo_before),
+      profileNick: r.user_id ? (nickOf.get(r.user_id as string) ?? null) : null,
       avatarUrl: r.user_id ? (avatars.get(r.user_id as string)?.avatarUrl ?? null) : null,
       k: r.kills ?? 0,
       a: r.assists ?? 0,

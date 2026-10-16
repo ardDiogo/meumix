@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Player } from "@/types/domain";
 import { cn } from "@/lib/utils";
 import { Avatar } from "../ui/avatar";
+import { playerHref } from "@/lib/player-slug";
 
 export function PlayerLink({
   player,
@@ -16,7 +17,7 @@ export function PlayerLink({
 }) {
   return (
     <Link
-      href={`/jogadores/${player.id}`}
+      href={playerHref(player)}
       className={cn("group inline-flex min-w-0 items-center gap-2 rounded-sm", className)}
     >
       <Avatar name={player.nickname} src={player.avatarUrl} size={size} />

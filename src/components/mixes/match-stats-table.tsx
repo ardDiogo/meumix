@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { LevelBadge } from "../players/level-badge";
 import { Avatar } from "../ui/avatar";
 import { TeamDot } from "./badges";
+import { playerSlug } from "@/lib/player-slug";
 
 type Col = {
   key: string;
@@ -120,7 +121,10 @@ export function MatchStatsTable({ rows }: { rows: StatRow[] }) {
                   <TeamDot side={r.team} />
                   <Avatar name={r.name} src={r.avatarUrl} size="sm" />
                   {r.userId ? (
-                    <Link href={`/jogadores/${r.userId}`} className="max-w-44 truncate hover:text-brand">
+                    <Link
+                      href={r.profileNick ? `/jogadores/${playerSlug(r.profileNick)}` : `/jogadores/${r.userId}`}
+                      className="max-w-44 truncate hover:text-brand"
+                    >
                       {r.name}
                     </Link>
                   ) : (

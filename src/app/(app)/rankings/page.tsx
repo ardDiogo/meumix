@@ -14,6 +14,7 @@ import { formatDecimal, formatPercent } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getDataSource } from "@/services";
 import { getRanking, parsePeriod, RANKING_PERIODS } from "@/services/queries";
+import { playerHref } from "@/lib/player-slug";
 
 export const metadata: Metadata = { title: "Rankings" };
 
@@ -107,7 +108,7 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
                     </span>
                   </TD>
                   <TD>
-                    <Link href={`/jogadores/${r.player.id}`} className="group flex items-center gap-2.5">
+                    <Link href={playerHref(r.player)} className="group flex items-center gap-2.5">
                       <Avatar name={r.player.nickname} src={r.player.avatarUrl} size="sm" />
                       <span className="font-medium group-hover:text-brand">{r.player.nickname}</span>
                     </Link>

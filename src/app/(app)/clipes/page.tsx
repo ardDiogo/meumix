@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate } from "@/lib/format";
 import type { HighlightKind } from "@/types/domain";
 import { getHighlightsFeed } from "@/services/queries";
+import { playerHref } from "@/lib/player-slug";
 
 export const metadata: Metadata = { title: "Clipes e highlights" };
 
@@ -61,7 +62,7 @@ export default async function ClipsPage() {
                     </div>
                     <div className="mt-1 font-medium">
                       {player && (
-                        <Link href={`/jogadores/${player.id}`} className="text-brand hover:underline">
+                        <Link href={playerHref(player)} className="text-brand hover:underline">
                           {player.nickname}
                         </Link>
                       )}{" "}

@@ -3,6 +3,7 @@ import { aggregatePlayer, buildScoreboard, playerMixResult } from "@/lib/stats";
 import type { ID, MapId, Player } from "@/types/domain";
 import type { Highlights, PlayerMixResult, PlayerProfile, RankingPeriod, RankingRow } from "@/types/views";
 import { getDataSource } from "./index";
+import { playerSlug } from "@/lib/player-slug";
 
 export const RANKING_PERIODS: Record<RankingPeriod, { label: string; days: number | null }> = {
   "7d": { label: "7 dias", days: 7 },
@@ -198,4 +199,14 @@ export async function getHighlightsFeed() {
     mixes: new Map(mixes.map((m) => [m.id, m])),
     players: new Map(players.map((p) => [p.id, p])),
   };
+}
+
+/** Perfil pelo id ou pelo nick do endereço (/jogadores/barker). */
+export async function resolvePlayerProfile(idOrSlug: string): Promise<PlayerProfile | null> {
+  const param = decodeURIComponent(idOrSlug);
+  const direct = /^[0-9a-f-]{36}$/i.test(param) || !/^[a-z0-9-]+$/.test(param) ? await getPlayerProfile(param) : null;
+  if (direct) return direct;
+  const slug = playerSlug(param);
+  const match = (await getDataSource().listPlayers()).find((p) => playerSlug(p.nickname) === slug || p.id === param);
+  return match ? getPlayerProfile(match.id) : null;
 }

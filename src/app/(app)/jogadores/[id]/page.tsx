@@ -1,7 +1,7 @@
 import { ArrowLeft, Crosshair, Flame, Link2, ShieldCheck, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { DemoBadge } from "@/components/demo-notice";
 import { ResultBadge } from "@/components/mixes/badges";
 import { Delta } from "@/components/stats/delta";
@@ -22,13 +22,14 @@ import { steamProfileUrl } from "@/lib/integrations/steam";
 import { mapName } from "@/lib/maps";
 import { seriesScore } from "@/lib/stats";
 import { getDataSource } from "@/services";
-import { getPlayerHighlights, getPlayerProfile, searchPlayers } from "@/services/queries";
+import { getPlayerHighlights, resolvePlayerProfile, searchPlayers } from "@/services/queries";
+import { playerHref, playerSlug } from "@/lib/player-slug";
 import { CsrepCard } from "@/components/players/csrep-card";
 import { getPermissions } from "@/services/auth";
 import { getCsrepView } from "@/services/csrep";
 
 export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">): Promise<Metadata> {
-  const profile = await getPlayerProfile((await params).id);
+  const profile = await resolvePlayerProfile((await params).id);
   return { title: profile?.player.nickname ?? "Jogador não encontrado" };
 }
 
@@ -36,11 +37,18 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const [{ id }, { comparar }] = await Promise.all([params, searchParams]);
   const otherId = typeof comparar === "string" && comparar !== id ? comparar : null;
   const [profile, other, allPlayers] = await Promise.all([
-    getPlayerProfile(id),
-    otherId ? getPlayerProfile(otherId) : null,
+    resolvePlayerProfile(id),
+    otherId ? resolvePlayerProfile(otherId) : null,
     searchPlayers(""),
   ]);
   if (!profile) notFound();
+  // Endereço com o nick: /jogadores/<id> vira /jogadores/barker.
+  const canonical = playerHref(profile.player);
+  const slugTaken =
+    allPlayers.filter((p) => playerSlug(p.player.nickname) === playerSlug(profile.player.nickname)).length > 1;
+  if (!slugTaken && decodeURIComponent(`/jogadores/${id}`) !== canonical) {
+    redirect(otherId ? `${canonical}?comparar=${encodeURIComponent(otherId)}` : canonical);
+  }
 
   const ds = getDataSource();
   const kind = ds.kind;

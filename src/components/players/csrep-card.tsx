@@ -24,7 +24,7 @@ function ItemList({
 }) {
   if (!items.length) return null;
   return (
-    <div className="rounded-lg border border-border bg-surface-2/50 p-4">
+    <div className="min-w-0 rounded-lg border border-border bg-surface-2/50 p-4 break-words">
       <h3 className={cn("mb-3 flex items-center gap-2 text-sm font-semibold", tone)}>
         <Icon className="size-4" aria-hidden /> {title}
       </h3>
@@ -75,7 +75,7 @@ export function CsrepCard({ userId, view, canEdit }: { userId: string; view: Csr
             </div>
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {CSREP_METRICS.filter((m) => latest.metrics[m.key] != null).map((m) => (
-                <li key={m.key} className="rounded-lg border border-border bg-surface-2/50 px-3 py-2.5">
+                <li key={m.key} className="min-w-0 rounded-lg border border-border bg-surface-2/50 px-3 py-2.5">
                   <div className="text-[10px] font-semibold tracking-wider text-muted uppercase">{m.label}</div>
                   <div className="font-display text-2xl font-bold tabular">
                     {fmt(latest.metrics[m.key]!, m.digits)}
@@ -84,8 +84,10 @@ export function CsrepCard({ userId, view, canEdit }: { userId: string; view: Csr
                 </li>
               ))}
             </ul>
-            <p className="rounded-lg border border-brand/30 bg-brand/5 p-4 text-sm">{latest.analysis.summary}</p>
-            <div className="grid gap-3 lg:grid-cols-3">
+            <p className="rounded-lg border border-brand/30 bg-brand/5 p-4 text-sm break-words">
+              {latest.analysis.summary}
+            </p>
+            <div className="grid gap-3 lg:grid-cols-3 [&>*]:min-w-0">
               <ItemList title="Pontos fortes" items={latest.analysis.strengths} icon={CheckCircle2} tone="text-win" />
               <ItemList
                 title="Pontos fracos"

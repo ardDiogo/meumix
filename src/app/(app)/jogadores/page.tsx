@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getDataSource } from "@/services";
 import { searchPlayers } from "@/services/queries";
+import { playerHref } from "@/lib/player-slug";
 
 export const metadata: Metadata = { title: "Jogadores" };
 
@@ -38,7 +39,7 @@ export default async function PlayersPage({ searchParams }: PageProps<"/jogadore
           {results.map(({ player, elo }) => (
             <li key={player.id}>
               <Link
-                href={`/jogadores/${player.id}`}
+                href={playerHref(player)}
                 className="group flex items-center gap-3 rounded-lg border border-border bg-surface p-3 transition-colors hover:border-border-strong hover:bg-surface-2"
               >
                 <Avatar name={player.nickname} src={player.avatarUrl} size="md" />
