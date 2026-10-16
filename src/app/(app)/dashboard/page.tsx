@@ -17,6 +17,7 @@ import { mapName } from "@/lib/maps";
 import { aggregatePlayer } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { getDataSource } from "@/services";
+import { getPermissions } from "@/services/auth";
 import { getDashboard } from "@/services/queries";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -24,7 +25,7 @@ export const metadata: Metadata = { title: "Dashboard" };
 const RECENT_WINDOW = 10;
 
 export default async function DashboardPage() {
-  const { kind, profile, highlights } = await getDashboard();
+  const [{ kind, profile, highlights }, { canManageMixes }] = await Promise.all([getDashboard(), getPermissions()]);
 
   if (!profile || !highlights) {
     return (
@@ -60,11 +61,13 @@ export default async function DashboardPage() {
         actions={
           <>
             <DemoBadge kind={kind} />
-            <Button variant="primary" asChild>
-              <Link href="/mixes/novo">
-                <Plus /> Novo mix
-              </Link>
-            </Button>
+            {canManageMixes && (
+              <Button variant="primary" asChild>
+                <Link href="/admin">
+                  <Plus /> Novo mix
+                </Link>
+              </Button>
+            )}
           </>
         }
       />

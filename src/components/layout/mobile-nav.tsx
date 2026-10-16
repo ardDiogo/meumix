@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "../ui/sheet";
 import { CommunityBadge } from "./community-switcher";
 import { NavLinks } from "./nav-links";
 
-export function MobileNav({ community }: { community: Community }) {
+export function MobileNav({ community, showAdmin }: { community: Community; showAdmin: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -23,7 +23,7 @@ export function MobileNav({ community }: { community: Community }) {
           <Logo />
         </SheetTitle>
         <CommunityBadge community={community} />
-        <NavLinks onNavigate={() => setOpen(false)} />
+        <NavLinks onNavigate={() => setOpen(false)} showAdmin={showAdmin} />
       </SheetContent>
     </Sheet>
   );

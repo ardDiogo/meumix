@@ -175,3 +175,28 @@ export interface ExternalAccountLink {
   externalId: string;
   linkedAt: ISODateString;
 }
+
+/* ------------------------------ Agenda de mixes ----------------------------- */
+
+/** 0 = domingo … 6 = sábado (mesma convenção de `Date.getDay()`). */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type MixRecurrence = { kind: "weekly"; weekday: Weekday } | { kind: "once"; date: string /* AAAA-MM-DD */ };
+
+/**
+ * Evento de mix criado pelo administrador. Cada ocorrência gera um `Mix`,
+ * com inscrições liberadas no horário definido.
+ */
+export interface MixSchedule {
+  id: ID;
+  communityId: ID;
+  recurrence: MixRecurrence;
+  /** Horário do evento, "HH:MM" no fuso da comunidade. */
+  eventTime: string;
+  /** Horário de liberação das inscrições no dia do evento, "HH:MM". */
+  registrationOpensAt: string;
+  maxPlayers: number;
+  active: boolean;
+  createdBy: ID;
+  createdAt: ISODateString;
+}

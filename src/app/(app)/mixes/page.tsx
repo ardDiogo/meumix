@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FilterTabs } from "@/components/ui/filter-tabs";
+import { getPermissions } from "@/services/auth";
 import { listMixes } from "@/services/queries";
 
 export const metadata: Metadata = { title: "Mixes" };
@@ -21,7 +22,7 @@ type Filter = keyof typeof FILTERS;
 export default async function MixesPage({ searchParams }: PageProps<"/mixes">) {
   const { status } = await searchParams;
   const filter: Filter = typeof status === "string" && status in FILTERS ? (status as Filter) : "todos";
-  const { kind, mixes } = await listMixes();
+  const [{ kind, mixes }, { canManageMixes }] = await Promise.all([listMixes(), getPermissions()]);
   const visible = mixes.filter((m) => FILTERS[filter].match(m.status));
 
   return (
@@ -32,11 +33,13 @@ export default async function MixesPage({ searchParams }: PageProps<"/mixes">) {
         actions={
           <>
             <DemoBadge kind={kind} />
-            <Button variant="primary" asChild>
-              <Link href="/mixes/novo">
-                <Plus /> Novo mix
-              </Link>
-            </Button>
+            {canManageMixes && (
+              <Button variant="primary" asChild>
+                <Link href="/admin">
+                  <Plus /> Novo mix
+                </Link>
+              </Button>
+            )}
           </>
         }
       />

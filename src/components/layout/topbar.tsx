@@ -10,14 +10,16 @@ export function Topbar({
   community,
   player,
   isDemo,
+  showAdmin,
 }: {
   community: Community;
   player: Player | null;
   isDemo: boolean;
+  showAdmin: boolean;
 }) {
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-bg/90 px-4 backdrop-blur lg:px-6">
-      <MobileNav community={community} />
+      <MobileNav community={community} showAdmin={showAdmin} />
       <Logo className="lg:hidden" height={26} />
       <PlayerSearch className="ml-auto hidden w-full max-w-xs sm:block lg:ml-0" />
       <div className="ml-auto flex items-center gap-1 sm:ml-0 lg:ml-auto">
@@ -28,7 +30,7 @@ export function Topbar({
         >
           <Search className="size-4" />
         </Link>
-        <UserMenu player={player} isDemo={isDemo} />
+        <UserMenu player={player} isDemo={isDemo} showAdmin={showAdmin} />
       </div>
     </header>
   );

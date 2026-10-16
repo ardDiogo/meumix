@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { NAV_MAIN, NAV_SECONDARY, type NavItem } from "./nav-items";
+import { NAV_ADMIN, NAV_MAIN, NAV_SECONDARY, type NavItem } from "./nav-items";
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -31,7 +31,7 @@ function NavLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void 
   );
 }
 
-export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+export function NavLinks({ onNavigate, showAdmin }: { onNavigate?: () => void; showAdmin?: boolean }) {
   return (
     <nav aria-label="Navegação principal" className="flex flex-1 flex-col gap-6">
       <div className="flex flex-col gap-0.5">
@@ -40,6 +40,7 @@ export function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         ))}
       </div>
       <div className="mt-auto flex flex-col gap-0.5 border-t border-border pt-3">
+        {showAdmin && <NavLink item={NAV_ADMIN} onNavigate={onNavigate} />}
         {NAV_SECONDARY.map((item) => (
           <NavLink key={item.href} item={item} onNavigate={onNavigate} />
         ))}

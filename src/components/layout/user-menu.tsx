@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, LogOut, Settings, UserRound } from "lucide-react";
+import { ChevronDown, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { Player } from "@/types/domain";
@@ -14,7 +14,15 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 
-export function UserMenu({ player, isDemo }: { player: Player | null; isDemo: boolean }) {
+export function UserMenu({
+  player,
+  isDemo,
+  showAdmin,
+}: {
+  player: Player | null;
+  isDemo: boolean;
+  showAdmin: boolean;
+}) {
   const name = player?.nickname ?? "Visitante";
   return (
     <DropdownMenu>
@@ -34,6 +42,13 @@ export function UserMenu({ player, isDemo }: { player: Player | null; isDemo: bo
           <DropdownMenuItem asChild>
             <Link href={`/jogadores/${player.id}`}>
               <UserRound /> Meu perfil
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {showAdmin && (
+          <DropdownMenuItem asChild>
+            <Link href="/admin">
+              <ShieldCheck /> Administração
             </Link>
           </DropdownMenuItem>
         )}

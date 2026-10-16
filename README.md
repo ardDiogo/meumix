@@ -49,7 +49,8 @@ src/
   app/
     (app)/                 # Rotas com o shell (sidebar + topbar)
       dashboard/           # Dashboard do jogador
-      mixes/               # Lista, detalhes ([id]) e criação (novo)
+      mixes/               # Lista e detalhes ([id])
+      admin/               # Painel administrativo (criação de mixes)
       jogadores/           # Busca e perfil ([id])
       rankings/            # Ranking com filtro de período e busca
       estatisticas/        # Números da comunidade
@@ -79,6 +80,13 @@ supabase/migrations/       # Schema PostgreSQL planejado
 - **Multi-comunidade.** Jogadores participam de várias comunidades, com ELO, mixes e rankings próprios em cada uma (`community_members`).
 - **Sem ações falsas.** Funcionalidades ainda não implementadas informam isso explicitamente ao serem acionadas.
 - **Segredos só no servidor.** Apenas variáveis `NEXT_PUBLIC_*` chegam ao navegador; chaves privadas (Supabase service role, Steam Web API) nunca devem usar esse prefixo.
+
+## Permissões
+
+- Apenas **administradores** criam mixes (painel em `/admin`). Admins da plataforma são definidos pela variável `ADMIN_EMAILS` (somente servidor); admins de comunidade usam o papel `owner`/`admin` em `community_members`.
+- A regra está em `src/lib/auth/permissions.ts` e é verificada **no servidor** (Server Action em `src/app/(app)/admin/actions.ts`), não apenas escondendo botões.
+- Enquanto o login não existe, **ninguém é administrador em produção** e o painel fica bloqueado.
+- Para visualizar o painel localmente, rode com `MEUMIX_DEV_SESSION_EMAIL=<email do admin>` e `ADMIN_EMAILS=<email do admin>` no `.env.local` (ignorado em produção).
 
 ## Próximos passos sugeridos
 

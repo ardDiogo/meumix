@@ -3,6 +3,7 @@ import {
   Clapperboard,
   LayoutDashboard,
   Settings,
+  ShieldCheck,
   Swords,
   Trophy,
   Users,
@@ -25,6 +26,13 @@ export const NAV_MAIN: NavItem[] = [
   { href: "/estatisticas", label: "Estatísticas", icon: BarChart3, description: "Números da comunidade" },
   { href: "/clipes", label: "Clipes", icon: Clapperboard, description: "Clipes e highlights" },
 ];
+
+export const NAV_ADMIN: NavItem = {
+  href: "/admin",
+  label: "Administração",
+  icon: ShieldCheck,
+  description: "Criar e gerenciar mixes",
+};
 
 export const NAV_SECONDARY: NavItem[] = [
   { href: "/configuracoes", label: "Configurações", icon: Settings, description: "Conta e integrações" },

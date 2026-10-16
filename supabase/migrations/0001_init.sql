@@ -179,3 +179,25 @@ insert into public.maps (id, name, active) values
   ('de_mirage', 'Mirage', true), ('de_inferno', 'Inferno', true), ('de_nuke', 'Nuke', true),
   ('de_ancient', 'Ancient', true), ('de_anubis', 'Anubis', true), ('de_dust2', 'Dust II', true),
   ('de_train', 'Train', true), ('de_overpass', 'Overpass', false), ('de_vertigo', 'Vertigo', false);
+
+-- ---------------------------------------------------------------------------
+-- Agenda de mixes (eventos recorrentes criados pelo administrador)
+-- ---------------------------------------------------------------------------
+create table public.mix_schedules (
+  id uuid primary key default gen_random_uuid(),
+  community_id uuid not null references public.communities (id) on delete cascade,
+  recurrence_kind text not null check (recurrence_kind in ('weekly', 'once')),
+  weekday smallint check (weekday between 0 and 6),   -- 0 = domingo
+  event_date date,
+  event_time time not null,
+  registration_opens_at time not null,
+  max_players smallint not null default 10,
+  active boolean not null default true,
+  created_by uuid references public.profiles (id) on delete set null,
+  created_at timestamptz not null default now(),
+  check ((recurrence_kind = 'weekly' and weekday is not null) or (recurrence_kind = 'once' and event_date is not null)),
+  check (registration_opens_at < event_time)
+);
+alter table public.mix_schedules enable row level security;
+create policy "leitura publica" on public.mix_schedules for select using (true);
+-- Escrita: somente owner/admin da comunidade (políticas de insert/update a definir com o Auth).
