@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-const TABLES = ["mix_registrations", "map_votes", "captain_votes", "mix_draft_state"] as const;
+const TABLES = ["mix_registrations", "map_votes", "captain_votes", "mix_draft_state", "map_tiebreaker_rounds"] as const;
 
 /**
  * Atualiza o painel sozinho quando inscrições ou votos mudam (seção 11).
@@ -34,7 +34,10 @@ export function LiveRefresh({ scheduleId }: { scheduleId: string }) {
       }
       channel.on("postgres_changes", { event: "DELETE", schema: "public", table }, refresh);
     }
-    channel.on("postgres_changes", { event: "*", schema: "public", table: "mix_schedules" }, refresh);
+    // Tabelas sem schedule_id (ou sem filtro útil): qualquer mudança atualiza.
+    for (const table of ["mix_schedules", "map_tiebreaker_votes", "feature_settings"]) {
+      channel.on("postgres_changes", { event: "*", schema: "public", table }, refresh);
+    }
     channel.subscribe();
 
     return () => {

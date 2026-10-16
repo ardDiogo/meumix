@@ -16,6 +16,7 @@ import { DraftPanel } from "./draft-panel";
 import { RemoveButton, ResetButton, StartDraftButton } from "./registration-controls";
 import { VoteDialog } from "./vote-dialog";
 import { ShareMixButton } from "./share-mix";
+import { TiebreakerPanel } from "./tiebreaker-panel";
 
 const TZ = "America/Sao_Paulo";
 const dayMonth = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TZ });
@@ -189,6 +190,7 @@ export async function NextMixPanel() {
             registered={!!mine}
             opensAt={occurrence.opensAt.getTime()}
             eventAt={occurrence.eventAt.getTime()}
+            penaltyDelay={result.mix.myPenaltyDelay}
           />
         </div>
       </Card>
@@ -201,6 +203,15 @@ export async function NextMixPanel() {
           names={Object.fromEntries(registrations.map((r) => [r.userId, r.displayName]))}
           classified={classifiedList.map((r) => r.userId)}
           viewerId={session?.id ?? null}
+          isAdmin={canManageMixes}
+        />
+      )}
+
+      {draft?.status === "completed" && (
+        <TiebreakerPanel
+          tiebreaker={result.mix.tiebreaker}
+          classifiedCount={classified}
+          isClassified={mine?.status === "classified"}
           isAdmin={canManageMixes}
         />
       )}
@@ -232,6 +243,14 @@ export async function NextMixPanel() {
                     <div className="flex items-center gap-2">
                       <Avatar name={r.displayName} size="xs" />
                       <span className="font-medium">{r.displayName}</span>
+                      {r.penalty && (
+                        <span
+                          className="inline-flex animate-pulse items-center text-loss"
+                          title={`Punição: ${r.penalty.reason} (atraso de ${r.penalty.delaySeconds}s)`}
+                        >
+                          <AlertTriangle className="size-3.5" aria-label={`Punição: ${r.penalty.reason}`} />
+                        </span>
+                      )}
                     </div>
                   </TD>
                   <TD>

@@ -5,6 +5,7 @@ import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { detectTiebreaker } from "@/services/tiebreaker";
 
 export type DraftResult = { ok: true; message: string } | { ok: false; message: string };
 const fail = (message: string): DraftResult => ({ ok: false, message });
@@ -76,13 +77,15 @@ export async function pickPlayer(scheduleId: string, date: string, playerId: str
   if (!session) return fail("Entre na sua conta.");
   const admin = createSupabaseAdminClient();
   if (!admin) return fail("Servidor não configurado.");
-  const { error } = await admin.rpc("draft_pick", {
+  const { data, error } = await admin.rpc("draft_pick", {
     p_schedule: scheduleId,
     p_date: date,
     p_user: session.id,
     p_player: playerId,
   });
   if (error) return fail(dbMessage(error.message));
+  // Escolha concluída → checa desempate de mapas (idempotente).
+  if ((data as { status?: string } | null)?.status === "completed") await detectTiebreaker(scheduleId, date);
   refresh();
   return { ok: true, message: "Jogador escolhido!" };
 }
@@ -99,6 +102,8 @@ export async function resetDraft(scheduleId: string, date: string, scope: "draft
   const match = { schedule_id: scheduleId, event_date: date };
   const draft = await admin.from("mix_draft_state").delete().match(match);
   if (draft.error) return fail("Não foi possível reiniciar a seleção.");
+  // Reiniciar a escolha também descarta o desempate de mapas (depende dos times).
+  await admin.from("map_tiebreaker_rounds").delete().match(match);
   if (scope === "all") {
     const votes = await admin.from("captain_votes").delete().match(match);
     if (votes.error) return fail("A seleção foi reiniciada, mas os votos de capitão não foram apagados.");

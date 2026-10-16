@@ -57,6 +57,7 @@ export function JoinButton({
   registered,
   opensAt,
   eventAt,
+  penaltyDelay,
 }: {
   scheduleId: string;
   date: string;
@@ -64,6 +65,8 @@ export function JoinButton({
   registered: boolean;
   opensAt: number;
   eventAt: number;
+  /** Atraso (s) de uma punição ativa: a inscrição libera em opensAt + atraso. */
+  penaltyDelay: number | null;
 }) {
   const { synced, now } = useServerClock();
   useTick(1000);
@@ -72,7 +75,9 @@ export function JoinButton({
   const inFlight = useRef(false);
 
   const serverNow = now();
-  const msToOpen = opensAt - serverNow;
+  const releaseAt = opensAt + (penaltyDelay ?? 0) * 1000;
+  const msToOpen = releaseAt - serverNow;
+  const penaltyRunning = !!penaltyDelay && serverNow >= opensAt - EARLY_TOLERANCE_MS;
   const started = serverNow >= eventAt;
 
   /* ---------------- Fila de nova tentativa (sobrevive a recarregar) ---------------- */
@@ -206,10 +211,19 @@ export function JoinButton({
     );
   }
 
+  if (msToOpen > EARLY_TOLERANCE_MS && penaltyRunning) {
+    return (
+      <Button variant="secondary" size="lg" className="w-full border-loss/40 text-loss tabular" disabled>
+        Punição ativa — sua inscrição libera em {countdown(msToOpen)}
+      </Button>
+    );
+  }
+
   if (msToOpen > EARLY_TOLERANCE_MS) {
     return (
       <Button variant="secondary" size="lg" className="w-full tabular" disabled>
-        Inscrições abrem em {countdown(msToOpen)}
+        Inscrições abrem em {countdown(opensAt - serverNow)}
+        {penaltyDelay ? ` (+${penaltyDelay}s de punição)` : ""}
       </Button>
     );
   }

@@ -6,6 +6,7 @@ import { currentOccurrence, registrationWindow } from "@/lib/mix-schedule";
 import { CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
+import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
@@ -15,7 +16,11 @@ import { toSchedule, type ScheduleRow } from "@/services/mix-events";
  */
 export type ActionResult =
   | { ok: true; message: string }
-  | { ok: false; message: string; code?: "too_early" | "closed" | "unavailable" | "denied" | "invalid" | "error" };
+  | {
+      ok: false;
+      message: string;
+      code?: "too_early" | "penalty" | "closed" | "unavailable" | "denied" | "invalid" | "error";
+    };
 
 const fail = (message: string, code?: Extract<ActionResult, { ok: false }>["code"]): ActionResult => ({
   ok: false,
@@ -90,6 +95,24 @@ export async function joinMix(scheduleId: string, date: string, device?: string)
   if (existing) {
     await audit({ ...base, outcome: "already_registered" });
     return { ok: true, message: "Você já está inscrito neste mix." };
+  }
+
+  // 2. Punição ativa: atraso a partir do horário de liberação (fail-open em erro).
+  const penalty = (await activePenalties([session.id])).get(session.id);
+  if (penalty) {
+    const releaseAt = ctx.occurrence.opensAt.getTime() + penalty.delaySeconds * 1000;
+    const remaining = releaseAt - ctx.now.getTime();
+    if (remaining > 0) {
+      await audit({
+        ...base,
+        outcome: "penalty",
+        detail: { penalty_id: penalty.id, seconds_remaining: Math.ceil(remaining / 1000) },
+      });
+      return fail(
+        `Você está com uma punição ativa. Sua inscrição libera em ${Math.ceil(remaining / 1000)}s.`,
+        "penalty",
+      );
+    }
   }
 
   // 3. Cedo demais (relógio do servidor, tolerância de 1s).

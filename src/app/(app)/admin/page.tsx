@@ -1,7 +1,19 @@
-import { Award, CalendarClock, KeyRound, LockKeyhole, LogIn, Settings, Swords, UsersRound } from "lucide-react";
+import {
+  Award,
+  CalendarClock,
+  KeyRound,
+  LockKeyhole,
+  LogIn,
+  Settings,
+  ShieldAlert,
+  Swords,
+  UsersRound,
+} from "lucide-react";
 import type { Metadata } from "next";
 import { CreateMixForm } from "@/components/admin/create-mix-form";
 import { ScheduleList } from "@/components/admin/schedule-list";
+import { FeatureToggles } from "@/components/admin/feature-toggles";
+import { PenaltiesPanel } from "@/components/admin/penalties-panel";
 import { UsersTable } from "@/components/admin/users-table";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -14,6 +26,8 @@ import { formatDateTime } from "@/lib/format";
 import { mapName } from "@/lib/maps";
 import { getDataSource } from "@/services";
 import { listManagedUsers } from "@/services/admin-users";
+import { getFeatures } from "@/services/features";
+import { activePenalties } from "@/services/penalties";
 import { getPermissions } from "@/services/auth";
 import { listSchedules } from "@/services/mix-events";
 
@@ -24,6 +38,7 @@ const TABS = {
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
   usuarios: { label: "Usuários", icon: UsersRound },
+  punicoes: { label: "Punições", icon: ShieldAlert },
 } as const;
 type Tab = keyof typeof TABS;
 
@@ -56,7 +71,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   }
 
   const { aba } = await searchParams;
-  const visibleTabs = (Object.keys(TABS) as Tab[]).filter((t) => t !== "usuarios" || canManageAdmins);
+  const visibleTabs = (Object.keys(TABS) as Tab[]).filter(
+    (t) => (t !== "usuarios" && t !== "punicoes") || canManageAdmins,
+  );
   const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
   const [schedules, upcoming] = await Promise.all([
     listSchedules(),
@@ -119,13 +136,11 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         </Card>
       )}
       {tab === "usuarios" && <UsersPanel />}
+      {tab === "punicoes" && <PenaltiesTab />}
       {tab === "configuracoes" && (
         <Card>
-          <EmptyState
-            icon={Settings}
-            title="Configurações da comunidade em breve"
-            description="Pool de mapas, ELO inicial, tamanho dos times e administradores da comunidade."
-          />
+          <CardHeader title="Funcionalidades" description="Ligue ou desligue recursos do mix." />
+          <FeatureToggles values={await getFeatures()} />
         </Card>
       )}
     </>
@@ -160,5 +175,24 @@ async function UsersPanel() {
         />
       )}
     </Card>
+  );
+}
+
+async function PenaltiesTab() {
+  const [users, penalties] = await Promise.all([listManagedUsers(), activePenalties()]);
+  const list = users.status === "ok" ? users.users : [];
+  const names = new Map(list.map((u) => [u.id, u.displayName]));
+  return (
+    <PenaltiesPanel
+      users={list.map((u) => ({ id: u.id, name: `${u.displayName} (${u.email})` }))}
+      penalties={[...penalties.values()].map((p) => ({
+        id: p.id,
+        userName: names.get(p.userId) ?? "Jogador",
+        delaySeconds: p.delaySeconds,
+        reason: p.reason,
+        expiresAt: p.expiresAt,
+        createdAt: p.createdAt,
+      }))}
+    />
   );
 }

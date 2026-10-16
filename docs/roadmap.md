@@ -24,28 +24,28 @@ Referência: [`regras-do-mix.md`](./regras-do-mix.md). Legenda: ✅ feito · �
 
 ## Fase 2 — Disputa e escolha dos times (em andamento)
 
-| Item                                                                      | Seção | Status |
-| ------------------------------------------------------------------------- | ----- | ------ |
-| Bloqueio de voto de capitão quando o PPT começa (trigger no banco)        | 4     | ✅     |
-| Capitães = 2 mais votados (início automático com 20 votos ou pelo admin)  | 4     | ✅     |
-| Pedra, papel ou tesoura decidido no banco (jogadas ocultas, empate salvo) | 5     | ✅     |
-| Escolha dos times 1-2-2-2-1 com checagem no banco a cada escolha          | 6     | ✅     |
-| Admin: reiniciar escolha / tudo; remover jogador zera escolhas            | 6     | ✅     |
-| Desempate de mapas (rounds 1 e 2 + sorteio)                               | 3     | ⬜     |
-| Sugestão de times balanceados (252 combinações) + votação 80%             | 7     | ⬜     |
-| Probabilidade de vitória                                                  | 7     | ⬜     |
+| Item                                                                          | Seção | Status |
+| ----------------------------------------------------------------------------- | ----- | ------ |
+| Bloqueio de voto de capitão quando o PPT começa (trigger no banco)            | 4     | ✅     |
+| Capitães = 2 mais votados (início automático com 20 votos ou pelo admin)      | 4     | ✅     |
+| Pedra, papel ou tesoura decidido no banco (jogadas ocultas, empate salvo)     | 5     | ✅     |
+| Escolha dos times 1-2-2-2-1 com checagem no banco a cada escolha              | 6     | ✅     |
+| Admin: reiniciar escolha / tudo; remover jogador zera escolhas                | 6     | ✅     |
+| Desempate de mapas (rounds 1 e 2 + sorteio criptográfico), com chave no admin | 3     | ✅     |
+| Sugestão de times balanceados (252 combinações) + votação 80%                 | 7     | ⬜     |
+| Probabilidade de vitória                                                      | 7     | ⬜     |
 
 ## Fase 3 — Cargos e administração
 
-| Item                                                                | Seção | Status                    |
-| ------------------------------------------------------------------- | ----- | ------------------------- |
-| Cargos master / admin / usuário                                     | 10    | 🟡 (super admin = master) |
-| Punições (atraso na abertura, expiração automática, ícone na lista) | 2, 10 | ⬜                        |
-| Reset de senha por admin/master                                     | 10    | ⬜                        |
-| Insígnias                                                           | 10    | ⬜                        |
-| Chaves de funcionalidades (sugestão de times, música, desempate)    | 10    | ⬜                        |
-| Música de fundo                                                     | 10    | ⬜                        |
-| Tela de logs de auditoria                                           | 10    | ⬜                        |
+| Item                                                                           | Seção | Status                                   |
+| ------------------------------------------------------------------------------ | ----- | ---------------------------------------- |
+| Cargos master / admin / usuário                                                | 10    | 🟡 (super admin = master)                |
+| Punições (atraso na abertura, expiração automática, ícone piscando; só master) | 2, 10 | ✅                                       |
+| Reset de senha por admin/master                                                | 10    | ⬜                                       |
+| Insígnias                                                                      | 10    | ⬜                                       |
+| Chaves de funcionalidades                                                      | 10    | 🟡 (desempate de mapas; demais em breve) |
+| Música de fundo                                                                | 10    | ⬜                                       |
+| Tela de logs de auditoria                                                      | 10    | ⬜                                       |
 
 ## Fase 4 — Finalização, ELO e histórico
 

@@ -3,6 +3,9 @@ import { currentOccurrence, type Occurrence } from "@/lib/mix-schedule";
 import { isAuthConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { tally } from "@/lib/mix-rules";
+import { getFeatures } from "./features";
+import { activePenalties } from "./penalties";
+import { finalMaps, type RoundRow } from "./tiebreaker";
 import type { MixRecurrence, Weekday } from "@/types/domain";
 
 export const DEFAULT_COMMUNITY_SLUG = "principal";
@@ -61,6 +64,28 @@ export interface Registration {
   captainVotesGiven: number;
   /** Votos de capitão recebidos (só contam votos de classificados). */
   captainVotesReceived: number;
+  /** Punição ativa (mostrada com ícone na lista). */
+  penalty: { reason: string; delaySeconds: number } | null;
+}
+
+export interface TiebreakerRoundView {
+  id: string;
+  roundNumber: 1 | 2;
+  status: "voting" | "completed" | "resolved_random";
+  candidates: { id: string; name: string; votes: number }[];
+  slots: number;
+  votesCast: number;
+  myVote: string[];
+  winning: string[];
+  random: string[];
+}
+
+export interface TiebreakerView {
+  enabled: boolean;
+  rounds: TiebreakerRoundView[];
+  /** Mapas definidos para o mix (após a escolha dos times). */
+  finalMaps: { id: string; name: string; random: boolean }[];
+  pending: boolean;
 }
 
 export interface VoteSummary {
@@ -101,6 +126,9 @@ export interface NextMix {
   registrations: Registration[];
   votes: VoteSummary;
   draft: DraftView | null;
+  tiebreaker: TiebreakerView;
+  /** Atraso (s) da punição ativa de quem está vendo, se houver. */
+  myPenaltyDelay: number | null;
 }
 
 export type NextMixResult = { status: "not_configured" } | { status: "none" } | { status: "ok"; mix: NextMix };
@@ -168,6 +196,7 @@ export async function listRegistrations(
       mapVoted: mapRows.some((v) => v.user_id === uid),
       captainVotesGiven: capRows.filter((v) => v.voter_id === uid).length,
       captainVotesReceived: capRows.filter((v) => v.candidate_id === uid).length,
+      penalty: null,
     };
   });
 
@@ -207,11 +236,22 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
   const next = upcoming[0];
   if (!next) return { status: "none" };
 
-  const [{ registrations, votes }, organizers, draft] = await Promise.all([
+  const [{ registrations, votes }, organizers, draft, features] = await Promise.all([
     listRegistrations(next.schedule.id, next.occurrence.date, next.schedule.maxPlayers, viewerId),
     displayNames(next.schedule.createdBy ? [next.schedule.createdBy] : []),
     loadDraft(next.schedule.id, next.occurrence.date),
+    getFeatures(),
   ]);
+
+  const ids = [...new Set([...registrations.map((r) => r.userId), ...(viewerId ? [viewerId] : [])])];
+  const [penalties, tiebreaker] = await Promise.all([
+    activePenalties(ids),
+    loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId),
+  ]);
+  for (const r of registrations) {
+    const p = penalties.get(r.userId);
+    r.penalty = p ? { reason: p.reason, delaySeconds: p.delaySeconds } : null;
+  }
   return {
     status: "ok",
     mix: {
@@ -220,6 +260,8 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
       registrations,
       votes,
       draft,
+      tiebreaker,
+      myPenaltyDelay: viewerId ? (penalties.get(viewerId)?.delaySeconds ?? null) : null,
     },
   };
 }
@@ -249,5 +291,63 @@ async function loadDraft(scheduleId: string, date: string): Promise<DraftView | 
     picksInTurn: data.picks_in_turn,
     teamA: data.team_a ?? [],
     teamB: data.team_b ?? [],
+  };
+}
+
+async function loadTiebreaker(
+  scheduleId: string,
+  date: string,
+  votes: VoteSummary,
+  draft: DraftView | null,
+  enabled: boolean,
+  viewerId: string | null,
+): Promise<TiebreakerView> {
+  const names = new Map(votes.maps.map((m) => [m.id, m.name]));
+  const empty: TiebreakerView = { enabled, rounds: [], finalMaps: [], pending: false };
+  const supabase = await createSupabaseServerClient();
+  if (!supabase || draft?.status !== "completed") return empty;
+
+  const { data: rounds } = await supabase
+    .from("map_tiebreaker_rounds")
+    .select("*")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .order("round_number");
+  const rows = (rounds ?? []) as RoundRow[];
+  const { data: rvotes } = rows.length
+    ? await supabase
+        .from("map_tiebreaker_votes")
+        .select("round_id, user_id, maps")
+        .in(
+          "round_id",
+          rows.map((r) => r.id),
+        )
+    : { data: [] };
+
+  const counts = new Map(votes.mapTally.map((m) => [m.id, m.votes]));
+  const main = votes.maps.map((m) => ({ id: m.id, votes: counts.get(m.id) ?? 0 }));
+  const result = finalMaps(main, rows, enabled);
+
+  return {
+    enabled,
+    pending: result.pending,
+    finalMaps: result.maps.map((id) => ({ id, name: names.get(id) ?? id, random: result.random.includes(id) })),
+    rounds: rows.map((r) => {
+      const mine = (rvotes ?? []).filter((v) => v.round_id === r.id);
+      return {
+        id: r.id,
+        roundNumber: r.round_number,
+        status: r.status,
+        slots: r.slots,
+        votesCast: mine.length,
+        myVote: (mine.find((v) => v.user_id === viewerId)?.maps as string[] | undefined) ?? [],
+        winning: r.winning_maps,
+        random: r.random_maps,
+        candidates: r.candidate_maps.map((id) => ({
+          id,
+          name: names.get(id) ?? id,
+          votes: mine.filter((v) => (v.maps as string[]).includes(id)).length,
+        })),
+      };
+    }),
   };
 }
