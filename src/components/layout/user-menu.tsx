@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronDown, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { ChevronDown, LogIn, LogOut, Settings, ShieldCheck } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
-import type { Player } from "@/types/domain";
+import { signOut } from "@/app/entrar/actions";
 import { Avatar } from "../ui/avatar";
+import { Button } from "../ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,37 +14,40 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 
-export function UserMenu({
-  player,
-  isDemo,
-  showAdmin,
-}: {
-  player: Player | null;
-  isDemo: boolean;
-  showAdmin: boolean;
-}) {
-  const name = player?.nickname ?? "Visitante";
+export interface MenuUser {
+  displayName: string;
+  email: string;
+  roleLabel: string | null;
+}
+
+export function UserMenu({ user, showAdmin }: { user: MenuUser | null; showAdmin: boolean }) {
+  if (!user) {
+    return (
+      <Button variant="primary" size="sm" asChild>
+        <Link href="/entrar">
+          <LogIn /> Entrar
+        </Link>
+      </Button>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-md p-1 pr-2 transition-colors hover:bg-surface-2 data-[state=open]:bg-surface-2">
-        <Avatar name={name} src={player?.avatarUrl} size="sm" />
-        <span className="hidden text-sm font-medium sm:block">{name}</span>
+        <Avatar name={user.displayName} size="sm" />
+        <span className="hidden text-sm font-medium sm:block">{user.displayName}</span>
         <ChevronDown className="hidden size-4 text-muted sm:block" aria-hidden />
         <span className="sr-only">Abrir menu do usuário</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>
-          <div className="font-medium text-fg">{name}</div>
-          {isDemo && <div>Conta de demonstração</div>}
+          <div className="font-medium text-fg">{user.displayName}</div>
+          <div className="truncate">{user.email}</div>
+          {user.roleLabel && (
+            <div className="mt-1 text-[11px] font-semibold tracking-wide text-brand uppercase">{user.roleLabel}</div>
+          )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {player && (
-          <DropdownMenuItem asChild>
-            <Link href={`/jogadores/${player.id}`}>
-              <UserRound /> Meu perfil
-            </Link>
-          </DropdownMenuItem>
-        )}
         {showAdmin && (
           <DropdownMenuItem asChild>
             <Link href="/admin">
@@ -58,15 +61,13 @@ export function UserMenu({
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() =>
-            toast.info("Autenticação ainda não implementada", {
-              description: "O login será feito via Supabase Auth em uma próxima etapa.",
-            })
-          }
-        >
-          <LogOut /> Sair
-        </DropdownMenuItem>
+        <form action={signOut}>
+          <DropdownMenuItem asChild>
+            <button type="submit" className="w-full">
+              <LogOut /> Sair
+            </button>
+          </DropdownMenuItem>
+        </form>
       </DropdownMenuContent>
     </DropdownMenu>
   );

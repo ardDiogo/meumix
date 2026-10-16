@@ -1,20 +1,18 @@
 import { Search } from "lucide-react";
 import Link from "next/link";
-import type { Community, Player } from "@/types/domain";
+import type { Community } from "@/types/domain";
 import { Logo } from "../brand/logo";
 import { MobileNav } from "./mobile-nav";
 import { PlayerSearch } from "./player-search";
-import { UserMenu } from "./user-menu";
+import { UserMenu, type MenuUser } from "./user-menu";
 
 export function Topbar({
   community,
-  player,
-  isDemo,
+  user,
   showAdmin,
 }: {
   community: Community;
-  player: Player | null;
-  isDemo: boolean;
+  user: MenuUser | null;
   showAdmin: boolean;
 }) {
   return (
@@ -30,7 +28,7 @@ export function Topbar({
         >
           <Search className="size-4" />
         </Link>
-        <UserMenu player={player} isDemo={isDemo} showAdmin={showAdmin} />
+        <UserMenu user={user} showAdmin={showAdmin} />
       </div>
     </header>
   );

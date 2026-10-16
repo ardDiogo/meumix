@@ -1,6 +1,8 @@
-import { Award, CalendarClock, LockKeyhole, Settings, Swords } from "lucide-react";
+import { Award, CalendarClock, KeyRound, LockKeyhole, LogIn, Settings, Swords, UsersRound } from "lucide-react";
 import type { Metadata } from "next";
 import { CreateMixForm } from "@/components/admin/create-mix-form";
+import { UsersTable } from "@/components/admin/users-table";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { StatusBadge } from "@/components/mixes/badges";
 import { PageHeader } from "@/components/page-header";
@@ -10,6 +12,7 @@ import { FilterTabs } from "@/components/ui/filter-tabs";
 import { formatDateTime } from "@/lib/format";
 import { mapName } from "@/lib/maps";
 import { getDataSource } from "@/services";
+import { listManagedUsers } from "@/services/admin-users";
 import { getPermissions } from "@/services/auth";
 
 export const metadata: Metadata = { title: "Painel administrativo" };
@@ -18,11 +21,12 @@ const TABS = {
   mix: { label: "Controle de mix", icon: Swords },
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
+  usuarios: { label: "Usuários", icon: UsersRound },
 } as const;
 type Tab = keyof typeof TABS;
 
 export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
-  const { canManageMixes } = await getPermissions();
+  const { session, canManageMixes, canManageAdmins } = await getPermissions();
 
   if (!canManageMixes) {
     return (
@@ -30,14 +34,28 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         <EmptyState
           icon={LockKeyhole}
           title="Acesso restrito a administradores"
-          description="Entre com uma conta de administrador para gerenciar mixes. O login ainda não está disponível nesta versão."
+          description={
+            session
+              ? "Sua conta não tem permissão de administrador. Peça acesso ao super administrador."
+              : "Entre com uma conta de administrador para gerenciar mixes."
+          }
+          action={
+            !session && (
+              <Button variant="primary" asChild>
+                <Link href="/entrar?next=/admin">
+                  <LogIn /> Entrar
+                </Link>
+              </Button>
+            )
+          }
         />
       </Card>
     );
   }
 
   const { aba } = await searchParams;
-  const tab: Tab = typeof aba === "string" && aba in TABS ? (aba as Tab) : "mix";
+  const visibleTabs = (Object.keys(TABS) as Tab[]).filter((t) => t !== "usuarios" || canManageAdmins);
+  const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
   const upcoming = await getDataSource().listMixes({ status: ["scheduled", "live"] });
 
   return (
@@ -50,9 +68,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         className="mb-4"
         label="Seções do painel"
         current={tab}
-        options={Object.entries(TABS).map(([value, t]) => ({
+        options={visibleTabs.map((value) => ({
           value,
-          label: t.label,
+          label: TABS[value].label,
           href: value === "mix" ? "/admin" : `/admin?aba=${value}`,
         }))}
       />
@@ -93,6 +111,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           />
         </Card>
       )}
+      {tab === "usuarios" && <UsersPanel />}
       {tab === "configuracoes" && (
         <Card>
           <EmptyState
@@ -103,5 +122,36 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         </Card>
       )}
     </>
+  );
+}
+
+async function UsersPanel() {
+  const result = await listManagedUsers();
+  return (
+    <Card>
+      <CardHeader
+        title="Usuários e administradores"
+        description="Administradores podem criar e gerenciar mixes. Somente o super administrador concede ou remove esse papel."
+      />
+      {result.status === "ok" ? (
+        result.users.length ? (
+          <UsersTable users={result.users} />
+        ) : (
+          <EmptyState icon={UsersRound} title="Nenhum usuário cadastrado ainda" />
+        )
+      ) : (
+        <EmptyState
+          icon={KeyRound}
+          title={
+            result.status === "not_configured" ? "Gestão de usuários não configurada" : "Erro ao carregar usuários"
+          }
+          description={
+            result.status === "not_configured"
+              ? "Defina SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente da Vercel para listar e gerenciar usuários."
+              : result.message
+          }
+        />
+      )}
+    </Card>
   );
 }

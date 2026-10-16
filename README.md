@@ -50,7 +50,9 @@ src/
     (app)/                 # Rotas com o shell (sidebar + topbar)
       dashboard/           # Dashboard do jogador
       mixes/               # Lista e detalhes ([id])
-      admin/               # Painel administrativo (criação de mixes)
+      admin/               # Painel administrativo (mixes e administradores)
+    entrar/                # Login, cadastro e recuperação de senha
+    auth/callback/         # Retorno dos links enviados por e-mail
       jogadores/           # Busca e perfil ([id])
       rankings/            # Ranking com filtro de período e busca
       estatisticas/        # Números da comunidade
@@ -81,12 +83,26 @@ supabase/migrations/       # Schema PostgreSQL planejado
 - **Sem ações falsas.** Funcionalidades ainda não implementadas informam isso explicitamente ao serem acionadas.
 - **Segredos só no servidor.** Apenas variáveis `NEXT_PUBLIC_*` chegam ao navegador; chaves privadas (Supabase service role, Steam Web API) nunca devem usar esse prefixo.
 
-## Permissões
+## Login e permissões
 
-- Apenas **administradores** criam mixes (painel em `/admin`). Admins da plataforma são definidos pela variável `ADMIN_EMAILS` (somente servidor); admins de comunidade usam o papel `owner`/`admin` em `community_members`.
-- A regra está em `src/lib/auth/permissions.ts` e é verificada **no servidor** (Server Action em `src/app/(app)/admin/actions.ts`), não apenas escondendo botões.
-- Enquanto o login não existe, **ninguém é administrador em produção** e o painel fica bloqueado.
-- Para visualizar o painel localmente, rode com `MEUMIX_DEV_SESSION_EMAIL=<email do admin>` e `ADMIN_EMAILS=<email do admin>` no `.env.local` (ignorado em produção).
+O login usa **Supabase Auth** (e-mail e senha, confirmação por e-mail e recuperação de senha) em `/entrar`.
+
+| Papel         | Como é definido                                        | Pode                                           |
+| ------------- | ------------------------------------------------------ | ---------------------------------------------- |
+| Super admin   | E-mail em `SUPER_ADMIN_EMAILS` (com e-mail confirmado) | Tudo, inclusive nomear/remover administradores |
+| Administrador | `profiles.role = 'admin'`, concedido pelo super admin  | Criar e gerenciar mixes                        |
+| Jogador       | Padrão de toda conta nova                              | Usar a plataforma                              |
+
+- Regras em `src/lib/auth/permissions.ts`, verificadas **no servidor** nas Server Actions (`src/app/(app)/admin/actions.ts`).
+- Ninguém consegue se promover: o banco bloqueia a edição de `role` pelo usuário (`0002_auth.sql`); só o servidor altera com a chave service role, após checar o super admin.
+- Sem Supabase configurado, ninguém é administrador em produção. Localmente, `MEUMIX_DEV_SESSION_EMAIL` simula uma sessão.
+
+### Ativando o login
+
+1. Crie um projeto gratuito em [supabase.com](https://supabase.com).
+2. No **SQL Editor**, execute `supabase/migrations/0001_init.sql` e depois `0002_auth.sql`.
+3. Em **Authentication → URL Configuration**, defina **Site URL** como `https://meumix.vercel.app` e adicione `https://meumix.vercel.app/auth/callback` (e `http://localhost:3000/auth/callback`) em **Redirect URLs**.
+4. Na Vercel (**Settings → Environment Variables**), adicione `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` e `SUPER_ADMIN_EMAILS`, e faça um novo deploy.
 
 ## Próximos passos sugeridos
 
