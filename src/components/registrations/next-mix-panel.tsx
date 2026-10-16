@@ -1,5 +1,6 @@
-import { CalendarClock, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, Check, Crown, Monitor, Smartphone, Users } from "lucide-react";
 import { headers } from "next/headers";
+import { CAPTAINS, CAPTAIN_VOTES_PER_PLAYER, MAPS_IN_ROTATION } from "@/lib/mix-rules";
 import { registrationWindow } from "@/lib/mix-schedule";
 import { cn } from "@/lib/utils";
 import { getPermissions } from "@/services/auth";
@@ -9,7 +10,10 @@ import { Badge } from "../ui/badge";
 import { Card, CardHeader } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
 import { Table, TD, TH, THead, TR } from "../ui/table";
-import { JoinButton, RemoveButton, ResetButton } from "./registration-controls";
+import { JoinButton } from "./join-button";
+import { LiveRefresh } from "./live-refresh";
+import { RemoveButton, ResetButton } from "./registration-controls";
+import { VoteDialog } from "./vote-dialog";
 import { ShareMixButton } from "./share-mix";
 
 const TZ = "America/Sao_Paulo";
@@ -69,7 +73,23 @@ function inviteMessage(opts: {
 
 /** Próximo mix com inscrições reais. Só usuários cadastrados podem participar. */
 export async function NextMixPanel() {
-  const [result, { session, canManageMixes }] = await Promise.all([getNextMix(), getPermissions()]);
+  const { session, canManageMixes } = await getPermissions();
+  let result: Awaited<ReturnType<typeof getNextMix>>;
+  try {
+    result = await getNextMix(session?.id ?? null);
+  } catch (e) {
+    console.error("[NextMixPanel]", e);
+    return (
+      <Card className="mb-4">
+        <EmptyState
+          icon={AlertTriangle}
+          title="Não foi possível carregar o mix"
+          description="Tente recarregar a página em instantes."
+          className="py-8"
+        />
+      </Card>
+    );
+  }
   if (result.status === "not_configured") return null;
 
   if (result.status === "none") {
@@ -85,26 +105,28 @@ export async function NextMixPanel() {
     );
   }
 
-  const { schedule, occurrence, organizer, registrations } = result.mix;
+  const { schedule, occurrence, organizer, registrations, votes } = result.mix;
   const now = new Date();
   const regWindow = registrationWindow(occurrence, now);
   const mine = session ? registrations.find((r) => r.userId === session.id) : undefined;
-  const classified = registrations.filter((r) => r.status === "classified").length;
+  const classifiedList = registrations.filter((r) => r.status === "classified");
+  const classified = classifiedList.length;
+  const full = classified >= schedule.maxPlayers;
+  const votesNeeded = schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER;
   const message = inviteMessage({
     eventAt: occurrence.eventAt,
     opensAt: occurrence.opensAt,
-    classified: registrations.filter((r) => r.status === "classified").map((r) => r.displayName),
+    classified: classifiedList.map((r) => r.displayName),
     reserves: registrations.filter((r) => r.status === "reserve").map((r) => r.displayName),
     maxPlayers: schedule.maxPlayers,
     link: `${await siteUrl()}/dashboard`,
   });
-  const opensLabel =
-    dayMonth(occurrence.opensAt) === dayMonth(now)
-      ? `hoje às ${hourMin(occurrence.opensAt)}`
-      : `${dayMonth(occurrence.opensAt)} às ${hourMin(occurrence.opensAt)}`;
+  const topMaps = votes.mapTally.slice(0, MAPS_IN_ROTATION);
+  const topCaptains = votes.captainTally.slice(0, CAPTAINS);
 
   return (
     <section aria-label="Próximo mix" className="mb-4 space-y-4">
+      <LiveRefresh scheduleId={schedule.id} />
       <Card>
         <div className="flex flex-col gap-4 p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
@@ -137,7 +159,20 @@ export async function NextMixPanel() {
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+              {mine?.status === "classified" && (
+                <VoteDialog
+                  scheduleId={schedule.id}
+                  date={occurrence.date}
+                  maps={votes.maps}
+                  candidates={classifiedList
+                    .filter((r) => r.userId !== session?.id)
+                    .map((r) => ({ userId: r.userId, displayName: r.displayName }))}
+                  myMaps={votes.mine.maps}
+                  myCaptains={votes.mine.captains}
+                  mandatory={full}
+                />
+              )}
               {canManageMixes && registrations.length > 0 && (
                 <ResetButton scheduleId={schedule.id} date={occurrence.date} />
               )}
@@ -149,8 +184,8 @@ export async function NextMixPanel() {
             date={occurrence.date}
             loggedIn={!!session}
             registered={!!mine}
-            regWindow={regWindow}
-            opensLabel={opensLabel}
+            opensAt={occurrence.opensAt.getTime()}
+            eventAt={occurrence.eventAt.getTime()}
           />
         </div>
       </Card>
@@ -158,7 +193,7 @@ export async function NextMixPanel() {
       <Card>
         <CardHeader
           title={`Jogadores inscritos (${classified}/${schedule.maxPlayers} classificados)`}
-          description="Lista ordenada por horário de inscrição. Após as vagas, os inscritos entram como suplentes."
+          description="Lista ordenada por horário de inscrição. Após as vagas, os inscritos entram como reservas."
         />
         {registrations.length ? (
           <Table>
@@ -167,7 +202,10 @@ export async function NextMixPanel() {
                 <TH className="w-12 text-center">#</TH>
                 <TH className="min-w-40">Nick</TH>
                 <TH>Status</TH>
+                <TH className="text-center">Device</TH>
+                <TH>Mapas</TH>
                 <TH>Horário</TH>
+                <TH title="Votos de capitão dados / recebidos">Votação</TH>
                 {canManageMixes && <TH className="text-right">Ações</TH>}
               </TR>
             </THead>
@@ -185,10 +223,50 @@ export async function NextMixPanel() {
                     {r.status === "classified" ? (
                       <Badge variant="win">Classificado</Badge>
                     ) : (
-                      <Badge variant="neutral">Suplente</Badge>
+                      <Badge variant="neutral">Reserva</Badge>
+                    )}
+                  </TD>
+                  <TD className="text-center text-muted">
+                    {r.device === "mobile" ? (
+                      <Smartphone className="mx-auto size-4" aria-label="Celular" />
+                    ) : r.device === "desktop" ? (
+                      <Monitor className="mx-auto size-4" aria-label="Computador" />
+                    ) : (
+                      "—"
+                    )}
+                  </TD>
+                  <TD className="text-xs">
+                    {r.status !== "classified" ? (
+                      <span className="text-subtle">—</span>
+                    ) : r.mapVoted ? (
+                      <span className="inline-flex items-center gap-1 text-win">
+                        <Check className="size-3.5" /> Votou
+                      </span>
+                    ) : (
+                      <span className="text-muted">Não votou</span>
                     )}
                   </TD>
                   <TD className="text-muted">{fullTime(r.createdAt)}</TD>
+                  <TD>
+                    {r.status === "classified" ? (
+                      <div className="flex items-center gap-3">
+                        <span className="rounded-sm bg-surface-2 px-1.5 py-0.5 text-xs font-semibold">
+                          {r.captainVotesGiven}/{CAPTAIN_VOTES_PER_PLAYER}
+                        </span>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1 text-xs",
+                            r.captainVotesReceived ? "text-brand" : "text-subtle",
+                          )}
+                          title="Votos para capitão recebidos"
+                        >
+                          <Crown className="size-3.5" /> ({r.captainVotesReceived})
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-subtle">—</span>
+                    )}
+                  </TD>
                   {canManageMixes && (
                     <TD className="text-right">
                       <RemoveButton registrationId={r.id} name={r.displayName} />
@@ -206,9 +284,51 @@ export async function NextMixPanel() {
             className="py-8"
           />
         )}
+
+        {(topMaps.length > 0 || topCaptains.length > 0) && (
+          <div className="grid gap-3 border-t border-border px-4 py-3 text-sm sm:grid-cols-2">
+            <div>
+              <div className="mb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">
+                Mapas mais votados
+              </div>
+              {topMaps.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {topMaps.map((m) => (
+                    <Badge key={m.id} variant="brand">
+                      {m.name} · {m.votes}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-subtle">Sem votos ainda</span>
+              )}
+            </div>
+            <div>
+              <div className="mb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">
+                Capitães mais votados
+              </div>
+              {topCaptains.length ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {topCaptains.map((c) => (
+                    <Badge key={c.userId} variant="brand">
+                      <Crown /> {c.displayName} · {c.votes}
+                    </Badge>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-subtle">Sem votos ainda</span>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="border-t border-border px-4 py-3 text-center text-sm text-muted">
-          Necessário <span className="font-semibold text-fg">{schedule.maxPlayers} jogadores classificados</span> para
-          iniciar a seleção de equipes ({classified}/{schedule.maxPlayers}).
+          Necessário <span className="font-semibold text-fg">{schedule.maxPlayers} jogadores classificados</span> (
+          {classified}/{schedule.maxPlayers}) e{" "}
+          <span className="font-semibold text-fg">
+            {votes.captainVotesCast}/{votesNeeded} votações
+          </span>{" "}
+          para iniciar a seleção de equipes.
         </div>
       </Card>
     </section>

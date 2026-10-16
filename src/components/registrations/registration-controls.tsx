@@ -1,17 +1,9 @@
 "use client";
 
-import { Loader2, LogIn, RotateCcw, Trash2, UserMinus, UserPlus } from "lucide-react";
-import Link from "next/link";
+import { Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useTransition } from "react";
 import { toast } from "sonner";
-import {
-  joinMix,
-  leaveMix,
-  removeRegistration,
-  resetRegistrations,
-  type ActionResult,
-} from "@/app/(app)/inscricoes/actions";
-import type { RegistrationWindow } from "@/lib/mix-schedule";
+import { removeRegistration, resetRegistrations, type ActionResult } from "@/app/(app)/inscricoes/actions";
 import { Button } from "../ui/button";
 
 function useAction() {
@@ -23,67 +15,6 @@ function useAction() {
       else toast.error(r.message);
     });
   return [pending, run] as const;
-}
-
-export function JoinButton({
-  scheduleId,
-  date,
-  loggedIn,
-  registered,
-  regWindow,
-  opensLabel,
-}: {
-  scheduleId: string;
-  date: string;
-  loggedIn: boolean;
-  registered: boolean;
-  regWindow: RegistrationWindow;
-  opensLabel: string;
-}) {
-  const [pending, run] = useAction();
-
-  if (!loggedIn) {
-    return (
-      <Button variant="primary" size="lg" className="w-full" asChild>
-        <Link href="/entrar?next=/dashboard">
-          <LogIn /> Entre ou cadastre-se para participar
-        </Link>
-      </Button>
-    );
-  }
-  if (registered) {
-    return (
-      <Button
-        variant="secondary"
-        size="lg"
-        className="w-full"
-        disabled={pending || regWindow === "closed"}
-        onClick={() => run(() => leaveMix(scheduleId, date))}
-      >
-        {pending ? <Loader2 className="animate-spin" /> : <UserMinus />}
-        {regWindow === "closed" ? "Inscrição confirmada" : "Cancelar minha inscrição"}
-      </Button>
-    );
-  }
-  if (regWindow !== "open") {
-    return (
-      <Button variant="secondary" size="lg" className="w-full" disabled>
-        {regWindow === "not_open" ? `Inscrições abrem ${opensLabel}` : "Inscrições encerradas"}
-      </Button>
-    );
-  }
-  return (
-    <Button
-      variant="primary"
-      size="lg"
-      className="w-full"
-      disabled={pending}
-      onClick={() => run(() => joinMix(scheduleId, date))}
-    >
-      {pending ? <Loader2 className="animate-spin" /> : <UserPlus />}
-      Quero participar
-    </Button>
-  );
 }
 
 export function ResetButton({ scheduleId, date }: { scheduleId: string; date: string }) {
