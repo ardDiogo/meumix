@@ -1,4 +1,4 @@
-import { Crosshair, Crown, Skull, Target, TrendingDown, Trophy, Zap } from "lucide-react";
+import { Crosshair, Crown, Scale, Skull, Target, TrendingDown, Trophy, Zap } from "lucide-react";
 import { kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
 import { cn } from "@/lib/utils";
 import { Avatar } from "../ui/avatar";
@@ -30,6 +30,13 @@ const STYLE: Record<
     box: "border-orange-500/30 bg-orange-500/10",
     icon_: "text-orange-400",
     detail: (r) => `${fmt2(r.adr ?? 0)} ADR`,
+  },
+  kdr: {
+    title: "Maior KDR",
+    icon: Scale,
+    box: "border-emerald-500/30 bg-emerald-500/10",
+    icon_: "text-emerald-400",
+    detail: (r) => `${fmt2(kdrOf(r))} KDR (${r.k}/${r.d})`,
   },
   fk: {
     title: "Mais first kills",

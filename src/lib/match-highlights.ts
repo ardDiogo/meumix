@@ -27,7 +27,7 @@ export interface StatRow {
 export const diffOf = (r: StatRow) => r.k - r.d;
 export const kdrOf = (r: StatRow) => (r.d ? r.k / r.d : r.k);
 
-export type HighlightKey = "mvp" | "kills" | "adr" | "fk" | "assists" | "deaths" | "worst";
+export type HighlightKey = "mvp" | "kills" | "adr" | "kdr" | "fk" | "assists" | "deaths" | "worst";
 
 export interface Highlight {
   key: HighlightKey;
@@ -50,6 +50,7 @@ export function matchHighlights(rows: StatRow[]): Highlight[] {
     mvp ? { key: "mvp", row: mvp } : null,
     { key: "kills", row: maxBy(rows, (r) => r.k)! },
     rows.some((r) => r.adr != null) ? { key: "adr", row: maxBy(rows, (r) => r.adr ?? -1)! } : null,
+    { key: "kdr", row: maxBy(rows, kdrOf)! },
     { key: "fk", row: maxBy(rows, (r) => r.fk)! },
     { key: "assists", row: maxBy(rows, (r) => r.a)! },
     { key: "deaths", row: maxBy(rows, (r) => r.d)! },
