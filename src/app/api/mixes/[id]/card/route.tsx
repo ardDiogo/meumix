@@ -144,7 +144,8 @@ const HL: Record<HighlightKey, { title: string; color: string; detail: (r: StatR
   worst: {
     title: "Pior performance",
     color: "#A1A1AA",
-    detail: (r) => `${r.k}K / ${fmt(r.adr, 1)} ADR / ${fmt(kdrOf(r), 2)} KDR`,
+    // Duas linhas: numa só não cabe no card.
+    detail: (r) => `${r.k}K / ${fmt(r.adr, 1)} ADR|${fmt(kdrOf(r), 2)} KDR`,
   },
 };
 
@@ -327,11 +328,13 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
             alignItems: "center",
             gap: 12,
             padding: "16px 24px",
-            backgroundImage: `linear-gradient(90deg, rgba(34,197,94,0.12), ${C.surface})`,
+            backgroundImage: `linear-gradient(90deg, rgba(255,106,0,0.14), ${C.surface})`,
             borderBottom: `1px solid ${C.border}`,
           }}
         >
-          <span style={{ fontFamily: display, fontSize: 28, fontWeight: 700 }}>Estatísticas dos jogadores</span>
+          <span style={{ fontFamily: display, fontSize: 28, fontWeight: 700, color: C.brand }}>
+            Estatísticas dos jogadores
+          </span>
           <span
             style={{
               fontSize: 14,
@@ -430,7 +433,14 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 <span style={{ fontSize: 19, fontWeight: 700, whiteSpace: "nowrap" }}>
                   {row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name}
                 </span>
-                <span style={{ fontSize: 13, color: C.muted }}>{h.detail(row)}</span>
+                {h
+                  .detail(row)
+                  .split("|")
+                  .map((line) => (
+                    <span key={line} style={{ fontSize: 13, color: C.muted, whiteSpace: "nowrap" }}>
+                      {line}
+                    </span>
+                  ))}
               </div>
             </div>
           );
