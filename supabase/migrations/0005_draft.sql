@@ -1,8 +1,15 @@
 -- MeuMix — Fase 2: capitães, pedra-papel-tesoura e escolha dos times (1-2-2-2-1)
--- Executar depois de 0004. Ver docs/especificacao-tecnica.md (3.4, 4.6, 4.7, 4.8).
+-- Executar depois de 0004 (exige a tabela captain_votes). Pode ser executado mais de uma vez. Ver docs/especificacao-tecnica.md (3.4, 4.6, 4.7, 4.8).
 -- Toda decisão acontece aqui no banco, com a linha travada (SELECT … FOR UPDATE).
 
-create table public.mix_draft_state (
+do $$
+begin
+  if to_regclass('public.captain_votes') is null then
+    raise exception 'Rode primeiro a migração 0004_votes_audit_realtime.sql (tabela captain_votes não existe).';
+  end if;
+end $$;
+
+create table if not exists public.mix_draft_state (
   schedule_id uuid not null references public.mix_schedules (id) on delete cascade,
   event_date date not null,
   status text not null default 'ppt' check (status in ('ppt', 'draft', 'completed')),
@@ -29,7 +36,7 @@ create table public.mix_draft_state (
 );
 
 -- Jogadas do PPT: SEM leitura pública (ninguém espia a jogada do outro).
-create table public.mix_draft_ppt_choices (
+create table if not exists public.mix_draft_ppt_choices (
   schedule_id uuid not null,
   event_date date not null,
   captain_id uuid not null references public.profiles (id) on delete cascade,
@@ -40,11 +47,20 @@ create table public.mix_draft_ppt_choices (
 
 alter table public.mix_draft_state enable row level security;
 alter table public.mix_draft_ppt_choices enable row level security;
+drop policy if exists "leitura publica" on public.mix_draft_state;
 create policy "leitura publica" on public.mix_draft_state for select using (true);
 revoke insert, update, delete on public.mix_draft_state from anon, authenticated;
 revoke all on public.mix_draft_ppt_choices from anon, authenticated;
 
-alter publication supabase_realtime add table public.mix_draft_state;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'mix_draft_state'
+  ) then
+    alter publication supabase_realtime add table public.mix_draft_state;
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- Classificados de uma ocorrência (os N primeiros por ordem de chegada).
@@ -83,6 +99,7 @@ begin
 end;
 $$;
 
+drop trigger if exists captain_votes_block_late on public.captain_votes;
 create trigger captain_votes_block_late
   before insert on public.captain_votes
   for each row execute function public.block_late_captain_vote();
