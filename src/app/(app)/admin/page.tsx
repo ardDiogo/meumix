@@ -147,7 +147,7 @@ async function UsersPanel() {
           }
           description={
             result.status === "not_configured"
-              ? "Defina SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente da Vercel para listar e gerenciar usuários."
+              ? "Defina SUPABASE_SECRET_KEY nas variáveis de ambiente da Vercel para listar e gerenciar usuários."
               : result.message
           }
         />
