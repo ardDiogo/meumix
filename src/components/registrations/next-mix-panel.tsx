@@ -133,7 +133,7 @@ export async function NextMixPanel() {
       <LiveRefresh scheduleId={schedule.id} />
       <Card>
         <div className="flex flex-col gap-4 p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-display text-xl font-bold tracking-tight">Participar do mix</h2>
@@ -163,7 +163,7 @@ export async function NextMixPanel() {
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+            <div className="-ml-2 flex shrink-0 flex-wrap items-center gap-1 sm:ml-0 sm:justify-end">
               {mine?.status === "classified" && (
                 <VoteDialog
                   scheduleId={schedule.id}

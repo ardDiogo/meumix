@@ -1,5 +1,4 @@
 import { DemoBanner } from "@/components/demo-notice";
-import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { getDataSource } from "@/services";
 import { getPermissions } from "@/services/auth";
@@ -29,15 +28,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <LevelsProvider levels={levels}>
-      <div className="flex min-h-dvh">
-        <Sidebar community={community} showAdmin={canManageMixes} />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar community={community} user={user} showAdmin={canManageMixes} />
-          <DemoBanner kind={ds.kind} />
-          <main id="conteudo" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6">
-            {children}
-          </main>
-        </div>
+      <div className="flex min-h-dvh flex-col">
+        <Topbar community={community} user={user} showAdmin={canManageMixes} />
+        <DemoBanner kind={ds.kind} />
+        <main id="conteudo" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6">
+          {children}
+        </main>
       </div>
       <MusicSettingsWatcher />
       {features.background_music && musicUrl && <BackgroundMusic url={musicUrl} />}

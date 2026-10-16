@@ -5,7 +5,7 @@ import { DemoBadge } from "@/components/demo-notice";
 import { MixList } from "@/components/mixes/mix-list";
 import { LevelBadge } from "@/components/players/level-badge";
 import { NextMixPanel } from "@/components/registrations/next-mix-panel";
-import { PageHeader } from "@/components/page-header";
+import { HeroBanner } from "@/components/dashboard/hero-banner";
 import { Delta } from "@/components/stats/delta";
 import { EloChart } from "@/components/stats/elo-chart";
 import { FormStrip } from "@/components/stats/form-strip";
@@ -37,10 +37,15 @@ export default async function DashboardPage() {
   if (!profile || !highlights) {
     return (
       <>
-        <PageHeader
-          eyebrow={session ? `Olá, ${session.displayName}` : undefined}
-          title="Dashboard"
+        <HeroBanner
+          eyebrow={session ? `Olá, ${session.displayName}` : "Mixes de CS2"}
+          title="Bem-vindo ao MeuMix"
           description="Inscreva-se no próximo mix e acompanhe seu desempenho."
+          actions={
+            <Button variant="secondary" asChild>
+              <Link href="/rankings">Ver ranking</Link>
+            </Button>
+          }
         />
         <NextMixPanel />
         <Card>
@@ -80,13 +85,12 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHeader
+      <HeroBanner
         eyebrow={session ? `Olá, ${session.displayName}` : undefined}
-        title="Dashboard"
-        description="Seu resumo competitivo na comunidade."
+        title="Seu resumo competitivo"
+        description="Inscreva-se no próximo mix, acompanhe seu ELO, nível e desempenho na comunidade."
         actions={
           <>
-            <DemoBadge kind={kind} />
             {canManageMixes && (
               <Button variant="primary" asChild>
                 <Link href="/admin">
@@ -94,6 +98,10 @@ export default async function DashboardPage() {
                 </Link>
               </Button>
             )}
+            <Button variant="secondary" asChild>
+              <Link href="/rankings">Ver ranking</Link>
+            </Button>
+            <DemoBadge kind={kind} />
           </>
         }
       />
