@@ -1,4 +1,5 @@
 import { CalendarClock, Users } from "lucide-react";
+import { headers } from "next/headers";
 import { registrationWindow } from "@/lib/mix-schedule";
 import { cn } from "@/lib/utils";
 import { getPermissions } from "@/services/auth";
@@ -9,6 +10,7 @@ import { Card, CardHeader } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 import { JoinButton, RemoveButton, ResetButton } from "./registration-controls";
+import { ShareMixButton } from "./share-mix";
 
 const TZ = "America/Sao_Paulo";
 const dayMonth = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TZ });
@@ -26,6 +28,44 @@ const fullTime = (iso: string) =>
     second: "2-digit",
     timeZone: TZ,
   });
+
+async function siteUrl() {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return host ? `${proto}://${host}` : "https://meumix.vercel.app";
+}
+
+/** Texto do convite no formato do WhatsApp (*negrito*). */
+function inviteMessage(opts: {
+  eventAt: Date;
+  opensAt: Date;
+  classified: string[];
+  reserves: string[];
+  maxPlayers: number;
+  link: string;
+}) {
+  const lines = [
+    `🎮 *MIX MEUMIX - ${weekday(opts.eventAt)}, ${dayMonth(opts.eventAt)} às ${hourMin(opts.eventAt)}*`,
+    `⏰ Inscrições abrem às ${hourMin(opts.opensAt)} (${dayMonth(opts.opensAt)})`,
+    `👥 ${opts.classified.length}/${opts.maxPlayers} jogadores classificados`,
+  ];
+  if (opts.classified.length) {
+    lines.push("", "📋 *Jogadores:*", ...opts.classified.map((n, i) => `${i + 1}. ${n}`));
+  }
+  if (opts.reserves.length) {
+    lines.push("", "🪑 *Suplentes:*", ...opts.reserves.map((n, i) => `${i + 1}. ${n}`));
+  }
+  const left = opts.maxPlayers - opts.classified.length;
+  lines.push(
+    "",
+    left > 0
+      ? `🔥 Faltam ${left} vaga${left > 1 ? "s" : ""}! Inscreva-se:`
+      : "✅ Vagas preenchidas! Entre como suplente:",
+    opts.link,
+  );
+  return lines.join("\n");
+}
 
 /** Próximo mix com inscrições reais. Só usuários cadastrados podem participar. */
 export async function NextMixPanel() {
@@ -50,6 +90,14 @@ export async function NextMixPanel() {
   const regWindow = registrationWindow(occurrence, now);
   const mine = session ? registrations.find((r) => r.userId === session.id) : undefined;
   const classified = registrations.filter((r) => r.status === "classified").length;
+  const message = inviteMessage({
+    eventAt: occurrence.eventAt,
+    opensAt: occurrence.opensAt,
+    classified: registrations.filter((r) => r.status === "classified").map((r) => r.displayName),
+    reserves: registrations.filter((r) => r.status === "reserve").map((r) => r.displayName),
+    maxPlayers: schedule.maxPlayers,
+    link: `${await siteUrl()}/dashboard`,
+  });
   const opensLabel =
     dayMonth(occurrence.opensAt) === dayMonth(now)
       ? `hoje às ${hourMin(occurrence.opensAt)}`
@@ -89,9 +137,12 @@ export async function NextMixPanel() {
                 </p>
               )}
             </div>
-            {canManageMixes && registrations.length > 0 && (
-              <ResetButton scheduleId={schedule.id} date={occurrence.date} />
-            )}
+            <div className="flex shrink-0 items-center gap-1">
+              {canManageMixes && registrations.length > 0 && (
+                <ResetButton scheduleId={schedule.id} date={occurrence.date} />
+              )}
+              <ShareMixButton message={message} />
+            </div>
           </div>
           <JoinButton
             scheduleId={schedule.id}
