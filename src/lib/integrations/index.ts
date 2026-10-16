@@ -21,8 +21,9 @@ export const INTEGRATIONS: IntegrationInfo[] = [
   {
     provider: "csrep",
     name: "CSRep",
-    description: "Consultar reputação e histórico competitivo dos jogadores.",
-    status: "not_implemented",
+    description:
+      "Link do perfil no CSRep (montado pela Steam) e análise por IA do print da tela Overview: pontos fortes, fracos e sugestões de treino. Informativo, fora do ELO.",
+    status: "available",
   },
   {
     provider: "twitch",
