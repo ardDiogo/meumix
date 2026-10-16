@@ -15,6 +15,7 @@ import { Table, TD, TH, THead, TR } from "../ui/table";
 import { JoinButton } from "./join-button";
 import { LiveRefresh } from "./live-refresh";
 import { DraftPanel } from "./draft-panel";
+import { SuggestionPanel } from "./suggestion-panel";
 import { RemoveButton, ResetButton, StartDraftButton } from "./registration-controls";
 import { VoteDialog } from "./vote-dialog";
 import { ShareMixButton } from "./share-mix";
@@ -110,6 +111,7 @@ export async function NextMixPanel() {
   }
 
   const { schedule, occurrence, organizer, registrations, votes, draft } = result.mix;
+  const nameOf = (id: string) => registrations.find((r) => r.userId === id)?.displayName ?? "Jogador";
   const now = new Date();
   const regWindow = registrationWindow(occurrence, now);
   const mine = session ? registrations.find((r) => r.userId === session.id) : undefined;
@@ -176,6 +178,16 @@ export async function NextMixPanel() {
                   myCaptains={votes.mine.captains}
                   captainsLocked={!!draft}
                   mandatory={full}
+                  suggestion={
+                    !draft && result.mix.suggestion?.status === "pending"
+                      ? {
+                          teamA: result.mix.suggestion.teamA.map((id) => nameOf(id)),
+                          teamB: result.mix.suggestion.teamB.map((id) => nameOf(id)),
+                          probA: result.mix.suggestion.probA,
+                          myVote: result.mix.suggestion.myVote,
+                        }
+                      : null
+                  }
                 />
               )}
               {canManageMixes && full && !draft && <StartDraftButton scheduleId={schedule.id} date={occurrence.date} />}
@@ -223,6 +235,19 @@ export async function NextMixPanel() {
           avatars={Object.fromEntries(registrations.map((r) => [r.userId, r.avatarUrl]))}
           classified={classifiedList.map((r) => r.userId)}
           viewerId={session?.id ?? null}
+          isAdmin={canManageMixes}
+          probA={result.mix.draftProbA}
+        />
+      )}
+
+      {!draft && result.mix.suggestion?.status === "pending" && (
+        <SuggestionPanel
+          scheduleId={schedule.id}
+          date={occurrence.date}
+          suggestion={result.mix.suggestion}
+          names={Object.fromEntries(registrations.map((r) => [r.userId, r.displayName]))}
+          avatars={Object.fromEntries(registrations.map((r) => [r.userId, r.avatarUrl]))}
+          canVote={mine?.status === "classified"}
           isAdmin={canManageMixes}
         />
       )}

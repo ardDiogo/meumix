@@ -318,7 +318,14 @@ export async function submitCaptainVotes(
   if (v.classified.length >= v.ctx.schedule.maxPlayers) {
     const { data: votes } = await v.ctx.admin.from("captain_votes").select("voter_id").match(occurrence);
     const cast = (votes ?? []).filter((x) => v.classified.includes(x.voter_id as string)).length;
-    if (cast >= v.ctx.schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER) {
+    // Com sugestão de times ainda em votação, espera o resultado dela.
+    const { data: pending } = await v.ctx.admin
+      .from("mix_team_suggestions")
+      .select("status")
+      .match(occurrence)
+      .eq("status", "pending")
+      .maybeSingle();
+    if (cast >= v.ctx.schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER && !pending) {
       await v.ctx.admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
     }
   }

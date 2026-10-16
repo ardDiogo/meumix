@@ -11,6 +11,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { TeamDot } from "../mixes/badges";
+import { WinProbability } from "./win-probability";
 
 const CHOICES: { id: PptChoice; label: string; emoji: string }[] = [
   { id: "rock", label: "Pedra", emoji: "✊" },
@@ -41,6 +42,7 @@ export function DraftPanel({
   classified,
   viewerId,
   isAdmin,
+  probA = null,
 }: {
   scheduleId: string;
   date: string;
@@ -50,6 +52,8 @@ export function DraftPanel({
   classified: string[];
   viewerId: string | null;
   isAdmin: boolean;
+  /** Chance do time A, com os times completos. */
+  probA?: number | null;
 }) {
   const [pending, run] = useRun();
   const name = (id: string | null) => (id ? (names[id] ?? "Jogador") : "—");
@@ -95,6 +99,14 @@ export function DraftPanel({
         )}
       </div>
 
+      {draft.status === "completed" && probA != null && (
+        <WinProbability
+          probA={probA}
+          nameA={`Time ${name(draft.teamA[0] ?? null)}`}
+          nameB={`Time ${name(draft.teamB[0] ?? null)}`}
+          className="border-b border-border px-4 py-3"
+        />
+      )}
       {draft.status === "ppt" ? (
         <PptStage scheduleId={scheduleId} date={date} draft={draft} name={name} avatar={avatar} mySide={mySide} />
       ) : (

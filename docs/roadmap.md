@@ -4,23 +4,23 @@ Referência: [`regras-do-mix.md`](./regras-do-mix.md). Legenda: ✅ feito · �
 
 ## Fase 1 — Inscrições e votações
 
-| Item                                                                            | Seção | Status                                       |
-| ------------------------------------------------------------------------------- | ----- | -------------------------------------------- |
-| Mix agendado (semanal ou data única), criado só por admin                       | 1     | ✅                                           |
-| Abertura pelo relógio do servidor (sincroniza com RTT, 5 min + ao voltar à aba) | 1     | ✅                                           |
-| Contagem regressiva de 1s; botão bloqueado até sincronizar                      | 1     | ✅                                           |
-| 10 classificados + reservas pela ordem de chegada; reordena ao cancelar         | 2     | ✅                                           |
-| Já inscrito → sucesso; cliques simultâneos → banco impede duplicidade           | 2     | ✅                                           |
-| Cedo demais → recusa se faltar mais de 1s                                       | 2     | ✅                                           |
-| Log de auditoria de toda tentativa e ação de admin                              | 2, 10 | ✅                                           |
-| Fila de nova tentativa (10 tentativas, 1–10s, reconectar/aba/5s)                | 2     | ✅                                           |
-| Renovação da sessão e "acordar" o servidor antes da abertura                    | 2     | ✅                                           |
-| Dispositivo da inscrição e registro de cancelamentos                            | 12    | ✅                                           |
-| Votação de mapas (exatamente 4, só classificados, troca o voto)                 | 3     | ✅                                           |
-| Votação de capitães (até 2, não em si, só classificados)                        | 4     | ✅                                           |
-| Janela de votação obrigatória com 10 classificados                              | 8     | 🟡 (capitães e mapas; sem sugestão de times) |
-| Tempo real: inscrições e votos atualizam sem recarregar                         | 11    | ✅                                           |
-| Compartilhar convite no WhatsApp                                                | —     | ✅                                           |
+| Item                                                                            | Seção | Status                       |
+| ------------------------------------------------------------------------------- | ----- | ---------------------------- |
+| Mix agendado (semanal ou data única), criado só por admin                       | 1     | ✅                           |
+| Abertura pelo relógio do servidor (sincroniza com RTT, 5 min + ao voltar à aba) | 1     | ✅                           |
+| Contagem regressiva de 1s; botão bloqueado até sincronizar                      | 1     | ✅                           |
+| 10 classificados + reservas pela ordem de chegada; reordena ao cancelar         | 2     | ✅                           |
+| Já inscrito → sucesso; cliques simultâneos → banco impede duplicidade           | 2     | ✅                           |
+| Cedo demais → recusa se faltar mais de 1s                                       | 2     | ✅                           |
+| Log de auditoria de toda tentativa e ação de admin                              | 2, 10 | ✅                           |
+| Fila de nova tentativa (10 tentativas, 1–10s, reconectar/aba/5s)                | 2     | ✅                           |
+| Renovação da sessão e "acordar" o servidor antes da abertura                    | 2     | ✅                           |
+| Dispositivo da inscrição e registro de cancelamentos                            | 12    | ✅                           |
+| Votação de mapas (exatamente 4, só classificados, troca o voto)                 | 3     | ✅                           |
+| Votação de capitães (até 2, não em si, só classificados)                        | 4     | ✅                           |
+| Janela de votação obrigatória com 10 classificados                              | 8     | ✅ (times, capitães e mapas) |
+| Tempo real: inscrições e votos atualizam sem recarregar                         | 11    | ✅                           |
+| Compartilhar convite no WhatsApp                                                | —     | ✅                           |
 
 ## Fase 2 — Disputa e escolha dos times (em andamento)
 
@@ -32,8 +32,8 @@ Referência: [`regras-do-mix.md`](./regras-do-mix.md). Legenda: ✅ feito · �
 | Escolha dos times 1-2-2-2-1 com checagem no banco a cada escolha              | 6     | ✅     |
 | Admin: reiniciar escolha / tudo; remover jogador zera escolhas                | 6     | ✅     |
 | Desempate de mapas (rounds 1 e 2 + sorteio criptográfico), com chave no admin | 3     | ✅     |
-| Sugestão de times balanceados (252 combinações) + votação 80%                 | 7     | ⬜     |
-| Probabilidade de vitória                                                      | 7     | ⬜     |
+| Sugestão de times balanceados (252 combinações) + votação 80%                 | 7     | ✅     |
+| Probabilidade de vitória (com ajuste opcional pelo HLTV do CSRep)             | 7     | ✅     |
 
 ## Fase 3 — Cargos e administração
 

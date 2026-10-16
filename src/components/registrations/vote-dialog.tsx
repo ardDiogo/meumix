@@ -1,16 +1,24 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Check, Crown, Loader2, Map as MapIcon, Vote, X } from "lucide-react";
+import { Check, Crown, Loader2, Map as MapIcon, Scale, ThumbsDown, ThumbsUp, Vote, X } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { submitCaptainVotes, submitMapVotes } from "@/app/(app)/inscricoes/actions";
+import { voteSuggestion } from "@/app/(app)/inscricoes/suggestion-actions";
 import { CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
 import { cn } from "@/lib/utils";
 import { Avatar } from "../ui/avatar";
 import { Button } from "../ui/button";
 
-type Step = "captains" | "maps" | "done";
+type Step = "suggestion" | "captains" | "maps" | "done";
+
+export interface DialogSuggestion {
+  teamA: string[];
+  teamB: string[];
+  probA: number;
+  myVote: boolean | null;
+}
 
 /**
  * Votação de capitães e mapas (docs/regras-do-mix.md, seções 3, 4 e 8).
@@ -26,6 +34,7 @@ export function VoteDialog({
   myCaptains,
   captainsLocked,
   mandatory,
+  suggestion = null,
 }: {
   scheduleId: string;
   date: string;
@@ -36,11 +45,28 @@ export function VoteDialog({
   /** A disputa de capitães começou: votos de capitão encerrados (pula para mapas). */
   captainsLocked: boolean;
   mandatory: boolean;
+  /** Sugestão de times em votação (nomes já resolvidos): é a 1ª etapa. */
+  suggestion?: DialogSuggestion | null;
 }) {
-  const pendingCaptains = !captainsLocked && myCaptains.length === 0 && candidates.length > 0;
+  const pendingSuggestion = !!suggestion && suggestion.myVote === null;
+  // Com a sugestão em votação, capitães só se ela for recusada.
+  const captainsOff = captainsLocked || !!suggestion;
+  const pendingCaptains = !captainsOff && myCaptains.length === 0 && candidates.length > 0;
   const pendingMaps = myMaps.length !== MAP_VOTES_PER_PLAYER;
-  const firstStep: Step = pendingCaptains ? "captains" : pendingMaps || captainsLocked ? "maps" : "captains";
-  const locked = mandatory && (pendingCaptains || pendingMaps);
+  const firstStep: Step = pendingSuggestion
+    ? "suggestion"
+    : pendingCaptains
+      ? "captains"
+      : pendingMaps || captainsOff
+        ? "maps"
+        : "captains";
+  const locked = mandatory && (pendingSuggestion || pendingCaptains || pendingMaps);
+  const steps: Step[] = [
+    ...(suggestion ? (["suggestion"] as const) : []),
+    ...(captainsOff ? [] : (["captains"] as const)),
+    "maps",
+    "done",
+  ];
 
   const [open, setOpen] = useState(locked);
   const [step, setStep] = useState<Step>(firstStep);
@@ -50,6 +76,14 @@ export function VoteDialog({
 
   const toggle = (list: string[], id: string, max: number) =>
     list.includes(id) ? list.filter((x) => x !== id) : list.length < max ? [...list, id] : list;
+
+  const voteOnSuggestion = (agree: boolean) =>
+    start(async () => {
+      const r = await voteSuggestion(scheduleId, date, agree);
+      if (!r.ok) return void toast.error(r.message);
+      toast.success(r.message);
+      setStep(pendingMaps ? "maps" : "done");
+    });
 
   const save = () =>
     start(async () => {
@@ -71,8 +105,8 @@ export function VoteDialog({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => (o || canClose) && setOpen(o)}>
       <DialogPrimitive.Trigger asChild>
-        <Button variant={pendingCaptains || pendingMaps ? "outline" : "ghost"} size="sm">
-          <Vote /> {pendingCaptains || pendingMaps ? "Votar" : "Alterar votos"}
+        <Button variant={pendingSuggestion || pendingCaptains || pendingMaps ? "outline" : "ghost"} size="sm">
+          <Vote /> {pendingSuggestion || pendingCaptains || pendingMaps ? "Votar" : "Alterar votos"}
         </Button>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
@@ -86,10 +120,10 @@ export function VoteDialog({
           <div className="border-b border-border p-5 pb-4">
             <DialogPrimitive.Title className="font-display text-lg font-bold">Votações do mix</DialogPrimitive.Title>
             <ol className="mt-3 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
-              {(captainsLocked ? (["maps", "done"] as const) : (["captains", "maps", "done"] as const)).map((s, i) => (
+              {steps.map((s, i) => (
                 <li key={s} className={cn("flex items-center gap-2", step === s ? "text-brand" : "text-subtle")}>
                   {i > 0 && <span className="h-px w-4 bg-border" aria-hidden />}
-                  {s === "captains" ? "Capitães" : s === "maps" ? "Mapas" : "Concluído"}
+                  {s === "suggestion" ? "Times" : s === "captains" ? "Capitães" : s === "maps" ? "Mapas" : "Concluído"}
                 </li>
               ))}
             </ol>
@@ -107,6 +141,44 @@ export function VoteDialog({
           </div>
 
           <div className="overflow-y-auto p-5">
+            {step === "suggestion" && suggestion && (
+              <div className="space-y-4">
+                <p className="flex items-center gap-2 text-sm text-muted">
+                  <Scale className="size-4 text-brand" /> Os times abaixo foram balanceados pelo nível e desempenho.
+                  Você concorda com a divisão?
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {(
+                    [
+                      ["A", suggestion.teamA, suggestion.probA],
+                      ["B", suggestion.teamB, 1 - suggestion.probA],
+                    ] as const
+                  ).map(([side, team, prob]) => (
+                    <div key={side} className="rounded-md border border-border bg-surface-2 p-3 text-sm">
+                      <div className="mb-1.5 flex justify-between font-semibold">
+                        <span className={side === "A" ? "text-team-a" : "text-team-b"}>Time {team[0]}</span>
+                        <span className="text-xs text-muted">{Math.round(prob * 100)}%</span>
+                      </div>
+                      <ul className="space-y-0.5 text-muted">
+                        {team.map((n) => (
+                          <li key={n} className="truncate">
+                            {n}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="primary" disabled={saving} onClick={() => voteOnSuggestion(true)}>
+                    {saving ? <Loader2 className="animate-spin" /> : <ThumbsUp />} Concordo
+                  </Button>
+                  <Button variant="secondary" disabled={saving} onClick={() => voteOnSuggestion(false)}>
+                    <ThumbsDown /> Não concordo
+                  </Button>
+                </div>
+              </div>
+            )}
             {step === "captains" && (
               <>
                 <p className="mb-3 flex items-center gap-2 text-sm text-muted">
@@ -188,21 +260,23 @@ export function VoteDialog({
           <div className="flex gap-2 border-t border-border p-4">
             {step === "done" ? (
               <>
-                <Button
-                  variant="secondary"
-                  className="flex-1"
-                  onClick={() => setStep(captainsLocked ? "maps" : "captains")}
-                >
+                <Button variant="secondary" className="flex-1" onClick={() => setStep(steps[0]!)}>
                   Rever votos
                 </Button>
                 <Button variant="primary" className="flex-1" onClick={() => setOpen(false)}>
                   Fechar
                 </Button>
               </>
+            ) : step === "suggestion" ? (
+              !pendingSuggestion && (
+                <Button variant="ghost" className="flex-1" onClick={() => setStep("maps")} disabled={saving}>
+                  Pular
+                </Button>
+              )
             ) : (
               <>
-                {step === "maps" && !captainsLocked && (
-                  <Button variant="secondary" onClick={() => setStep("captains")} disabled={saving}>
+                {step === "maps" && steps[0] !== "maps" && (
+                  <Button variant="secondary" onClick={() => setStep(steps[0]!)} disabled={saving}>
                     Voltar
                   </Button>
                 )}

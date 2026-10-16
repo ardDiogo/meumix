@@ -38,6 +38,12 @@ export async function startDraft(scheduleId: string, date: string): Promise<Draf
   if (!admin) return fail("Servidor não configurado.");
   const { error } = await admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
   if (error) return fail(dbMessage(error.message));
+  // Admin iniciou os capitães: a sugestão pendente deixa de valer.
+  await admin
+    .from("mix_team_suggestions")
+    .update({ status: "rejected", decided_at: new Date().toISOString() })
+    .match({ schedule_id: scheduleId, event_date: date })
+    .eq("status", "pending");
   await audit({
     action: "admin.force_start_draft",
     outcome: "success",
@@ -104,6 +110,8 @@ export async function resetDraft(scheduleId: string, date: string, scope: "draft
   if (draft.error) return fail("Não foi possível reiniciar a seleção.");
   // Reiniciar a escolha também descarta o desempate de mapas (depende dos times).
   await admin.from("map_tiebreaker_rounds").delete().match(match);
+  // A sugestão de times (se houver) é refeita e votada de novo.
+  await admin.from("mix_team_suggestions").delete().match(match);
   if (scope === "all") {
     const votes = await admin.from("captain_votes").delete().match(match);
     if (votes.error) return fail("A seleção foi reiniciada, mas os votos de capitão não foram apagados.");

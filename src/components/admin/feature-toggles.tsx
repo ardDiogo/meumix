@@ -16,8 +16,8 @@ const FEATURES = [
     key: "team_suggestion" as const,
     name: "Sugestão de times balanceados",
     description:
-      "Quando ativada, sugere times automaticamente quando 10 jogadores são classificados. Os jogadores votam se concordam ou não com a divisão.",
-    available: false,
+      "Quando ativada, sugere times automaticamente quando 10 jogadores são classificados. Os jogadores votam se concordam ou não com a divisão (aceita com 80%).",
+    available: true,
   },
 ];
 

@@ -176,7 +176,9 @@ export async function deactivatePenalty(penaltyId: string): Promise<RoleChangeRe
 export async function setFeature(key: "map_tiebreaker" | "team_suggestion", enabled: boolean): Promise<RoleChangeResult> {
   const session = await getSession();
   if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem alterar funcionalidades." };
-  if (key !== "map_tiebreaker") return { ok: false, message: "Funcionalidade ainda não disponível." };
+  if (key !== "map_tiebreaker" && key !== "team_suggestion") {
+    return { ok: false, message: "Funcionalidade ainda não disponível." };
+  }
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
   const { error } = await admin

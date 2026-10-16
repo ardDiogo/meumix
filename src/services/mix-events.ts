@@ -9,6 +9,7 @@ import { finalMaps, type RoundRow } from "./tiebreaker";
 import type { MixRecurrence, Weekday } from "@/types/domain";
 import { profileAvatars } from "./avatars";
 import { listAllMaps } from "./maps";
+import { loadSuggestion, syncSuggestion, teamWinProbability, type SuggestionView } from "./team-suggestion";
 
 export const DEFAULT_COMMUNITY_SLUG = "principal";
 
@@ -135,6 +136,10 @@ export interface NextMix {
   myPenaltyDelay: number | null;
   /** Partida finalizada desta ocorrência, se houver. */
   finalizedMatchId: string | null;
+  /** Sugestão de times balanceados (seção 7), se ligada. */
+  suggestion: SuggestionView | null;
+  /** Chance do time A vencer, com os times completos. */
+  draftProbA: number | null;
 }
 
 export type NextMixResult = { status: "not_configured" } | { status: "none" } | { status: "ok"; mix: NextMix };
@@ -266,11 +271,22 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
     getFeatures(),
   ]);
 
+  const classified = registrations.filter((r) => r.status === "classified").map((r) => r.userId);
+  await syncSuggestion({
+    scheduleId: next.schedule.id,
+    date: next.occurrence.date,
+    classified,
+    maxPlayers: next.schedule.maxPlayers,
+    enabled: features.team_suggestion,
+    draftStarted: !!draft,
+  });
   const ids = [...new Set([...registrations.map((r) => r.userId), ...(viewerId ? [viewerId] : [])])];
-  const [penalties, tiebreaker, finalizedMatchId] = await Promise.all([
+  const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA] = await Promise.all([
     activePenalties(ids),
     loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId),
     loadFinalizedMatch(next.schedule.id, next.occurrence.date),
+    loadSuggestion(next.schedule.id, next.occurrence.date, viewerId, classified),
+    draft?.status === "completed" ? teamWinProbability(draft.teamA, draft.teamB) : null,
   ]);
   for (const r of registrations) {
     const p = penalties.get(r.userId);
@@ -287,6 +303,8 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
       tiebreaker,
       myPenaltyDelay: viewerId ? (penalties.get(viewerId)?.delaySeconds ?? null) : null,
       finalizedMatchId,
+      suggestion,
+      draftProbA,
     },
   };
 }
