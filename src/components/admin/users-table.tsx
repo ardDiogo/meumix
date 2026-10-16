@@ -298,10 +298,7 @@ function EloDialog({ user, onDone }: { user: ManagedUser; onDone: () => void }) 
   const valid = Number.isInteger(elo) && elo >= 0 && elo <= ELO_CAP;
 
   return (
-    <DialogContent
-      title="Editar nível e ELO"
-      description={`Ajuste o nível e o ELO de ${user.displayName}.`}
-    >
+    <DialogContent title="Editar nível e ELO" description={`Ajuste o nível e o ELO de ${user.displayName}.`}>
       <div className="space-y-4">
         <div>
           <Label htmlFor="elo-level">Nível</Label>

@@ -61,12 +61,15 @@ export function FinalizeForm({
   maps,
   initialMaps,
   players,
+  otherProfiles = [],
 }: {
   scheduleId: string;
   date: string;
   maps: { id: string; name: string }[];
   initialMaps: string[];
   players: { userId: string; name: string; team: "A" | "B"; elo: number }[];
+  /** Cadastrados que não se inscreveram neste mix (para ligar nicks do print). */
+  otherProfiles?: { userId: string; name: string; elo: number }[];
 }) {
   const levels = useLevels();
   const router = useRouter();
@@ -218,10 +221,27 @@ export function FinalizeForm({
       drop: String(p.drop),
     });
 
+    // Nicks sem inscrição no mix: procura entre os demais cadastrados antes de virar convidado.
+    const usedIds = new Set(rows.map((r) => r.userId).filter(Boolean));
+    const pool = otherProfiles.filter((p) => !usedIds.has(p.userId));
+    const poolIdx = matchProfiles(
+      guests,
+      pool.map((p) => ({ name: p.name })),
+    );
+    const extra = guests.flatMap((g, i) => {
+      const p = poolIdx[i]! >= 0 ? pool[poolIdx[i]!] : undefined;
+      return p ? [{ g, p }] : [];
+    });
+    const realGuests = guests.filter((_, i) => !(poolIdx[i]! >= 0));
+    if (extra.length)
+      notes.push(
+        `Ligados a jogadores cadastrados que não se inscreveram no site: ${extra.map((e) => `${e.g.name} → ${e.p.name}`).join(", ")}.`,
+      );
+
     const missing = profileRows.filter((r) => !byProfile.has(r.key)).map((r) => r.name);
     if (missing.length) notes.push(`Sem dados no print (confira ou remova): ${missing.join(", ")}.`);
-    if (guests.length)
-      notes.push(`Adicionados como convidados (sem perfil vinculado): ${guests.map((g) => g.name).join(", ")}.`);
+    if (realGuests.length)
+      notes.push(`Adicionados como convidados (sem perfil vinculado): ${realGuests.map((g) => g.name).join(", ")}.`);
 
     setRows((current) => [
       ...current
@@ -230,7 +250,15 @@ export function FinalizeForm({
           const p = byProfile.get(r.key);
           return p ? { ...r, ...fill(p) } : r;
         }),
-      ...guests.map((g, i) => ({
+      ...extra.map(({ g, p }) => ({
+        key: p.userId,
+        userId: p.userId,
+        name: p.name,
+        elo: p.elo,
+        calculateElo: true,
+        ...fill(g),
+      })),
+      ...realGuests.map((g, i) => ({
         key: `guest-ocr-${i}-${Date.now()}`,
         userId: null,
         name: g.name,

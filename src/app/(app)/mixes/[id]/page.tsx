@@ -18,6 +18,9 @@ import { getMixDetail } from "@/services/queries";
 import { getMatchReport } from "@/services/match-report";
 import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
+import { LinkGuests } from "@/components/mixes/link-guests";
+import { getPermissions } from "@/services/auth";
+import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
 
 export async function generateMetadata({ params }: PageProps<"/mixes/[id]">): Promise<Metadata> {
@@ -31,6 +34,16 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const { kind, mix, players, scoreboard, mapScoreboards, highlights } = detail;
   const report = kind === "supabase" && mix.status === "finished" ? await getMatchReport(mix.id) : null;
   const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;
+  const guests = report?.rows.filter((r) => !r.userId) ?? [];
+  const { canManageMixes } = guests.length ? await getPermissions() : { canManageMixes: false };
+  const linked = new Set(report?.rows.map((r) => r.userId).filter(Boolean));
+  const linkable =
+    canManageMixes && guests.length
+      ? (await getDataSource().listPlayers())
+          .filter((p) => !linked.has(p.id))
+          .map((p) => ({ id: p.id, name: p.nickname }))
+          .sort((a, b) => a.name.localeCompare(b.name))
+      : [];
 
   const score = seriesScore(mix);
   const winner = seriesWinner(mix);
@@ -132,6 +145,13 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 </div>
                 <MatchStatsTable rows={report.rows} />
               </Card>
+              {canManageMixes && guests.length > 0 && (
+                <LinkGuests
+                  matchId={mix.id}
+                  guests={guests.map((g) => ({ recordId: g.key, name: g.name, rp: g.rp }))}
+                  profiles={linkable}
+                />
+              )}
               <MatchHighlights rows={report.rows} />
             </>
           ) : finished ? (

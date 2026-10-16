@@ -38,9 +38,9 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
   }
 
   const supabase = await createSupabaseServerClient();
-  const ids = occurrence.registrations.map((r) => r.userId);
-  const { data: elos } = ids.length ? await supabase!.from("profiles").select("id, elo").in("id", ids) : { data: [] };
-  const eloOf = new Map((elos ?? []).map((p) => [p.id as string, p.elo as number]));
+  // Todos os perfis: nicks do print que não se inscreveram no site ainda são ligados à conta certa.
+  const { data: profiles } = await supabase!.from("profiles").select("id, display_name, elo");
+  const eloOf = new Map((profiles ?? []).map((p) => [p.id as string, p.elo as number]));
 
   // Times da escolha (se houver); senão, os classificados alternados entre A e B.
   const draft = occurrence.draft;
@@ -54,6 +54,9 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
       date={date}
       maps={occurrence.votes.maps}
       initialMaps={occurrence.tiebreaker.finalMaps.map((x) => x.id)}
+      otherProfiles={(profiles ?? [])
+        .filter((p) => !classified.some((r) => r.userId === p.id))
+        .map((p) => ({ userId: p.id as string, name: p.display_name as string, elo: (p.elo as number) ?? 0 }))}
       players={classified.map((r, i) => ({
         userId: r.userId,
         name: r.displayName,
