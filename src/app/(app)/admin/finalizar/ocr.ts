@@ -13,7 +13,8 @@ import { getSession } from "@/services/auth";
  * - OpenAI (GPT): OPENAI_API_KEY; opcionais OPENAI_MODEL e OPENAI_FALLBACK_MODEL.
  * - Gemini: GEMINI_API_KEY; opcionais GEMINI_MODEL e GEMINI_FALLBACK_MODEL.
  * Com as duas chaves, o Gemini vira o serviço alternativo do GPT. Em sobrecarga
- * (429/500/503) troca na hora para o próximo modelo, sem espera.
+ * (429/500/503) ou modelo descontinuado (404) troca na hora para o próximo
+ * modelo da lista, sem espera.
  */
 
 export type OcrResult = { ok: true; map: OcrMap; model: string } | { ok: false; message: string };
@@ -85,7 +86,10 @@ const RESPONSE_SCHEMA = {
   required: ["teams"],
 };
 
+/** Erro que manda pular direto para o próximo modelo (sobrecarga ou modelo indisponível). */
 class OverloadedError extends Error {}
+
+const SKIP_STATUS = new Set([404, 429, 500, 503]);
 
 /** Extrai o JSON da resposta, tolerando cercas de código ou texto em volta. */
 function parseJson(text: string): unknown {
@@ -113,8 +117,8 @@ async function callGemini(model: string, key: string, mimeType: string, data: st
       signal: AbortSignal.timeout(45_000),
     },
   );
-  // Sobrecarga ou cota: troca imediatamente para o modelo alternativo (sem espera).
-  if (res.status === 429 || res.status === 503 || res.status === 500) throw new OverloadedError(`HTTP ${res.status}`);
+  // Sobrecarga, cota ou modelo descontinuado: troca imediatamente para o próximo modelo.
+  if (SKIP_STATUS.has(res.status)) throw new OverloadedError(`${model}: HTTP ${res.status}`);
   if (!res.ok) throw new Error(`Gemini respondeu ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const body = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
   const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
@@ -190,7 +194,7 @@ async function callOpenAI(model: string, key: string, mimeType: string, data: st
     }),
     signal: AbortSignal.timeout(45_000),
   });
-  if (res.status === 429 || res.status === 503 || res.status === 500) throw new OverloadedError(`HTTP ${res.status}`);
+  if (SKIP_STATUS.has(res.status)) throw new OverloadedError(`${model}: HTTP ${res.status}`);
   if (!res.ok) throw new Error(`OpenAI respondeu ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const body = (await res.json()) as { choices?: { message?: { content?: string; refusal?: string } }[] };
   const message = body.choices?.[0]?.message;
@@ -215,10 +219,17 @@ function providers(): Provider[] {
   }
   const gemini = process.env.GEMINI_API_KEY;
   if (gemini) {
-    for (const model of [
-      process.env.GEMINI_MODEL || "gemini-2.5-flash",
-      process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite",
-    ]) {
+    // Modelos do Google mudam com frequência: tenta os configurados e depois os
+    // atuais conhecidos; 404 (descontinuado) pula para o próximo.
+    const models = [
+      process.env.GEMINI_MODEL,
+      process.env.GEMINI_FALLBACK_MODEL,
+      "gemini-3.5-flash",
+      "gemini-3.5-flash-lite",
+      "gemini-flash-latest",
+      "gemini-2.5-flash",
+    ].filter((m, i, all): m is string => !!m && all.indexOf(m) === i);
+    for (const model of models) {
       list.push({ label: `gemini:${model}`, call: (m, d) => callGemini(model, gemini, m, d) });
     }
   }
@@ -236,7 +247,7 @@ export async function analyzeGcPrint(image: { mimeType: string; data: string }):
   if (!ALLOWED.has(image.mimeType)) return { ok: false, message: "Envie imagens PNG, JPG ou WEBP." };
   if (!image.data || image.data.length > MAX_BASE64) return { ok: false, message: "Imagem muito grande (máx. 3 MB)." };
 
-  let lastError = "";
+  const errors: string[] = [];
   for (const { label: model, call } of list) {
     // Até 2 tentativas por modelo para JSON inválido; sobrecarga pula direto para o próximo.
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -248,14 +259,15 @@ export async function analyzeGcPrint(image: { mimeType: string; data: string }):
         await audit({ action: "admin.ocr_gc", outcome: "success", actorId: session!.id, detail: { model, players } });
         return { ok: true, map, model };
       } catch (e) {
-        lastError = e instanceof Error ? e.message : String(e);
+        errors.push(e instanceof Error ? e.message : String(e));
         if (e instanceof OverloadedError) break;
       }
     }
   }
-  await audit({ action: "admin.ocr_gc", outcome: "error", actorId: session!.id, detail: { error: lastError } });
+  await audit({ action: "admin.ocr_gc", outcome: "error", actorId: session!.id, detail: { errors } });
+  const lastError = errors.at(-1) ?? "erro desconhecido";
   return {
     ok: false,
-    message: `Não foi possível ler o print (${lastError}). Tente outra imagem ou preencha manualmente.`,
+    message: `Não foi possível ler o print (${lastError.slice(0, 200)}). Tente outra imagem ou preencha manualmente.`,
   };
 }
