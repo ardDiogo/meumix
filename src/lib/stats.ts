@@ -62,6 +62,14 @@ function kastOf(rows: PlayerMapStats[]) {
   return round((sum(withKast.map((r) => r.kastRounds!)) / sum(withKast.map((r) => r.roundsPlayed!))) * 100, 1);
 }
 
+/** "Lanterna": terminou o mix com o pior saldo (K − D) entre todos os jogadores. */
+export function isLantern(mix: Mix, playerId: ID) {
+  const diffs = new Map<ID, number>();
+  for (const s of mix.stats) diffs.set(s.playerId, (diffs.get(s.playerId) ?? 0) + s.kills - s.deaths);
+  const mine = diffs.get(playerId);
+  return mine != null && diffs.size > 1 && mine === Math.min(...diffs.values());
+}
+
 export function statsForPlayer(mix: Mix, playerId: ID) {
   return mix.stats.filter((s) => s.playerId === playerId);
 }
@@ -82,6 +90,7 @@ export function emptyAggregate(): PlayerAggregate {
     firstKills: 0,
     clutchesWon: 0,
     mvps: 0,
+    lanterns: 0,
   };
 }
 
@@ -112,6 +121,7 @@ export function aggregatePlayer(playerId: ID, mixes: Mix[]): PlayerAggregate {
     firstKills: sum(rows.map((r) => r.firstKills ?? 0)),
     clutchesWon: sum(rows.map((r) => r.clutchesWon ?? 0)),
     mvps: played.filter((m) => m.mvpPlayerId === playerId).length,
+    lanterns: played.filter((m) => isLantern(m, playerId)).length,
   };
 }
 

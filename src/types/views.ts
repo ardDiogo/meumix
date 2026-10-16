@@ -21,6 +21,8 @@ export interface PlayerAggregate {
   firstKills: number;
   clutchesWon: number;
   mvps: number;
+  /** Mixes em que terminou com o pior saldo (K − D) da partida. */
+  lanterns: number;
 }
 
 export interface RankingRow {

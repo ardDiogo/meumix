@@ -8,6 +8,7 @@ import { Delta } from "@/components/stats/delta";
 import { EloChart } from "@/components/stats/elo-chart";
 import { FormStrip } from "@/components/stats/form-strip";
 import { StatCard } from "@/components/stats/stat-card";
+import { ComparePlayers } from "@/components/players/compare-players";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,15 +21,21 @@ import { steamProfileUrl } from "@/lib/integrations/steam";
 import { mapName } from "@/lib/maps";
 import { seriesScore } from "@/lib/stats";
 import { getDataSource } from "@/services";
-import { getPlayerHighlights, getPlayerProfile } from "@/services/queries";
+import { getPlayerHighlights, getPlayerProfile, searchPlayers } from "@/services/queries";
 
 export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">): Promise<Metadata> {
   const profile = await getPlayerProfile((await params).id);
   return { title: profile?.player.nickname ?? "Jogador não encontrado" };
 }
 
-export default async function PlayerProfilePage({ params }: PageProps<"/jogadores/[id]">) {
-  const profile = await getPlayerProfile((await params).id);
+export default async function PlayerProfilePage({ params, searchParams }: PageProps<"/jogadores/[id]">) {
+  const [{ id }, { comparar }] = await Promise.all([params, searchParams]);
+  const otherId = typeof comparar === "string" && comparar !== id ? comparar : null;
+  const [profile, other, allPlayers] = await Promise.all([
+    getPlayerProfile(id),
+    otherId ? getPlayerProfile(otherId) : null,
+    searchPlayers(""),
+  ]);
   if (!profile) notFound();
 
   const ds = getDataSource();
@@ -153,6 +160,15 @@ export default async function PlayerProfilePage({ params }: PageProps<"/jogadore
           )}
         </Card>
       </div>
+
+      <ComparePlayers
+        player={player}
+        stats={stats}
+        other={other && { player: other.player, stats: other.stats }}
+        options={allPlayers
+          .filter((p) => p.player.id !== player.id)
+          .map((p) => ({ id: p.player.id, label: `${p.player.nickname} (ELO ${p.elo})` }))}
+      />
 
       <Card className="mt-4">
         <CardHeader title="Histórico de mixes" description={`${recentMixes.length} partidas`} />
