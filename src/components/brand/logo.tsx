@@ -1,47 +1,27 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import logo from "../../../public/brand/logo.png";
+import simbolo from "../../../public/brand/simbolo.png";
 
-/**
- * Marca tipográfica "meumix".
- * `symbol` é o espaço reservado para o futuro símbolo da marca; até lá
- * usamos uma marca geométrica mínima (chanfro + barra) em laranja.
- */
-export function LogoMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={cn("size-6", className)} aria-hidden>
-      <path d="M2 6 6 2h16v16l-4 4H2z" fill="var(--color-brand)" />
-      <path d="M7 17V7h2.6l2.4 4 2.4-4H17v10h-2.6v-5.4L12 15.4l-2.4-3.8V17z" fill="var(--color-brand-fg)" />
-    </svg>
-  );
+/** Símbolo "M" da marca, para espaços pequenos. */
+export function LogoMark({ className, size = 28 }: { className?: string; size?: number }) {
+  return <Image src={simbolo} alt="" width={size} height={size} className={className} aria-hidden />;
 }
 
-export function Wordmark({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn("font-display text-[19px] leading-none font-bold tracking-[-0.01em] text-fg lowercase", className)}
-    >
-      meu<span className="text-brand">mix</span>
-    </span>
-  );
-}
-
+/** Logo completo (símbolo + "meumix"). */
 export function Logo({
   href = "/dashboard",
-  symbol = <LogoMark />,
+  height = 30,
   className,
 }: {
   href?: string;
-  symbol?: React.ReactNode | null;
+  height?: number;
   className?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={cn("inline-flex items-center gap-2 rounded-md", className)}
-      aria-label="MeuMix — início"
-    >
-      {symbol}
-      <Wordmark />
+    <Link href={href} className={cn("inline-flex items-center rounded-md", className)} aria-label="MeuMix — início">
+      <Image src={logo} alt="MeuMix" height={height} width={Math.round((logo.width / logo.height) * height)} priority />
     </Link>
   );
 }

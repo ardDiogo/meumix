@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 export default function NotFound() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-6 px-4">
-      <Logo />
+      <Logo height={44} />
       <EmptyState
         icon={Crosshair}
         title="Página não encontrada"

@@ -7,7 +7,7 @@ export function Sidebar({ community }: { community: Community }) {
   return (
     <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col gap-5 border-r border-border bg-surface px-3 py-4 lg:flex">
       <div className="px-2">
-        <Logo />
+        <Logo height={34} />
       </div>
       <CommunityBadge community={community} />
       <NavLinks />
