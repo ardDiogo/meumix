@@ -6,12 +6,14 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { finalizeMix, type FinalizeMap, type FinalizePlayer } from "@/app/(app)/admin/finalizar/actions";
 import { ELO_CAP, levelForElo } from "@/lib/levels";
+import { mapIdFromName, matchProfiles, type MergedResult } from "@/lib/gc-ocr";
 import { pickMvpAndLanterna } from "@/lib/match-rules";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { Input, Select } from "../ui/input";
 import { TeamDot } from "../mixes/badges";
+import { GcImport } from "./gc-import";
 
 interface PlayerDraft extends Omit<
   FinalizePlayer,
@@ -47,6 +49,8 @@ export function FinalizeForm({
   const router = useRouter();
   const [saving, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<"manual" | "gc">("manual");
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [mapRows, setMapRows] = useState<{ mapId: string; scoreA: string; scoreB: string }[]>(
     (initialMaps.length ? initialMaps : [maps[0]?.id ?? ""]).map((id) => ({ mapId: id, scoreA: "", scoreB: "" })),
   );
@@ -120,7 +124,7 @@ export function FinalizeForm({
     }));
     if (!confirm("Finalizar o mix? O ELO dos jogadores será atualizado e isso não pode ser desfeito por aqui.")) return;
     start(async () => {
-      const result = await finalizeMix({ scheduleId, date, maps: payloadMaps, players: payloadPlayers });
+      const result = await finalizeMix({ scheduleId, date, platform, maps: payloadMaps, players: payloadPlayers });
       if (!result.ok) {
         setError(result.message);
         toast.error(result.message);
@@ -133,8 +137,92 @@ export function FinalizeForm({
 
   const cell = "h-8 w-16 px-2 text-right tabular";
 
+  /** Preenche o formulário com o resultado da leitura dos prints. */
+  function applyImport(result: MergedResult) {
+    const notes = [...result.warnings];
+    const profileRows = rows.filter((r) => r.userId);
+    const idx = matchProfiles(
+      result.players,
+      profileRows.map((r) => ({ name: r.name })),
+    );
+
+    // Lado X do print = time A ou B? Decide pela maioria dos jogadores vinculados.
+    let xIsA = 0;
+    let xIsB = 0;
+    result.players.forEach((p, i) => {
+      const row = idx[i]! >= 0 ? profileRows[idx[i]!] : undefined;
+      if (!row) return;
+      if ((p.side === "X") === (row.team === "A")) xIsA += 1;
+      else xIsB += 1;
+    });
+    const flip = xIsB > xIsA;
+    const teamOf = (side: "X" | "Y"): "A" | "B" => ((side === "X") !== flip ? "A" : "B");
+
+    setMapRows(
+      result.maps.map((m, i) => {
+        const id = mapIdFromName(m.mapName, maps) ?? mapRows[i]?.mapId ?? maps[0]?.id ?? "";
+        if (!mapIdFromName(m.mapName, maps))
+          notes.push(`Mapa ${i + 1}: nome "${m.mapName ?? "?"}" não reconhecido; escolha o mapa.`);
+        const [a, b] = flip ? [m.scoreY, m.scoreX] : [m.scoreX, m.scoreY];
+        return { mapId: id, scoreA: a == null ? "" : String(a), scoreB: b == null ? "" : String(b) };
+      }),
+    );
+
+    const byProfile = new Map<string, MergedResult["players"][number]>();
+    const guests: MergedResult["players"] = [];
+    result.players.forEach((p, i) => {
+      const row = idx[i]! >= 0 ? profileRows[idx[i]!] : undefined;
+      if (row) byProfile.set(row.key, p);
+      else guests.push(p);
+    });
+    const fill = (p: MergedResult["players"][number]) => ({
+      team: teamOf(p.side),
+      kills: String(p.k),
+      assists: String(p.a),
+      deaths: String(p.d),
+      firstKills: String(p.fk),
+      adr: p.adr == null ? "" : String(p.adr),
+      kast: p.kast == null ? "" : String(p.kast),
+      rp: String(p.rp),
+    });
+
+    const missing = profileRows.filter((r) => !byProfile.has(r.key)).map((r) => r.name);
+    if (missing.length) notes.push(`Sem dados no print (confira ou remova): ${missing.join(", ")}.`);
+    if (guests.length)
+      notes.push(`Adicionados como convidados (sem perfil vinculado): ${guests.map((g) => g.name).join(", ")}.`);
+
+    setRows((current) => [
+      ...current
+        .filter((r) => r.userId)
+        .map((r) => {
+          const p = byProfile.get(r.key);
+          return p ? { ...r, ...fill(p) } : r;
+        }),
+      ...guests.map((g, i) => ({
+        key: `guest-ocr-${i}-${Date.now()}`,
+        userId: null,
+        name: g.name,
+        elo: null,
+        calculateElo: false,
+        ...fill(g),
+      })),
+    ]);
+    setPlatform("gc");
+    setWarnings(notes);
+  }
+
   return (
     <div className="space-y-4">
+      <GcImport maps={maps} onImported={applyImport} />
+      {warnings.length > 0 && (
+        <ul className="space-y-1 rounded-md border border-brand/40 bg-brand/5 px-4 py-3 text-sm">
+          {warnings.map((w, i) => (
+            <li key={i} className="flex gap-2">
+              <AlertCircle className="mt-0.5 size-4 shrink-0 text-brand" /> {w}
+            </li>
+          ))}
+        </ul>
+      )}
       <Card>
         <CardHeader
           title="Mapas e placar"

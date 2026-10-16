@@ -11,6 +11,8 @@ import { getPermissions } from "@/services/auth";
 import { getOccurrenceForFinalization } from "@/services/mix-events";
 
 export const metadata: Metadata = { title: "Finalizar mix" };
+// A leitura dos prints por IA pode levar alguns segundos por imagem.
+export const maxDuration = 60;
 
 export default async function FinalizePage({ searchParams }: PageProps<"/admin/finalizar">) {
   const { canManageMixes } = await getPermissions();

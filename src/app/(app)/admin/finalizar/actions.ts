@@ -38,6 +38,7 @@ const isNum = (n: unknown, min: number, max: number) =>
 export async function finalizeMix(input: {
   scheduleId: string;
   date: string;
+  platform: "manual" | "gc";
   maps: FinalizeMap[];
   players: FinalizePlayer[];
 }): Promise<FinalizeResult> {
@@ -81,7 +82,7 @@ export async function finalizeMix(input: {
   const { data, error } = await admin.rpc("finalize_mix", {
     p_schedule: input.scheduleId,
     p_date: input.date,
-    p_platform: "manual",
+    p_platform: input.platform === "gc" ? "gc" : "manual",
     p_maps: maps.map((m) => ({ map_id: m.mapId, score_a: m.scoreA, score_b: m.scoreB })),
     p_players: players.map((p, i) => ({
       user_id: p.userId,
@@ -109,7 +110,7 @@ export async function finalizeMix(input: {
     actorId: session!.id,
     scheduleId: input.scheduleId,
     eventDate: input.date,
-    detail: { match_id: data, players: players.length, maps: maps.length },
+    detail: { match_id: data, players: players.length, maps: maps.length, platform: input.platform },
   });
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
     revalidatePath(path, "layout");
