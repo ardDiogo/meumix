@@ -19,6 +19,7 @@ import { getMatchReport } from "@/services/match-report";
 import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
 import { LinkGuests } from "@/components/mixes/link-guests";
+import { ShareResult } from "@/components/mixes/share-result";
 import { getPermissions } from "@/services/auth";
 import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,8 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const mvp = mix.mvpPlayerId ? players.get(mix.mvpPlayerId) : undefined;
   const organizers = mix.organizerIds.map((id) => players.get(id)).filter((p) => p != null);
   const finished = mix.status === "finished";
+  // Série empatada (ex.: 2×2 em 4 mapas): painel em cinza.
+  const draw = finished && !winner && !!score;
 
   return (
     <>
@@ -63,6 +66,15 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
         description={formatDateTime(mix.scheduledAt)}
         actions={
           <>
+            {report?.rows.length ? (
+              <ShareResult
+                matchId={mix.id}
+                fileName={`meumix-${mix.scheduledAt.slice(0, 10)}.png`}
+                text={`🏆 ${mix.name}: ${mix.teams[0].name} ${score?.[0] ?? 0} x ${score?.[1] ?? 0} ${mix.teams[1].name}${
+                  winner ? ` — vitória do ${mix.teams[winner === "A" ? 0 : 1].name}` : " — empate"
+                }`}
+              />
+            ) : null}
             <DemoBadge kind={kind} />
             <StatusBadge status={mix.status} />
           </>
@@ -70,8 +82,16 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
       />
 
       {/* Placar geral */}
-      <Card className="mb-4">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-5 sm:px-8">
+      <Card className="mb-4 overflow-hidden">
+        <div
+          className={cn(
+            "grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-4 py-5 sm:px-8",
+            // Vencedor em verde, perdedor em vermelho.
+            winner === "A" && "bg-gradient-to-r from-win/20 via-transparent to-loss/20",
+            winner === "B" && "bg-gradient-to-r from-loss/20 via-transparent to-win/20",
+            draw && "bg-gradient-to-r from-surface-3/80 via-transparent to-surface-3/80",
+          )}
+        >
           {mix.teams.map((team, i) => (
             <div
               key={team.side}
@@ -88,15 +108,23 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                   {team.name}
                 </span>
               </div>
-              <div className="mt-0.5 text-xs text-muted">{team.playerIds.length} jogadores</div>
+              <div className="mt-0.5 text-xs text-muted">
+                {winner && (
+                  <span className={cn("font-semibold", winner === team.side ? "text-win" : "text-loss")}>
+                    {winner === team.side ? "Vencedor" : "Derrota"} ·{" "}
+                  </span>
+                )}
+                {draw && <span className="font-semibold text-muted">Empate · </span>}
+                {team.playerIds.length} jogadores
+              </div>
             </div>
           ))}
           <div className="col-start-2 row-start-1 text-center">
             {score ? (
               <div className="font-display text-3xl font-bold tabular sm:text-4xl">
-                <span className={winner === "A" ? "text-brand" : "text-muted"}>{score[0]}</span>
+                <span className={winner ? (winner === "A" ? "text-win" : "text-loss") : "text-muted"}>{score[0]}</span>
                 <span className="mx-2 text-subtle">:</span>
-                <span className={winner === "B" ? "text-brand" : "text-muted"}>{score[1]}</span>
+                <span className={winner ? (winner === "B" ? "text-win" : "text-loss") : "text-muted"}>{score[1]}</span>
               </div>
             ) : (
               <span className="text-sm text-muted">vs</span>
