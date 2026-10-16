@@ -4,6 +4,7 @@ import { canManageMixes } from "@/lib/auth/permissions";
 import { sanitizeMap, type OcrMap } from "@/lib/gc-ocr";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BASE64, visionConfigured, visionJson } from "@/services/ai-vision";
 
 /**
  * Leitura de um print do placar da Gamers Club por IA
@@ -18,9 +19,6 @@ import { getSession } from "@/services/auth";
  */
 
 export type OcrResult = { ok: true; map: OcrMap; model: string } | { ok: false; message: string };
-
-const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp"]);
-const MAX_BASE64 = 4_000_000; // ~3 MB de imagem
 
 const PROMPT = `Você vai ler um print do placar final de uma partida de Counter-Strike 2 na Gamers Club.
 
@@ -87,45 +85,6 @@ const RESPONSE_SCHEMA = {
 };
 
 /** Erro que manda pular direto para o próximo modelo (sobrecarga ou modelo indisponível). */
-class OverloadedError extends Error {}
-
-const SKIP_STATUS = new Set([404, 429, 500, 503]);
-
-/** Extrai o JSON da resposta, tolerando cercas de código ou texto em volta. */
-function parseJson(text: string): unknown {
-  const cleaned = text.replace(/```(?:json)?/gi, "").trim();
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start >= 0 && end > start) return JSON.parse(cleaned.slice(start, end + 1));
-    throw new Error("JSON inválido");
-  }
-}
-
-async function callGemini(model: string, key: string, mimeType: string, data: string): Promise<unknown> {
-  const res = await fetch(
-    `${process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data } }] }],
-        generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: RESPONSE_SCHEMA },
-      }),
-      signal: AbortSignal.timeout(45_000),
-    },
-  );
-  // Sobrecarga, cota ou modelo descontinuado: troca imediatamente para o próximo modelo.
-  if (SKIP_STATUS.has(res.status)) throw new OverloadedError(`${model}: HTTP ${res.status}`);
-  if (!res.ok) throw new Error(`Gemini respondeu ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const body = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = body.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  if (!text) throw new Error("Resposta vazia do Gemini");
-  return parseJson(text);
-}
-
 /** Mesmo formato em JSON Schema estrito (OpenAI Structured Outputs). */
 const nullable = (type: string) => ({ type: [type, "null"] });
 const OPENAI_PLAYER = {
@@ -171,99 +130,42 @@ const OPENAI_SCHEMA = {
   required: ["map_name", "teams"],
 };
 
-async function callOpenAI(model: string, key: string, mimeType: string, data: string): Promise<unknown> {
-  const res = await fetch(`${process.env.OPENAI_API_BASE || "https://api.openai.com"}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: PROMPT },
-            { type: "image_url", image_url: { url: `data:${mimeType};base64,${data}`, detail: "high" } },
-          ],
-        },
-      ],
-      response_format: {
-        type: "json_schema",
-        json_schema: { name: "gc_scoreboard", strict: true, schema: OPENAI_SCHEMA },
-      },
-    }),
-    signal: AbortSignal.timeout(45_000),
-  });
-  if (SKIP_STATUS.has(res.status)) throw new OverloadedError(`${model}: HTTP ${res.status}`);
-  if (!res.ok) throw new Error(`OpenAI respondeu ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const body = (await res.json()) as { choices?: { message?: { content?: string; refusal?: string } }[] };
-  const message = body.choices?.[0]?.message;
-  if (message?.refusal) throw new Error(`OpenAI recusou: ${message.refusal}`);
-  if (!message?.content) throw new Error("Resposta vazia da OpenAI");
-  return parseJson(message.content);
-}
-
-type Provider = { label: string; call: (mimeType: string, data: string) => Promise<unknown> };
-
-/** Provedores configurados, na ordem: GPT (principal e alternativo) e depois Gemini. */
-function providers(): Provider[] {
-  const list: Provider[] = [];
-  const openai = process.env.OPENAI_API_KEY;
-  if (openai) {
-    for (const model of [
-      process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      process.env.OPENAI_FALLBACK_MODEL || "gpt-4o-mini",
-    ]) {
-      list.push({ label: `openai:${model}`, call: (m, d) => callOpenAI(model, openai, m, d) });
-    }
-  }
-  const gemini = process.env.GEMINI_API_KEY;
-  if (gemini) {
-    // Modelos do Google mudam com frequência: tenta os configurados e depois os
-    // atuais conhecidos; 404 (descontinuado) pula para o próximo.
-    const models = [
-      process.env.GEMINI_MODEL,
-      process.env.GEMINI_FALLBACK_MODEL,
-      "gemini-3.5-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-flash-latest",
-      "gemini-2.5-flash",
-    ].filter((m, i, all): m is string => !!m && all.indexOf(m) === i);
-    for (const model of models) {
-      list.push({ label: `gemini:${model}`, call: (m, d) => callGemini(model, gemini, m, d) });
-    }
-  }
-  return list;
-}
-
 export async function analyzeGcPrint(image: { mimeType: string; data: string }): Promise<OcrResult> {
   const session = await getSession();
   if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem ler prints." };
 
-  const list = providers();
-  if (!list.length) {
+  if (!visionConfigured()) {
     return { ok: false, message: "Leitura por IA não configurada: defina OPENAI_API_KEY ou GEMINI_API_KEY na Vercel." };
   }
-  if (!ALLOWED.has(image.mimeType)) return { ok: false, message: "Envie imagens PNG, JPG ou WEBP." };
-  if (!image.data || image.data.length > MAX_BASE64) return { ok: false, message: "Imagem muito grande (máx. 3 MB)." };
-
-  const errors: string[] = [];
-  for (const { label: model, call } of list) {
-    // Até 2 tentativas por modelo para JSON inválido; sobrecarga pula direto para o próximo.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const raw = await call(image.mimeType, image.data);
-        const map = sanitizeMap(raw);
-        const players = map.teams[0].players.length + map.teams[1].players.length;
-        if (players < 2) throw new Error("Nenhum jogador encontrado no print");
-        await audit({ action: "admin.ocr_gc", outcome: "success", actorId: session!.id, detail: { model, players } });
-        return { ok: true, map, model };
-      } catch (e) {
-        errors.push(e instanceof Error ? e.message : String(e));
-        if (e instanceof OverloadedError) break;
-      }
-    }
+  if (!ALLOWED_IMAGE_TYPES.has(image.mimeType)) return { ok: false, message: "Envie imagens PNG, JPG ou WEBP." };
+  if (!image.data || image.data.length > MAX_IMAGE_BASE64) {
+    return { ok: false, message: "Imagem muito grande (máx. 3 MB)." };
   }
+
+  const result = await visionJson({
+    prompt: PROMPT,
+    geminiSchema: RESPONSE_SCHEMA,
+    openaiSchema: OPENAI_SCHEMA,
+    image,
+    parse: (raw) => {
+      const map = sanitizeMap(raw);
+      if (map.teams[0].players.length + map.teams[1].players.length < 2) {
+        throw new Error("Nenhum jogador encontrado no print");
+      }
+      return map;
+    },
+  });
+  if (result.ok) {
+    const players = result.value.teams[0].players.length + result.value.teams[1].players.length;
+    await audit({
+      action: "admin.ocr_gc",
+      outcome: "success",
+      actorId: session!.id,
+      detail: { model: result.model, players },
+    });
+    return { ok: true, map: result.value, model: result.model };
+  }
+  const errors = result.errors;
   await audit({ action: "admin.ocr_gc", outcome: "error", actorId: session!.id, detail: { errors } });
   const lastError = errors.at(-1) ?? "erro desconhecido";
   return {

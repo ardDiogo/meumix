@@ -23,6 +23,9 @@ import { mapName } from "@/lib/maps";
 import { seriesScore } from "@/lib/stats";
 import { getDataSource } from "@/services";
 import { getPlayerHighlights, getPlayerProfile, searchPlayers } from "@/services/queries";
+import { CsrepCard } from "@/components/players/csrep-card";
+import { getPermissions } from "@/services/auth";
+import { getCsrepView } from "@/services/csrep";
 
 export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">): Promise<Metadata> {
   const profile = await getPlayerProfile((await params).id);
@@ -46,6 +49,10 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const series = toEloSeries(eloHistory, new Map(recentMixes.map((r) => [r.mix.id, r.mix.name])));
   const recentChange = eloChangeSince(eloHistory, new Date(ds.now().getTime() - 30 * 86_400_000));
   const steamUrl = steamProfileUrl(player.steamId);
+  const [{ session, canManageMixes }, csrep] = await Promise.all([
+    getPermissions(),
+    kind === "supabase" ? getCsrepView(player.id, player.steamId) : null,
+  ]);
 
   return (
     <>
@@ -82,13 +89,17 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                   </a>
                 </Button>
               ) : (
-                <Badge variant="neutral" title="A integração com a Steam ainda não foi implementada">
+                <Badge variant="neutral" title="Vincule a Steam em Configurações → Perfil">
                   <Link2 aria-hidden /> Steam não vinculada
                 </Badge>
               )}
-              <Badge variant="neutral" title="A integração com o CSRep ainda não foi implementada">
-                CSRep · em breve
-              </Badge>
+              {csrep?.url && (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={csrep.url} target="_blank" rel="noopener noreferrer">
+                    <Link2 /> CSRep
+                  </a>
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex gap-6 sm:text-right">
@@ -164,6 +175,14 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
           )}
         </Card>
       </div>
+
+      {csrep && (
+        <CsrepCard
+          userId={player.id}
+          view={csrep}
+          canEdit={!!session && (session.id === player.id || canManageMixes)}
+        />
+      )}
 
       <ComparePlayers
         player={player}

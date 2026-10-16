@@ -5,24 +5,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { analyzeGcPrint } from "@/app/(app)/admin/finalizar/ocr";
 import { mapIdFromName, mergeMaps, type MergedResult, type OcrMap } from "@/lib/gc-ocr";
+import { compressImage } from "@/lib/image-client";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 
 const MAX_FILES = 5;
-const MAX_SIDE = 1800;
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
-
-/** Reduz a imagem no navegador (máx. 1800px, JPEG) e devolve base64 sem prefixo. */
-async function compress(file: File): Promise<{ mimeType: string; data: string }> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.9);
-  return { mimeType: "image/jpeg", data: dataUrl.slice(dataUrl.indexOf(",") + 1) };
-}
 
 const baseName = (file: File) => file.name.replace(/\.[^.]+$/, "");
 
@@ -56,7 +44,7 @@ export function GcImport({
       setProgress(`Lendo print ${i + 1} de ${files.length}…`);
       let result: Awaited<ReturnType<typeof analyzeGcPrint>>;
       try {
-        result = await analyzeGcPrint(await compress(file));
+        result = await analyzeGcPrint(await compressImage(file));
       } catch {
         result = { ok: false, message: "Falha de conexão ao enviar o print." };
       }
