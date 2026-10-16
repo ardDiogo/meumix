@@ -7,6 +7,7 @@ import { getFeatures } from "./features";
 import { activePenalties } from "./penalties";
 import { finalMaps, type RoundRow } from "./tiebreaker";
 import type { MixRecurrence, Weekday } from "@/types/domain";
+import { profileAvatars } from "./avatars";
 
 export const DEFAULT_COMMUNITY_SLUG = "principal";
 
@@ -54,6 +55,8 @@ export interface Registration {
   id: string;
   userId: string;
   displayName: string;
+  /** Foto do perfil Steam, se vinculado. */
+  avatarUrl: string | null;
   createdAt: string;
   position: number;
   status: "classified" | "reserve";
@@ -178,7 +181,10 @@ export async function listRegistrations(
 
   const rows = regs.data;
   const classified = new Set(rows.slice(0, maxPlayers).map((r) => r.user_id as string));
-  const names = await displayNames(rows.map((r) => r.user_id as string));
+  const [names, avatars] = await Promise.all([
+    displayNames(rows.map((r) => r.user_id as string)),
+    profileAvatars(rows.map((r) => r.user_id as string)),
+  ]);
   const mapRows = (mapVotes.data ?? []).filter((v) => classified.has(v.user_id as string));
   const capRows = (captainVotes.data ?? []).filter(
     (v) => classified.has(v.voter_id as string) && classified.has(v.candidate_id as string),
@@ -191,6 +197,7 @@ export async function listRegistrations(
       id: r.id as string,
       userId: uid,
       displayName: names.get(uid) ?? "Jogador",
+      avatarUrl: avatars.get(uid)?.avatarUrl ?? null,
       createdAt: r.created_at as string,
       position: i + 1,
       status: i < maxPlayers ? "classified" : "reserve",

@@ -6,14 +6,18 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { INTEGRATIONS } from "@/lib/integrations";
+import { SteamLinkForm } from "@/components/players/steam-link-form";
 import { getDataSource } from "@/services";
+import { getSession } from "@/services/auth";
+import { profileAvatars } from "@/services/avatars";
 
 export const metadata: Metadata = { title: "Configurações" };
 
 export default async function SettingsPage() {
   const ds = getDataSource();
   const [community, playerId] = await Promise.all([ds.getCommunity(), ds.getCurrentPlayerId()]);
-  const player = playerId ? await ds.getPlayer(playerId) : null;
+  const [player, session] = await Promise.all([playerId ? ds.getPlayer(playerId) : null, getSession()]);
+  const steam = session ? (await profileAvatars([session.id])).get(session.id) : undefined;
 
   return (
     <>
@@ -26,23 +30,23 @@ export default async function SettingsPage() {
                 <UserRound className="size-4 text-muted" /> Perfil
               </span>
             }
-            description="A edição será liberada junto com a autenticação."
+            description={
+              session ? "Vincule sua Steam para usar a foto do perfil no site." : "Entre na sua conta para editar."
+            }
           />
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="nickname">Nickname</Label>
-              <Input id="nickname" defaultValue={player?.nickname} disabled />
-            </div>
-            <div>
-              <Label htmlFor="steam">Steam ID</Label>
-              <Input
-                id="steam"
-                defaultValue={player?.steamId ?? ""}
-                placeholder="Vinculado via integração Steam"
-                disabled
+            {session ? (
+              <SteamLinkForm
+                name={session.displayName}
+                avatarUrl={steam?.avatarUrl ?? null}
+                steamUrl={steam?.steamUrl ?? null}
               />
-            </div>
-            <NotImplementedButton feature="Edição de perfil">Salvar alterações</NotImplementedButton>
+            ) : (
+              <div>
+                <Label htmlFor="nickname">Nickname</Label>
+                <Input id="nickname" defaultValue={player?.nickname} disabled />
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -77,9 +81,15 @@ export default async function SettingsPage() {
                   <div className="font-medium">{i.name}</div>
                   <div className="text-sm text-muted">{i.description}</div>
                 </div>
-                <Badge variant="neutral" className="shrink-0">
-                  Não implementada
-                </Badge>
+                {i.status === "available" ? (
+                  <Badge variant="win" className="shrink-0">
+                    Ativa
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral" className="shrink-0">
+                    Não implementada
+                  </Badge>
+                )}
               </li>
             ))}
           </ul>

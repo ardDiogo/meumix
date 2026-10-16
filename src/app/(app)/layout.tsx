@@ -3,12 +3,15 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { getDataSource } from "@/services";
 import { getPermissions } from "@/services/auth";
+import { profileAvatars } from "@/services/avatars";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ds = getDataSource();
   const [community, { session, canManageMixes }] = await Promise.all([ds.getCommunity(), getPermissions()]);
+  const avatarUrl = session ? ((await profileAvatars([session.id])).get(session.id)?.avatarUrl ?? null) : null;
   const user = session && {
     displayName: session.displayName,
+    avatarUrl,
     email: session.email,
     roleLabel: session.isSuperAdmin ? "Super admin" : session.role === "admin" ? "Administrador" : null,
   };

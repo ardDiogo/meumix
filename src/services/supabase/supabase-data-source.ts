@@ -12,6 +12,7 @@ import type {
   TeamSide,
 } from "@/types/domain";
 import { getSession } from "../auth";
+import { profileAvatars } from "../avatars";
 
 /**
  * Dados reais (Supabase). Cada partida finalizada (`mix_matches`) vira um `Mix`;
@@ -152,21 +153,33 @@ export const supabaseDataSource: DataSource = {
 
   async listPlayers(): Promise<Player[]> {
     const supabase = await client();
-    const { data } = await supabase.from("profiles").select("id, display_name, faceit_player_id, created_at");
+    const [{ data }, steam] = await Promise.all([
+      supabase.from("profiles").select("id, display_name, faceit_player_id, created_at"),
+      profileAvatars(),
+    ]);
     return (data ?? []).map((p) => ({
       id: p.id as string,
       nickname: p.display_name as string,
-      avatarUrl: null,
-      steamId: null,
+      avatarUrl: steam.get(p.id as string)?.avatarUrl ?? null,
+      steamId: steam.get(p.id as string)?.steamId ?? null,
       createdAt: p.created_at as string,
     }));
   },
 
   async getPlayer(id) {
     const supabase = await client();
-    const { data: p } = await supabase.from("profiles").select("id, display_name, created_at").eq("id", id).maybeSingle();
+    const [{ data: p }, steam] = await Promise.all([
+      supabase.from("profiles").select("id, display_name, created_at").eq("id", id).maybeSingle(),
+      profileAvatars([id]),
+    ]);
     return p
-      ? { id: p.id as string, nickname: p.display_name as string, avatarUrl: null, steamId: null, createdAt: p.created_at as string }
+      ? {
+          id: p.id as string,
+          nickname: p.display_name as string,
+          avatarUrl: steam.get(id)?.avatarUrl ?? null,
+          steamId: steam.get(id)?.steamId ?? null,
+          createdAt: p.created_at as string,
+        }
       : null;
   },
 

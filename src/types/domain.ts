@@ -167,7 +167,7 @@ export interface Highlight {
 /* -------------------------- Integrações externas -------------------------- */
 
 export type IntegrationProvider = "steam" | "csrep" | "twitch";
-export type IntegrationStatus = "not_implemented" | "disconnected" | "connected" | "error";
+export type IntegrationStatus = "not_implemented" | "available" | "disconnected" | "connected" | "error";
 
 export interface ExternalAccountLink {
   playerId: ID;

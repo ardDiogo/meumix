@@ -37,6 +37,7 @@ export function DraftPanel({
   date,
   draft,
   names,
+  avatars = {},
   classified,
   viewerId,
   isAdmin,
@@ -45,12 +46,14 @@ export function DraftPanel({
   date: string;
   draft: DraftView;
   names: Record<string, string>;
+  avatars?: Record<string, string | null>;
   classified: string[];
   viewerId: string | null;
   isAdmin: boolean;
 }) {
   const [pending, run] = useRun();
   const name = (id: string | null) => (id ? (names[id] ?? "Jogador") : "—");
+  const avatar = (id: string | null) => (id ? (avatars[id] ?? null) : null);
   const mySide = viewerId === draft.captainA ? "a" : viewerId === draft.captainB ? "b" : null;
 
   return (
@@ -93,13 +96,14 @@ export function DraftPanel({
       </div>
 
       {draft.status === "ppt" ? (
-        <PptStage scheduleId={scheduleId} date={date} draft={draft} name={name} mySide={mySide} />
+        <PptStage scheduleId={scheduleId} date={date} draft={draft} name={name} avatar={avatar} mySide={mySide} />
       ) : (
         <PickStage
           scheduleId={scheduleId}
           date={date}
           draft={draft}
           name={name}
+          avatar={avatar}
           classified={classified}
           mySide={mySide}
         />
@@ -113,12 +117,14 @@ function PptStage({
   date,
   draft,
   name,
+  avatar,
   mySide,
 }: {
   scheduleId: string;
   date: string;
   draft: DraftView;
   name: (id: string | null) => string;
+  avatar: (id: string | null) => string | null;
   mySide: "a" | "b" | null;
 }) {
   const [choice, setChoice] = useState<PptChoice | null>(null);
@@ -129,9 +135,21 @@ function PptStage({
   return (
     <div className="space-y-4 p-4 sm:p-5">
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-        <CaptainCard side="A" name={name(draft.captainA)} ready={draft.aReady} me={mySide === "a"} />
+        <CaptainCard
+          side="A"
+          name={name(draft.captainA)}
+          src={avatar(draft.captainA)}
+          ready={draft.aReady}
+          me={mySide === "a"}
+        />
         <span className="font-display text-sm font-bold text-subtle">VS</span>
-        <CaptainCard side="B" name={name(draft.captainB)} ready={draft.bReady} me={mySide === "b"} />
+        <CaptainCard
+          side="B"
+          name={name(draft.captainB)}
+          src={avatar(draft.captainB)}
+          ready={draft.bReady}
+          me={mySide === "b"}
+        />
       </div>
 
       {tie && (
@@ -189,7 +207,19 @@ function PptStage({
   );
 }
 
-function CaptainCard({ side, name, ready, me }: { side: "A" | "B"; name: string; ready: boolean; me: boolean }) {
+function CaptainCard({
+  side,
+  name,
+  src,
+  ready,
+  me,
+}: {
+  side: "A" | "B";
+  name: string;
+  src: string | null;
+  ready: boolean;
+  me: boolean;
+}) {
   return (
     <div
       className={cn(
@@ -197,7 +227,7 @@ function CaptainCard({ side, name, ready, me }: { side: "A" | "B"; name: string;
         me ? "border-brand/50 bg-brand/5" : "border-border bg-surface-2",
       )}
     >
-      <Avatar name={name} size="md" />
+      <Avatar name={name} src={src} size="md" />
       <div className="flex items-center gap-1.5 font-medium">
         <TeamDot side={side} /> {name}
       </div>
@@ -217,6 +247,7 @@ function PickStage({
   date,
   draft,
   name,
+  avatar,
   classified,
   mySide,
 }: {
@@ -224,6 +255,7 @@ function PickStage({
   date: string;
   draft: DraftView;
   name: (id: string | null) => string;
+  avatar: (id: string | null) => string | null;
   classified: string[];
   mySide: "a" | "b" | null;
 }) {
@@ -277,7 +309,7 @@ function PickStage({
                 {team.map((id, i) => (
                   <li key={id} className="flex items-center gap-2 text-sm">
                     <span className="w-5 text-right font-display text-xs text-subtle tabular">{i + 1}º</span>
-                    <Avatar name={name(id)} size="xs" />
+                    <Avatar name={name(id)} src={avatar(id)} size="xs" />
                     <span className="flex-1 truncate">{name(id)}</span>
                     {id === captain && <Crown className="size-3.5 text-brand" aria-label="Capitão" />}
                   </li>
@@ -308,7 +340,7 @@ function PickStage({
                       : "cursor-default border-border bg-surface-2/50 text-muted",
                   )}
                 >
-                  <Avatar name={name(id)} size="xs" />
+                  <Avatar name={name(id)} src={avatar(id)} size="xs" />
                   <span className="flex-1 truncate">{name(id)}</span>
                   {pending && picking === id ? (
                     <Loader2 className="size-4 animate-spin" />

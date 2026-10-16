@@ -8,15 +8,15 @@ export interface IntegrationInfo {
 }
 
 /**
- * Catálogo de integrações externas planejadas. Nenhuma está implementada;
- * o status reflete isso honestamente na interface.
+ * Catálogo de integrações externas. O status reflete honestamente na
+ * interface o que já funciona.
  */
 export const INTEGRATIONS: IntegrationInfo[] = [
   {
     provider: "steam",
     name: "Steam",
-    description: "Vincular conta via Steam OpenID, importar avatar, nickname e Steam ID.",
-    status: "not_implemented",
+    description: "Cole o link do seu perfil Steam em Perfil para importar a foto e o Steam ID.",
+    status: "available",
   },
   {
     provider: "csrep",

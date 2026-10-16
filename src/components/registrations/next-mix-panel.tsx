@@ -171,7 +171,7 @@ export async function NextMixPanel() {
                   maps={votes.maps}
                   candidates={classifiedList
                     .filter((r) => r.userId !== session?.id)
-                    .map((r) => ({ userId: r.userId, displayName: r.displayName }))}
+                    .map((r) => ({ userId: r.userId, displayName: r.displayName, avatarUrl: r.avatarUrl }))}
                   myMaps={votes.mine.maps}
                   myCaptains={votes.mine.captains}
                   captainsLocked={!!draft}
@@ -220,6 +220,7 @@ export async function NextMixPanel() {
           date={occurrence.date}
           draft={draft}
           names={Object.fromEntries(registrations.map((r) => [r.userId, r.displayName]))}
+          avatars={Object.fromEntries(registrations.map((r) => [r.userId, r.avatarUrl]))}
           classified={classifiedList.map((r) => r.userId)}
           viewerId={session?.id ?? null}
           isAdmin={canManageMixes}
@@ -260,7 +261,7 @@ export async function NextMixPanel() {
                   <TD className="text-center font-display font-bold text-muted">{r.position}</TD>
                   <TD>
                     <div className="flex items-center gap-2">
-                      <Avatar name={r.displayName} size="xs" />
+                      <Avatar name={r.displayName} src={r.avatarUrl} size="xs" />
                       <span className="font-medium">{r.displayName}</span>
                       {r.penalty && (
                         <span

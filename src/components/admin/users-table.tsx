@@ -1,15 +1,17 @@
 "use client";
 
 import { Loader2, ShieldMinus, ShieldPlus } from "lucide-react";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { setGcLevel, setUserRole } from "@/app/(app)/admin/actions";
 import { formatDate } from "@/lib/format";
 import type { ManagedUser } from "@/services/admin-users";
 import { LevelBadge } from "../players/level-badge";
+import { SteamLinkForm } from "../players/steam-link-form";
 import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "../ui/dialog";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 
 export function UsersTable({ users }: { users: ManagedUser[] }) {
@@ -31,7 +33,7 @@ export function UsersTable({ users }: { users: ManagedUser[] }) {
           <TR key={u.id}>
             <TD>
               <div className="flex items-center gap-2.5">
-                <Avatar name={u.displayName} size="sm" />
+                <SteamButton user={u} />
                 <div className="min-w-0">
                   <div className="font-medium">{u.displayName}</div>
                   <div className="text-xs text-muted">
@@ -68,6 +70,30 @@ export function UsersTable({ users }: { users: ManagedUser[] }) {
         ))}
       </tbody>
     </Table>
+  );
+}
+
+/** Foto do jogador; clicar abre o vínculo com o perfil Steam. */
+function SteamButton({ user }: { user: ManagedUser }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        className="rounded-md focus-visible:ring-2 focus-visible:ring-brand focus-visible:outline-none"
+        title={user.steamUrl ? "Alterar perfil Steam" : "Vincular perfil Steam"}
+      >
+        <Avatar name={user.displayName} src={user.avatarUrl} size="sm" />
+      </DialogTrigger>
+      <DialogContent title="Perfil Steam" description={`Importe a foto de ${user.displayName} pelo link do perfil.`}>
+        <SteamLinkForm
+          name={user.displayName}
+          avatarUrl={user.avatarUrl}
+          steamUrl={user.steamUrl}
+          userId={user.id}
+          onDone={() => setOpen(false)}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 

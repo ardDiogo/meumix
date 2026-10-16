@@ -30,7 +30,7 @@ export function VoteDialog({
   scheduleId: string;
   date: string;
   maps: { id: string; name: string }[];
-  candidates: { userId: string; displayName: string }[];
+  candidates: { userId: string; displayName: string; avatarUrl?: string | null }[];
   myMaps: string[];
   myCaptains: string[];
   /** A disputa de capitães começou: votos de capitão encerrados (pula para mapas). */
@@ -129,7 +129,7 @@ export function VoteDialog({
                               : "border-border bg-surface-2 hover:border-border-strong",
                           )}
                         >
-                          <Avatar name={c.displayName} size="xs" />
+                          <Avatar name={c.displayName} src={c.avatarUrl} size="xs" />
                           <span className="flex-1 truncate font-medium">{c.displayName}</span>
                           {active && <Check className="size-4 text-brand" />}
                         </button>

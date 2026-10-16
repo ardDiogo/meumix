@@ -16,6 +16,7 @@ import {
 
 export interface MenuUser {
   displayName: string;
+  avatarUrl?: string | null;
   email: string;
   roleLabel: string | null;
 }
@@ -34,7 +35,7 @@ export function UserMenu({ user, showAdmin }: { user: MenuUser | null; showAdmin
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-md p-1 pr-2 transition-colors hover:bg-surface-2 data-[state=open]:bg-surface-2">
-        <Avatar name={user.displayName} size="sm" />
+        <Avatar name={user.displayName} src={user.avatarUrl} size="sm" />
         <span className="hidden text-sm font-medium sm:block">{user.displayName}</span>
         <ChevronDown className="hidden size-4 text-muted sm:block" aria-hidden />
         <span className="sr-only">Abrir menu do usuário</span>
