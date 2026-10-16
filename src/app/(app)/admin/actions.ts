@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 import { canManageAdmins, canManageMixes, isSuperAdminEmail, type PlatformRole } from "@/lib/auth/permissions";
 import { communityToday, describeRecurrence, parseSchedule, type ScheduleErrors } from "@/lib/mix-schedule";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { validatePassword } from "@/lib/auth/validation";
+import { parseBulkUsers } from "@/lib/bulk-users";
+import { initialEloFromGc, levelForElo } from "@/lib/levels";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { DEFAULT_COMMUNITY_SLUG } from "@/services/mix-events";
@@ -182,4 +185,102 @@ export async function setFeature(key: "map_tiebreaker", enabled: boolean): Promi
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   return { ok: true, message: enabled ? "Funcionalidade ligada." : "Funcionalidade desligada." };
+}
+
+/* --------------------------- Cadastro em lote ---------------------------- */
+
+export interface BulkCreateResult {
+  ok: boolean;
+  message: string;
+  rows: { email: string; nick: string; status: "created" | "exists" | "error"; detail?: string }[];
+}
+
+/**
+ * Master cadastra jogadores em lote com uma senha inicial. As contas já
+ * nascem confirmadas; cada jogador troca a senha em "Alterar senha".
+ */
+export async function bulkCreateUsers(text: string, password: string): Promise<BulkCreateResult> {
+  const session = await getSession();
+  if (!canManageAdmins(session)) return { ok: false, message: "Apenas o master pode cadastrar jogadores.", rows: [] };
+  const passwordError = validatePassword(password);
+  if (passwordError) return { ok: false, message: passwordError, rows: [] };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor.", rows: [] };
+
+  const parsed = parseBulkUsers(text);
+  if (!parsed.length) return { ok: false, message: "Cole ao menos uma linha.", rows: [] };
+  const invalid = parsed.filter((r) => r.error);
+  if (invalid.length) {
+    return {
+      ok: false,
+      message: `Corrija a lista: ${invalid.map((r) => `linha ${r.line} (${r.error})`).join("; ")}.`,
+      rows: [],
+    };
+  }
+
+  const rows: BulkCreateResult["rows"] = [];
+  for (const r of parsed) {
+    const { error } = await admin.auth.admin.createUser({
+      email: r.email,
+      password,
+      email_confirm: true,
+      user_metadata: { display_name: r.nick, full_name: r.fullName || null, gc_level: r.gcLevel },
+    });
+    if (!error) rows.push({ email: r.email, nick: r.nick, status: "created" });
+    else if (error.code === "email_exists" || /already|registered|exists/i.test(error.message)) {
+      rows.push({ email: r.email, nick: r.nick, status: "exists" });
+    } else rows.push({ email: r.email, nick: r.nick, status: "error", detail: error.message });
+  }
+
+  const created = rows.filter((r) => r.status === "created").length;
+  await audit({
+    action: "admin.bulk_create_users",
+    outcome: "success",
+    actorId: session!.id,
+    detail: { created, total: rows.length },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/jogadores");
+  return { ok: true, message: `${created} de ${rows.length} jogadores cadastrados.`, rows };
+}
+
+/** Define o nível GC (e o ELO inicial) de um jogador que ainda não tem partidas. */
+export async function setGcLevel(userId: string, gcLevel: number): Promise<RoleChangeResult> {
+  const session = await getSession();
+  if (!canManageAdmins(session)) return { ok: false, message: "Apenas o master pode alterar o nível GC." };
+  if (!Number.isInteger(gcLevel) || gcLevel < 0 || gcLevel > 20) return { ok: false, message: "Nível GC inválido." };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
+
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("elo, level, mixes_played")
+    .eq("id", userId)
+    .maybeSingle();
+  if (!profile) return { ok: false, message: "Jogador não encontrado." };
+  if ((profile.mixes_played as number) > 0) {
+    return { ok: false, message: "O jogador já tem partidas: o ELO agora é definido pelos mixes." };
+  }
+  const elo = initialEloFromGc(gcLevel);
+  const level = levelForElo(elo).level;
+  const { error } = await admin.from("profiles").update({ gc_level: gcLevel, elo, level }).eq("id", userId);
+  if (error) return { ok: false, message: "Não foi possível salvar." };
+  await admin.from("elo_change_logs").insert({
+    user_id: userId,
+    old_elo: profile.elo,
+    new_elo: elo,
+    old_level: profile.level,
+    new_level: level,
+    reason: `nível GC ${gcLevel}`,
+    changed_by: session!.id,
+  });
+  await audit({
+    action: "admin.set_gc_level",
+    outcome: "success",
+    actorId: session!.id,
+    detail: { user_id: userId, gcLevel, elo },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/rankings");
+  return { ok: true, message: `Nível GC ${gcLevel} → ELO inicial ${elo} (nível ${level}).` };
 }

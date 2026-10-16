@@ -10,6 +10,10 @@ export interface ManagedUser {
   emailConfirmed: boolean;
   role: PlatformRole;
   isSuperAdmin: boolean;
+  fullName: string | null;
+  elo: number;
+  gcLevel: number | null;
+  mixesPlayed: number;
 }
 
 export type ListUsersResult =
@@ -22,7 +26,7 @@ export async function listManagedUsers(): Promise<ListUsersResult> {
 
   const [{ data, error }, profiles] = await Promise.all([
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
-    admin.from("profiles").select("id, display_name, role"),
+    admin.from("profiles").select("id, display_name, role, full_name, elo, gc_level, mixes_played"),
   ]);
   if (error) return { status: "error", message: "Não foi possível carregar os usuários." };
 
@@ -39,6 +43,10 @@ export async function listManagedUsers(): Promise<ListUsersResult> {
       emailConfirmed: !!u.email_confirmed_at,
       role: profile?.role === "admin" ? "admin" : "user",
       isSuperAdmin: isSuperAdminEmail(email, !!u.email_confirmed_at),
+      fullName: (profile?.full_name as string | null) ?? null,
+      elo: (profile?.elo as number | undefined) ?? 0,
+      gcLevel: (profile?.gc_level as number | null | undefined) ?? null,
+      mixesPlayed: (profile?.mixes_played as number | undefined) ?? 0,
     };
   });
   users.sort(

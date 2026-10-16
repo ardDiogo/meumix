@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { Metadata } from "next";
+import { BulkUsersForm } from "@/components/admin/bulk-users-form";
 import { CreateMixForm } from "@/components/admin/create-mix-form";
 import { ScheduleList } from "@/components/admin/schedule-list";
 import { FeatureToggles } from "@/components/admin/feature-toggles";
@@ -139,7 +140,12 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           />
         </Card>
       )}
-      {tab === "usuarios" && <UsersPanel />}
+      {tab === "usuarios" && (
+        <div className="space-y-4">
+          <BulkUsersForm />
+          <UsersPanel />
+        </div>
+      )}
       {tab === "punicoes" && <PenaltiesTab />}
       {tab === "configuracoes" && (
         <Card>
