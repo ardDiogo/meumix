@@ -2,7 +2,7 @@
 
 Referência: [`regras-do-mix.md`](./regras-do-mix.md). Legenda: ✅ feito · 🟡 parcial · ⬜ pendente.
 
-## Fase 1 — Inscrições e votações (atual)
+## Fase 1 — Inscrições e votações
 
 | Item                                                                            | Seção | Status                                       |
 | ------------------------------------------------------------------------------- | ----- | -------------------------------------------- |
@@ -22,17 +22,18 @@ Referência: [`regras-do-mix.md`](./regras-do-mix.md). Legenda: ✅ feito · �
 | Tempo real: inscrições e votos atualizam sem recarregar                         | 11    | ✅                                           |
 | Compartilhar convite no WhatsApp                                                | —     | ✅                                           |
 
-## Fase 2 — Disputa e escolha dos times
+## Fase 2 — Disputa e escolha dos times (em andamento)
 
-| Item                                                                                         | Seção | Status |
-| -------------------------------------------------------------------------------------------- | ----- | ------ |
-| Bloqueio de voto de capitão quando o PPT começa                                              | 4     | ⬜     |
-| Pedra, papel ou tesoura entre capitães (oculto até ambos prontos, empate salvo, reset em 3s) | 5     | ⬜     |
-| Escolha dos times 1-2-2-2-1 com checagem no banco a cada escolha                             | 6     | ⬜     |
-| Admin: reiniciar escolha / tudo; remover jogador zera escolhas                               | 6     | ⬜     |
-| Desempate de mapas (rounds 1 e 2 + sorteio)                                                  | 3     | ⬜     |
-| Sugestão de times balanceados (252 combinações) + votação 80%                                | 7     | ⬜     |
-| Probabilidade de vitória                                                                     | 7     | ⬜     |
+| Item                                                                      | Seção | Status |
+| ------------------------------------------------------------------------- | ----- | ------ |
+| Bloqueio de voto de capitão quando o PPT começa (trigger no banco)        | 4     | ✅     |
+| Capitães = 2 mais votados (início automático com 20 votos ou pelo admin)  | 4     | ✅     |
+| Pedra, papel ou tesoura decidido no banco (jogadas ocultas, empate salvo) | 5     | ✅     |
+| Escolha dos times 1-2-2-2-1 com checagem no banco a cada escolha          | 6     | ✅     |
+| Admin: reiniciar escolha / tudo; remover jogador zera escolhas            | 6     | ✅     |
+| Desempate de mapas (rounds 1 e 2 + sorteio)                               | 3     | ⬜     |
+| Sugestão de times balanceados (252 combinações) + votação 80%             | 7     | ⬜     |
+| Probabilidade de vitória                                                  | 7     | ⬜     |
 
 ## Fase 3 — Cargos e administração
 
