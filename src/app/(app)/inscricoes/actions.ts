@@ -139,6 +139,8 @@ async function deleteRegistration(
 
   const { error } = await admin.from("mix_registrations").delete().eq("id", reg.id);
   if (error) return { found: true as const, error };
+  // Remover um jogador zera a escolha dos times (mantém os votos de capitão).
+  await admin.from("mix_draft_state").delete().match({ schedule_id: reg.schedule_id, event_date: reg.event_date });
   await admin.from("mix_cancellations").insert({
     schedule_id: reg.schedule_id,
     event_date: reg.event_date,
@@ -195,6 +197,8 @@ export async function resetRegistrations(scheduleId: string, date: string): Prom
   if (!admin) return fail("Servidor não configurado.", "unavailable");
 
   const match = { schedule_id: scheduleId, event_date: date };
+  const draft = await admin.from("mix_draft_state").delete().match(match);
+  if (draft.error) return fail("Não foi possível reiniciar o mix.", "error");
   const results = await Promise.all([
     admin.from("mix_registrations").delete().match(match),
     admin.from("map_votes").delete().match(match),
@@ -267,7 +271,11 @@ export async function submitCaptainVotes(
   if (unique.some((id) => !v.classified.includes(id)))
     return fail("Só é possível votar em jogadores classificados.", "invalid");
 
-  const match = { schedule_id: scheduleId, event_date: date, voter_id: v.session.id };
+  const occurrence = { schedule_id: scheduleId, event_date: date };
+  const { data: draft } = await v.ctx.admin.from("mix_draft_state").select("status").match(occurrence).maybeSingle();
+  if (draft) return fail("A seleção de equipes já começou: os votos de capitão estão encerrados.", "closed");
+
+  const match = { ...occurrence, voter_id: v.session.id };
   const del = await v.ctx.admin.from("captain_votes").delete().match(match);
   const ins = del.error
     ? del
@@ -282,6 +290,15 @@ export async function submitCaptainVotes(
     eventDate: date,
     detail: { candidates: unique },
   });
+
+  // Todos os classificados votaram nos 2 capitães: a disputa começa sozinha.
+  if (v.classified.length >= v.ctx.schedule.maxPlayers) {
+    const { data: votes } = await v.ctx.admin.from("captain_votes").select("voter_id").match(occurrence);
+    const cast = (votes ?? []).filter((x) => v.classified.includes(x.voter_id as string)).length;
+    if (cast >= v.ctx.schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER) {
+      await v.ctx.admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
+    }
+  }
   refresh();
   return { ok: true, message: "Voto de capitães registrado!" };
 }

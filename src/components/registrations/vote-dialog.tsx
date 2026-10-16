@@ -24,6 +24,7 @@ export function VoteDialog({
   candidates,
   myMaps,
   myCaptains,
+  captainsLocked,
   mandatory,
 }: {
   scheduleId: string;
@@ -32,11 +33,13 @@ export function VoteDialog({
   candidates: { userId: string; displayName: string }[];
   myMaps: string[];
   myCaptains: string[];
+  /** A disputa de capitães começou: votos de capitão encerrados (pula para mapas). */
+  captainsLocked: boolean;
   mandatory: boolean;
 }) {
-  const pendingCaptains = myCaptains.length === 0 && candidates.length > 0;
+  const pendingCaptains = !captainsLocked && myCaptains.length === 0 && candidates.length > 0;
   const pendingMaps = myMaps.length !== MAP_VOTES_PER_PLAYER;
-  const firstStep: Step = pendingCaptains ? "captains" : pendingMaps ? "maps" : "captains";
+  const firstStep: Step = pendingCaptains ? "captains" : pendingMaps || captainsLocked ? "maps" : "captains";
   const locked = mandatory && (pendingCaptains || pendingMaps);
 
   const [open, setOpen] = useState(locked);
@@ -83,7 +86,7 @@ export function VoteDialog({
           <div className="border-b border-border p-5 pb-4">
             <DialogPrimitive.Title className="font-display text-lg font-bold">Votações do mix</DialogPrimitive.Title>
             <ol className="mt-3 flex items-center gap-2 text-xs font-semibold tracking-wide uppercase">
-              {(["captains", "maps", "done"] as const).map((s, i) => (
+              {(captainsLocked ? (["maps", "done"] as const) : (["captains", "maps", "done"] as const)).map((s, i) => (
                 <li key={s} className={cn("flex items-center gap-2", step === s ? "text-brand" : "text-subtle")}>
                   {i > 0 && <span className="h-px w-4 bg-border" aria-hidden />}
                   {s === "captains" ? "Capitães" : s === "maps" ? "Mapas" : "Concluído"}
@@ -185,7 +188,11 @@ export function VoteDialog({
           <div className="flex gap-2 border-t border-border p-4">
             {step === "done" ? (
               <>
-                <Button variant="secondary" className="flex-1" onClick={() => setStep("captains")}>
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setStep(captainsLocked ? "maps" : "captains")}
+                >
                   Rever votos
                 </Button>
                 <Button variant="primary" className="flex-1" onClick={() => setOpen(false)}>
@@ -194,7 +201,7 @@ export function VoteDialog({
               </>
             ) : (
               <>
-                {step === "maps" && (
+                {step === "maps" && !captainsLocked && (
                   <Button variant="secondary" onClick={() => setStep("captains")} disabled={saving}>
                     Voltar
                   </Button>

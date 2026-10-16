@@ -73,12 +73,34 @@ export interface VoteSummary {
   mine: { maps: string[]; captains: string[] };
 }
 
+export type PptChoice = "rock" | "paper" | "scissors";
+
+export interface DraftView {
+  status: "ppt" | "draft" | "completed";
+  captainA: string;
+  captainB: string;
+  aReady: boolean;
+  bReady: boolean;
+  revealedA: PptChoice | null;
+  revealedB: PptChoice | null;
+  lastTieChoice: PptChoice | null;
+  tieCount: number;
+  winner: string | null;
+  currentTurn: "a" | "b" | null;
+  turnNumber: number;
+  picksInTurn: number;
+  /** Ordem de escolha (o capitão é o 1º). */
+  teamA: string[];
+  teamB: string[];
+}
+
 export interface NextMix {
   schedule: Schedule;
   occurrence: Occurrence;
   organizer: string | null;
   registrations: Registration[];
   votes: VoteSummary;
+  draft: DraftView | null;
 }
 
 export type NextMixResult = { status: "not_configured" } | { status: "none" } | { status: "ok"; mix: NextMix };
@@ -185,9 +207,10 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
   const next = upcoming[0];
   if (!next) return { status: "none" };
 
-  const [{ registrations, votes }, organizers] = await Promise.all([
+  const [{ registrations, votes }, organizers, draft] = await Promise.all([
     listRegistrations(next.schedule.id, next.occurrence.date, next.schedule.maxPlayers, viewerId),
     displayNames(next.schedule.createdBy ? [next.schedule.createdBy] : []),
+    loadDraft(next.schedule.id, next.occurrence.date),
   ]);
   return {
     status: "ok",
@@ -196,6 +219,35 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
       organizer: next.schedule.createdBy ? (organizers.get(next.schedule.createdBy) ?? null) : null,
       registrations,
       votes,
+      draft,
     },
+  };
+}
+
+async function loadDraft(scheduleId: string, date: string): Promise<DraftView | null> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from("mix_draft_state")
+    .select("*")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    status: data.status,
+    captainA: data.captain_a,
+    captainB: data.captain_b,
+    aReady: data.a_ready,
+    bReady: data.b_ready,
+    revealedA: data.revealed_a,
+    revealedB: data.revealed_b,
+    lastTieChoice: data.last_tie_choice,
+    tieCount: data.tie_count,
+    winner: data.winner,
+    currentTurn: data.current_turn,
+    turnNumber: data.turn_number,
+    picksInTurn: data.picks_in_turn,
+    teamA: data.team_a ?? [],
+    teamB: data.team_b ?? [],
   };
 }

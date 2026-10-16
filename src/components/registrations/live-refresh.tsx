@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 
-const TABLES = ["mix_registrations", "map_votes", "captain_votes"] as const;
+const TABLES = ["mix_registrations", "map_votes", "captain_votes", "mix_draft_state"] as const;
 
 /**
  * Atualiza o painel sozinho quando inscrições ou votos mudam (seção 11).

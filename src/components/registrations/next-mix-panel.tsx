@@ -12,7 +12,8 @@ import { EmptyState } from "../ui/empty-state";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 import { JoinButton } from "./join-button";
 import { LiveRefresh } from "./live-refresh";
-import { RemoveButton, ResetButton } from "./registration-controls";
+import { DraftPanel } from "./draft-panel";
+import { RemoveButton, ResetButton, StartDraftButton } from "./registration-controls";
 import { VoteDialog } from "./vote-dialog";
 import { ShareMixButton } from "./share-mix";
 
@@ -105,7 +106,7 @@ export async function NextMixPanel() {
     );
   }
 
-  const { schedule, occurrence, organizer, registrations, votes } = result.mix;
+  const { schedule, occurrence, organizer, registrations, votes, draft } = result.mix;
   const now = new Date();
   const regWindow = registrationWindow(occurrence, now);
   const mine = session ? registrations.find((r) => r.userId === session.id) : undefined;
@@ -170,9 +171,11 @@ export async function NextMixPanel() {
                     .map((r) => ({ userId: r.userId, displayName: r.displayName }))}
                   myMaps={votes.mine.maps}
                   myCaptains={votes.mine.captains}
+                  captainsLocked={!!draft}
                   mandatory={full}
                 />
               )}
+              {canManageMixes && full && !draft && <StartDraftButton scheduleId={schedule.id} date={occurrence.date} />}
               {canManageMixes && registrations.length > 0 && (
                 <ResetButton scheduleId={schedule.id} date={occurrence.date} />
               )}
@@ -189,6 +192,18 @@ export async function NextMixPanel() {
           />
         </div>
       </Card>
+
+      {draft && (
+        <DraftPanel
+          scheduleId={schedule.id}
+          date={occurrence.date}
+          draft={draft}
+          names={Object.fromEntries(registrations.map((r) => [r.userId, r.displayName]))}
+          classified={classifiedList.map((r) => r.userId)}
+          viewerId={session?.id ?? null}
+          isAdmin={canManageMixes}
+        />
+      )}
 
       <Card>
         <CardHeader

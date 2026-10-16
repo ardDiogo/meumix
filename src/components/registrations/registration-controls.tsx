@@ -1,8 +1,9 @@
 "use client";
 
-import { Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Loader2, Play, RotateCcw, Trash2 } from "lucide-react";
 import { useTransition } from "react";
 import { toast } from "sonner";
+import { startDraft } from "@/app/(app)/draft/actions";
 import { removeRegistration, resetRegistrations, type ActionResult } from "@/app/(app)/inscricoes/actions";
 import { Button } from "../ui/button";
 
@@ -48,6 +49,23 @@ export function RemoveButton({ registrationId, name }: { registrationId: string;
       }}
     >
       {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+    </Button>
+  );
+}
+
+export function StartDraftButton({ scheduleId, date }: { scheduleId: string; date: string }) {
+  const [pending, run] = useAction();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={pending}
+      onClick={() => {
+        if (confirm("Iniciar a seleção de equipes agora? Os votos de capitão serão encerrados."))
+          run(() => startDraft(scheduleId, date));
+      }}
+    >
+      {pending ? <Loader2 className="animate-spin" /> : <Play />} Iniciar seleção
     </Button>
   );
 }
