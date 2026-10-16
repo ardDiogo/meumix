@@ -18,7 +18,7 @@ import { GcImport } from "./gc-import";
 
 interface PlayerDraft extends Omit<
   FinalizePlayer,
-  "kills" | "deaths" | "assists" | "firstKills" | "adr" | "kast" | "rp"
+  "kills" | "deaths" | "assists" | "firstKills" | "adr" | "kast" | "rp" | "s" | "fa" | "mk" | "drop"
 > {
   key: string;
   elo: number | null;
@@ -29,7 +29,28 @@ interface PlayerDraft extends Omit<
   adr: string;
   kast: string;
   rp: string;
+  s: string;
+  fa: string;
+  mk: string;
+  drop: string;
 }
+
+/** Colunas do placar na ordem da GC. */
+const FIELDS = [
+  ["kills", "K"],
+  ["assists", "A"],
+  ["deaths", "D"],
+  ["adr", "ADR"],
+  ["kast", "KAST"],
+  ["s", "S"],
+  ["fa", "FA"],
+  ["mk", "MK"],
+  ["firstKills", "FK"],
+  ["rp", "RP"],
+  ["drop", "DROP"],
+] as const;
+const DECIMAL = new Set(["adr", "kast", "rp"]);
+const EMPTY_STATS = { s: "", fa: "", mk: "", drop: "" };
 
 const intOr0 = (v: string) => (v.trim() === "" ? 0 : Number(v));
 const numOrNull = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
@@ -70,6 +91,7 @@ export function FinalizeForm({
       adr: "",
       kast: "",
       rp: "",
+      ...EMPTY_STATS,
       calculateElo: true,
     })),
   );
@@ -122,6 +144,10 @@ export function FinalizeForm({
       adr: numOrNull(r.adr),
       kast: numOrNull(r.kast),
       rp: intOr0(r.rp),
+      s: r.s.trim() === "" ? null : intOr0(r.s),
+      fa: intOr0(r.fa),
+      mk: intOr0(r.mk),
+      drop: intOr0(r.drop),
       calculateElo: r.calculateElo,
     }));
     if (!confirm("Finalizar o mix? O ELO dos jogadores será atualizado e isso não pode ser desfeito por aqui.")) return;
@@ -186,6 +212,10 @@ export function FinalizeForm({
       adr: p.adr == null ? "" : String(p.adr),
       kast: p.kast == null ? "" : String(p.kast),
       rp: String(p.rp),
+      s: p.s ? String(p.s) : "",
+      fa: String(p.fa),
+      mk: String(p.mk),
+      drop: String(p.drop),
     });
 
     const missing = profileRows.filter((r) => !byProfile.has(r.key)).map((r) => r.name);
@@ -312,7 +342,7 @@ export function FinalizeForm({
               <tr>
                 <th className="px-3 py-2 text-left">Jogador</th>
                 <th className="px-2 py-2">Time</th>
-                {["K", "A", "D", "FK", "ADR", "KAST", "RP"].map((h) => (
+                {FIELDS.map(([, h]) => (
                   <th key={h} className="px-2 py-2 text-right">
                     {h}
                   </th>
@@ -365,15 +395,15 @@ export function FinalizeForm({
                         <option value="B">B</option>
                       </Select>
                     </td>
-                    {(["kills", "assists", "deaths", "firstKills", "adr", "kast", "rp"] as const).map((field) => (
+                    {FIELDS.map(([field, label]) => (
                       <td key={field} className="px-1 py-1.5">
                         <Input
-                          aria-label={`${field} de ${r.name}`}
-                          inputMode={field === "adr" || field === "kast" || field === "rp" ? "decimal" : "numeric"}
+                          aria-label={`${label} de ${r.name}`}
+                          inputMode={DECIMAL.has(field) ? "decimal" : "numeric"}
                           value={r[field]}
                           onChange={(e) => update(r.key, { [field]: e.target.value })}
-                          className={cn(cell, field === "rp" && "w-20")}
-                          placeholder={field === "adr" || field === "kast" ? "—" : "0"}
+                          className={cn(cell, field === "rp" && "w-20", (field === "s" || field === "drop") && "w-14")}
+                          placeholder={field === "adr" || field === "kast" || field === "s" ? "—" : "0"}
                         />
                       </td>
                     ))}
@@ -423,6 +453,7 @@ export function FinalizeForm({
                   adr: "",
                   kast: "",
                   rp: "",
+                  ...EMPTY_STATS,
                   calculateElo: false,
                 },
               ])

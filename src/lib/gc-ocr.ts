@@ -175,6 +175,10 @@ export interface MergedPlayer {
   d: number;
   fk: number;
   rp: number;
+  s: number;
+  fa: number;
+  mk: number;
+  drop: number;
   adr: number | null;
   kast: number | null;
   maps: number;
@@ -266,6 +270,10 @@ export function mergeMaps(maps: OcrMap[]): MergedResult {
             d: 0,
             fk: 0,
             rp: 0,
+            s: 0,
+            fa: 0,
+            mk: 0,
+            drop: 0,
             adr: null,
             kast: null,
             maps: 0,
@@ -282,6 +290,10 @@ export function mergeMaps(maps: OcrMap[]): MergedResult {
         next.d += p.d;
         next.fk += p.fk;
         next.rp += p.rp;
+        next.s += p.s;
+        next.fa += p.fa;
+        next.mk += p.mk;
+        next.drop += p.drop;
         next.maps += 1;
         if (p.adr != null) {
           next.adrSum += p.adr * rounds;
@@ -305,6 +317,10 @@ export function mergeMaps(maps: OcrMap[]): MergedResult {
     d: p.d,
     fk: p.fk,
     rp: p.rp,
+    s: p.s,
+    fa: p.fa,
+    mk: p.mk,
+    drop: p.drop,
     adr: p.adrRounds ? Math.round((p.adrSum / p.adrRounds) * 10) / 10 : null,
     kast: p.kastRounds ? Math.round((p.kastSum / p.kastRounds) * 10) / 10 : null,
     maps: p.maps,

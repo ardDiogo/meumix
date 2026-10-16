@@ -15,6 +15,10 @@ import { mapName } from "@/lib/maps";
 import { seriesScore, seriesWinner } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { getMixDetail } from "@/services/queries";
+import { getMatchReport } from "@/services/match-report";
+import { MatchHighlights } from "@/components/mixes/match-highlights";
+import { MatchStatsTable } from "@/components/mixes/match-stats-table";
+import { Badge } from "@/components/ui/badge";
 
 export async function generateMetadata({ params }: PageProps<"/mixes/[id]">): Promise<Metadata> {
   const detail = await getMixDetail((await params).id);
@@ -25,6 +29,8 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const detail = await getMixDetail((await params).id);
   if (!detail) notFound();
   const { kind, mix, players, scoreboard, mapScoreboards, highlights } = detail;
+  const report = kind === "supabase" && mix.status === "finished" ? await getMatchReport(mix.id) : null;
+  const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;
 
   const score = seriesScore(mix);
   const winner = seriesWinner(mix);
@@ -107,9 +113,28 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
         </ul>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_18rem]">
+      {/* Com o placar completo, a tabela usa a largura toda e o painel lateral vai para baixo. */}
+      <div className={cn("grid gap-4", !report?.rows.length && "xl:grid-cols-[1fr_18rem]")}>
         <div className="min-w-0 space-y-4">
-          {finished ? (
+          {report?.rows.length ? (
+            <>
+              <Card className="overflow-hidden">
+                <div className="border-b border-border bg-gradient-to-r from-win/10 to-transparent px-4 py-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-display text-xl font-bold">Estatísticas dos jogadores</h2>
+                    <Badge variant="neutral">{PLATFORM[report.platform]}</Badge>
+                  </div>
+                  <p className="mt-0.5 text-sm text-muted">
+                    {mix.maps.length > 1
+                      ? `Estatísticas agregadas dos ${mix.maps.length} mapas enviados`
+                      : `Estatísticas de ${mapName(mix.maps[0]!.mapId)}`}
+                  </p>
+                </div>
+                <MatchStatsTable rows={report.rows} />
+              </Card>
+              <MatchHighlights rows={report.rows} />
+            </>
+          ) : finished ? (
             <>
               <Card>
                 <CardHeader
@@ -159,7 +184,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
           )}
         </div>
 
-        <aside className="space-y-4">
+        <aside className={cn(report?.rows.length ? "grid items-start gap-4 md:grid-cols-2" : "space-y-4")}>
           <Card>
             <CardHeader title="Informações" />
             <dl className="divide-y divide-border text-sm">

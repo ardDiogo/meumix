@@ -24,6 +24,10 @@ export interface FinalizePlayer {
   adr: number | null;
   kast: number | null;
   rp: number;
+  s?: number | null;
+  fa?: number;
+  mk?: number;
+  drop?: number;
   calculateElo: boolean;
 }
 
@@ -73,6 +77,9 @@ export async function finalizeMix(input: {
     if (![p.kills, p.deaths, p.assists, p.firstKills].every((n) => isInt(n, 0, 500))) {
       return { ok: false, message: `Confira K, A, D e FK de ${p.name}.` };
     }
+    if (![p.fa ?? 0, p.mk ?? 0, p.drop ?? 0].every((n) => isInt(n, 0, 500)) || !(p.s == null || isInt(p.s, 0, 500))) {
+      return { ok: false, message: `Confira S, FA, MK e DROP de ${p.name}.` };
+    }
     if (!isNum(p.adr, 0, 500) || !isNum(p.kast, 0, 100) || !isInt(p.rp, -200, 200)) {
       return { ok: false, message: `Confira ADR (0–500), KAST (0–100) e RP (−200 a 200) de ${p.name}.` };
     }
@@ -95,6 +102,10 @@ export async function finalizeMix(input: {
       adr: p.adr,
       kast: p.kast,
       rp: p.rp,
+      s: p.s ?? null,
+      fa: p.fa ?? 0,
+      mk: p.mk ?? 0,
+      drop: p.drop ?? 0,
       is_mvp: i === mvp,
       is_lanterna: i === lanterna,
       calculate_elo: p.calculateElo,
