@@ -6,11 +6,14 @@ import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 
 /**
- * Leitura de um print do placar da Gamers Club com o Gemini
+ * Leitura de um print do placar da Gamers Club por IA
  * (docs/especificacao-tecnica.md, 4.12). Um print por chamada.
  *
- * Variáveis (somente servidor): GEMINI_API_KEY; opcionais GEMINI_MODEL e
- * GEMINI_FALLBACK_MODEL (modelo alternativo usado na hora em caso de sobrecarga).
+ * Provedores (somente servidor), na ordem de uso:
+ * - OpenAI (GPT): OPENAI_API_KEY; opcionais OPENAI_MODEL e OPENAI_FALLBACK_MODEL.
+ * - Gemini: GEMINI_API_KEY; opcionais GEMINI_MODEL e GEMINI_FALLBACK_MODEL.
+ * Com as duas chaves, o Gemini vira o serviço alternativo do GPT. Em sobrecarga
+ * (429/500/503) troca na hora para o próximo modelo, sem espera.
  */
 
 export type OcrResult = { ok: true; map: OcrMap; model: string } | { ok: false; message: string };
@@ -119,26 +122,126 @@ async function callGemini(model: string, key: string, mimeType: string, data: st
   return parseJson(text);
 }
 
+/** Mesmo formato em JSON Schema estrito (OpenAI Structured Outputs). */
+const nullable = (type: string) => ({ type: [type, "null"] });
+const OPENAI_PLAYER = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    nick: { type: "string" },
+    k: { type: "integer" },
+    a: { type: "integer" },
+    d: { type: "integer" },
+    diff: nullable("integer"),
+    adr: nullable("number"),
+    kdr: nullable("number"),
+    kast: nullable("number"),
+    s: nullable("integer"),
+    fa: nullable("integer"),
+    mk: nullable("integer"),
+    fk: nullable("integer"),
+    rp: nullable("integer"),
+    drop: nullable("integer"),
+  },
+  required: ["nick", "k", "a", "d", "diff", "adr", "kdr", "kast", "s", "fa", "mk", "fk", "rp", "drop"],
+};
+const OPENAI_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    map_name: nullable("string"),
+    teams: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          name: nullable("string"),
+          score: nullable("integer"),
+          players: { type: "array", items: OPENAI_PLAYER },
+        },
+        required: ["name", "score", "players"],
+      },
+    },
+  },
+  required: ["map_name", "teams"],
+};
+
+async function callOpenAI(model: string, key: string, mimeType: string, data: string): Promise<unknown> {
+  const res = await fetch(`${process.env.OPENAI_API_BASE || "https://api.openai.com"}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: PROMPT },
+            { type: "image_url", image_url: { url: `data:${mimeType};base64,${data}`, detail: "high" } },
+          ],
+        },
+      ],
+      response_format: {
+        type: "json_schema",
+        json_schema: { name: "gc_scoreboard", strict: true, schema: OPENAI_SCHEMA },
+      },
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (res.status === 429 || res.status === 503 || res.status === 500) throw new OverloadedError(`HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`OpenAI respondeu ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const body = (await res.json()) as { choices?: { message?: { content?: string; refusal?: string } }[] };
+  const message = body.choices?.[0]?.message;
+  if (message?.refusal) throw new Error(`OpenAI recusou: ${message.refusal}`);
+  if (!message?.content) throw new Error("Resposta vazia da OpenAI");
+  return parseJson(message.content);
+}
+
+type Provider = { label: string; call: (mimeType: string, data: string) => Promise<unknown> };
+
+/** Provedores configurados, na ordem: GPT (principal e alternativo) e depois Gemini. */
+function providers(): Provider[] {
+  const list: Provider[] = [];
+  const openai = process.env.OPENAI_API_KEY;
+  if (openai) {
+    for (const model of [
+      process.env.OPENAI_MODEL || "gpt-4.1-mini",
+      process.env.OPENAI_FALLBACK_MODEL || "gpt-4o-mini",
+    ]) {
+      list.push({ label: `openai:${model}`, call: (m, d) => callOpenAI(model, openai, m, d) });
+    }
+  }
+  const gemini = process.env.GEMINI_API_KEY;
+  if (gemini) {
+    for (const model of [
+      process.env.GEMINI_MODEL || "gemini-2.5-flash",
+      process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite",
+    ]) {
+      list.push({ label: `gemini:${model}`, call: (m, d) => callGemini(model, gemini, m, d) });
+    }
+  }
+  return list;
+}
+
 export async function analyzeGcPrint(image: { mimeType: string; data: string }): Promise<OcrResult> {
   const session = await getSession();
   if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem ler prints." };
 
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return { ok: false, message: "Leitura por IA não configurada: defina GEMINI_API_KEY na Vercel." };
+  const list = providers();
+  if (!list.length) {
+    return { ok: false, message: "Leitura por IA não configurada: defina OPENAI_API_KEY ou GEMINI_API_KEY na Vercel." };
+  }
   if (!ALLOWED.has(image.mimeType)) return { ok: false, message: "Envie imagens PNG, JPG ou WEBP." };
   if (!image.data || image.data.length > MAX_BASE64) return { ok: false, message: "Imagem muito grande (máx. 3 MB)." };
 
-  const models = [
-    process.env.GEMINI_MODEL || "gemini-2.5-flash",
-    process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash-lite",
-  ];
-
   let lastError = "";
-  for (const model of models) {
+  for (const { label: model, call } of list) {
     // Até 2 tentativas por modelo para JSON inválido; sobrecarga pula direto para o próximo.
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const raw = await callGemini(model, key, image.mimeType, image.data);
+        const raw = await call(image.mimeType, image.data);
         const map = sanitizeMap(raw);
         const players = map.teams[0].players.length + map.teams[1].players.length;
         if (players < 2) throw new Error("Nenhum jogador encontrado no print");
