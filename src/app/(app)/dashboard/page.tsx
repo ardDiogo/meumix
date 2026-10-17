@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { getDataSource } from "@/services";
 import { getPermissions } from "@/services/auth";
 import { getDashboard } from "@/services/queries";
+import { mixHref } from "@/lib/mix-slug";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -175,7 +176,7 @@ export default async function DashboardPage() {
               label="Último MVP"
               value={highlights.lastMvp ? highlights.lastMvp.mix.name : "Nenhum ainda"}
               detail={highlights.lastMvp ? formatDate(highlights.lastMvp.mix.scheduledAt) : undefined}
-              href={highlights.lastMvp ? `/mixes/${highlights.lastMvp.mix.id}` : undefined}
+              href={highlights.lastMvp ? mixHref(highlights.lastMvp.mix) : undefined}
               accent={!!highlights.lastMvp}
             />
             <HighlightItem
@@ -191,7 +192,7 @@ export default async function DashboardPage() {
                   ? `${highlights.bestRecent.mix.name} · ${highlights.bestRecent.mix.maps.map((m) => mapName(m.mapId)).join(", ")}`
                   : undefined
               }
-              href={highlights.bestRecent ? `/mixes/${highlights.bestRecent.mix.id}` : undefined}
+              href={highlights.bestRecent ? mixHref(highlights.bestRecent.mix) : undefined}
             />
             <HighlightItem
               icon={ShieldCheck}

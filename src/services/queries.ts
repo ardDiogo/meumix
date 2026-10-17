@@ -1,4 +1,5 @@
 import "server-only";
+import { findMixBySlug, mixSlug } from "@/lib/mix-slug";
 import { aggregatePlayer, buildScoreboard, playerMixResult } from "@/lib/stats";
 import type { ID, MapId, Player } from "@/types/domain";
 import type { Highlights, PlayerMixResult, PlayerProfile, RankingPeriod, RankingRow } from "@/types/views";
@@ -125,15 +126,20 @@ export async function listMixes() {
   return { kind: ds.kind, mixes, players: new Map(players.map((p) => [p.id, p])) };
 }
 
-export async function getMixDetail(id: ID) {
+/** Mix pelo id ou pelo endereço amigável (/mixes/outubro13). */
+export async function getMixDetail(idOrSlug: ID) {
   const ds = getDataSource();
-  const mix = await ds.getMix(id);
+  const param = decodeURIComponent(idOrSlug);
+  const all = await ds.listMixes();
+  const mix = (await ds.getMix(param)) ?? findMixBySlug(param, all);
   if (!mix) return null;
+  const id = mix.id;
   const [players, highlights] = await Promise.all([ds.listPlayers(), ds.listHighlights()]);
   const byId = new Map(players.map((p) => [p.id, p]));
   return {
     kind: ds.kind,
     mix,
+    slug: mixSlug(mix, all),
     players: byId,
     scoreboard: buildScoreboard(mix, byId),
     mapScoreboards: mix.maps.map((m) => ({ map: m, rows: buildScoreboard(mix, byId, m.order) })),

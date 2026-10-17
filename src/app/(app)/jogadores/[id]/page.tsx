@@ -32,6 +32,7 @@ import { getPermissions } from "@/services/auth";
 import { getCsrepView } from "@/services/csrep";
 import { BadgeIcon } from "@/components/badges/badge-icon";
 import { playerBadges } from "@/services/badges";
+import { mixHref } from "@/lib/mix-slug";
 
 export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">): Promise<Metadata> {
   const profile = await resolvePlayerProfile((await params).id);
@@ -207,7 +208,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
           </dl>
           {highlights.lastMvp && (
             <Link
-              href={`/mixes/${highlights.lastMvp.mix.id}`}
+              href={mixHref(highlights.lastMvp.mix)}
               className="block border-t border-border px-4 py-3 text-sm transition-colors hover:bg-surface-2"
             >
               <span className="text-muted">Último MVP:</span>{" "}
@@ -293,7 +294,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                   <TR key={r.mix.id} className="hover:bg-surface-2/50">
                     <TD className="text-muted">{formatDate(r.mix.scheduledAt)}</TD>
                     <TD>
-                      <Link href={`/mixes/${r.mix.id}`} className="font-medium hover:text-brand">
+                      <Link href={mixHref(r.mix)} className="font-medium hover:text-brand">
                         {r.mix.name}
                       </Link>
                       {r.isMvp && <span className="ml-2 text-[10px] font-bold text-brand uppercase">MVP</span>}

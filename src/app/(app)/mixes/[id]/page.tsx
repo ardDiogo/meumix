@@ -1,7 +1,7 @@
 import { ArrowLeft, CalendarClock, Clapperboard, ExternalLink, Trophy, Tv, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { DemoBadge } from "@/components/demo-notice";
 import { StatusBadge, TeamDot } from "@/components/mixes/badges";
 import { Scoreboard } from "@/components/mixes/scoreboard";
@@ -36,8 +36,11 @@ export async function generateMetadata({ params }: PageProps<"/mixes/[id]">): Pr
 }
 
 export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">) {
-  const detail = await getMixDetail((await params).id);
+  const { id: param } = await params;
+  const detail = await getMixDetail(param);
   if (!detail) notFound();
+  // Endereço amigável: /mixes/<id> vira /mixes/outubro13.
+  if (decodeURIComponent(param) !== detail.slug) redirect(`/mixes/${detail.slug}`);
   const { kind, mix, players, scoreboard, mapScoreboards, highlights } = detail;
   const report = kind === "supabase" && mix.status === "finished" ? await getMatchReport(mix.id) : null;
   const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;

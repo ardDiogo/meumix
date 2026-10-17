@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import type { ID, Mix } from "@/types/domain";
 import { EmptyState } from "../ui/empty-state";
 import { ResultBadge, StatusBadge, TeamDot } from "./badges";
+import { mixHref } from "@/lib/mix-slug";
 
 /**
  * Lista de mixes compacta. Com `perspectiveId`, mostra o resultado do ponto
@@ -39,7 +40,7 @@ export function MixList({
         return (
           <li key={mix.id} className="flex items-center">
             <Link
-              href={`/mixes/${mix.id}`}
+              href={mixHref(mix)}
               className="group grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-surface-2 sm:grid-cols-[9rem_1fr_auto_auto]"
             >
               <div className="min-w-0">
