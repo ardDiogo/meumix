@@ -105,6 +105,16 @@ export async function requestPasswordReset(_prev: AuthState, fd: FormData): Prom
   });
   if (error && error.code?.startsWith("over_"))
     return { status: "error", message: authErrorMessage(error.code), email };
+  // Falha no envio (ex.: SMTP recusou): avisa em vez de fingir que enviou.
+  if (error && (error.status ?? 0) >= 500) {
+    console.error("[requestPasswordReset]", error.status, error.code, error.message);
+    return {
+      status: "error",
+      message:
+        "Não foi possível enviar o e-mail agora. Tente mais tarde ou peça a um administrador para redefinir sua senha.",
+      email,
+    };
+  }
 
   // Mesma resposta exista ou não a conta (não revela e-mails cadastrados).
   return {
