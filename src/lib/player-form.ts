@@ -128,3 +128,34 @@ export function mapRecords(mixes: Mix[], playerId: ID): MapRecord[] {
     winRate: Math.round((v.won / v.played) * 100),
   }));
 }
+
+export interface TimelineMix {
+  mixId: string;
+  date: string;
+  label: string;
+  maps: { order: number; mapId: MapId; won: boolean | null; own: number | null; opp: number | null }[];
+}
+
+/** Linha do tempo por mapa: cada mix com os mapas jogados e o resultado do jogador em cada um. */
+export function mapTimeline(mixes: Mix[], playerId: ID): TimelineMix[] {
+  return [...mixes]
+    .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))
+    .flatMap((mix) => {
+      const side = playerSide(mix, playerId);
+      if (!side || mix.status !== "finished") return [];
+      return [
+        {
+          mixId: mix.id,
+          date: mix.scheduledAt,
+          label: mix.name,
+          maps: mix.maps.map((m) => ({
+            order: m.order,
+            mapId: m.mapId,
+            won: m.winner == null ? null : m.winner === side,
+            own: side === "A" ? m.scoreA : m.scoreB,
+            opp: side === "A" ? m.scoreB : m.scoreA,
+          })),
+        },
+      ];
+    });
+}

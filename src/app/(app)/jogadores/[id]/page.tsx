@@ -23,7 +23,7 @@ import { allstarProfileUrl } from "@/lib/allstar";
 import { ClipCard } from "@/components/clips/clip-card";
 import { MapRecords, RecentMatches } from "@/components/players/map-records";
 import { PlayerForm } from "@/components/players/player-form";
-import { formSeries, mapRecords } from "@/lib/player-form";
+import { formSeries, mapRecords, mapTimeline } from "@/lib/player-form";
 import { toClipViews } from "@/services/clips";
 import { mapName } from "@/lib/maps";
 import { seriesScore } from "@/lib/stats";
@@ -71,6 +71,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const playedMixes = recentMixes.map((r) => r.mix);
   const formPoints = formSeries(playedMixes, player.id);
   const mapRecs = mapRecords(playedMixes, player.id);
+  const timeline = mapTimeline(playedMixes, player.id);
   const [{ session, canManageMixes }, csrep, badges, feed] = await Promise.all([
     getPermissions(),
     kind === "supabase" ? getCsrepView(player.id, player.steamId) : null,
@@ -234,7 +235,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         />
       )}
 
-      <RecentMatches points={formPoints} />
+      <RecentMatches timeline={timeline} />
       <PlayerForm points={formPoints} />
       <MapRecords records={mapRecs} />
 
