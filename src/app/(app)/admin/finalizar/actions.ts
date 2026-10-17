@@ -42,7 +42,7 @@ const isNum = (n: unknown, min: number, max: number) =>
 export async function finalizeMix(input: {
   scheduleId: string;
   date: string;
-  platform: "manual" | "gc";
+  platform: "manual" | "gc" | "faceit";
   maps: FinalizeMap[];
   players: FinalizePlayer[];
 }): Promise<FinalizeResult> {
@@ -89,7 +89,7 @@ export async function finalizeMix(input: {
   const { data, error } = await admin.rpc("finalize_mix", {
     p_schedule: input.scheduleId,
     p_date: input.date,
-    p_platform: input.platform === "gc" ? "gc" : "manual",
+    p_platform: input.platform === "gc" || input.platform === "faceit" ? input.platform : "manual",
     p_maps: maps.map((m) => ({ map_id: m.mapId, score_a: m.scoreA, score_b: m.scoreB })),
     p_players: players.map((p, i) => ({
       user_id: p.userId,

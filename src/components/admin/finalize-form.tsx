@@ -14,6 +14,7 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { Input, Label, Select } from "../ui/input";
 import { TeamDot } from "../mixes/badges";
+import { FaceitImport } from "./faceit-import";
 import { GcImport } from "./gc-import";
 
 interface PlayerDraft extends Omit<
@@ -75,7 +76,7 @@ export function FinalizeForm({
   const router = useRouter();
   const [saving, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<"manual" | "gc">("gc");
+  const [platform, setPlatform] = useState<"manual" | "gc" | "faceit">("gc");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [mapRows, setMapRows] = useState<{ mapId: string; scoreA: string; scoreB: string }[]>(
     (initialMaps.length ? initialMaps : [maps[0]?.id ?? ""]).map((id) => ({ mapId: id, scoreA: "", scoreB: "" })),
@@ -169,13 +170,25 @@ export function FinalizeForm({
   const cell = "h-8 w-16 px-2 text-right tabular";
 
   /** Preenche o formulário com o resultado da leitura dos prints. */
-  function applyImport(result: MergedResult) {
+  function applyImport(result: MergedResult, links: Record<string, string> = {}) {
     const notes = [...result.warnings];
     const profileRows = rows.filter((r) => r.userId);
+    // Vínculo garantido (SteamID / ID Faceit) vale antes da semelhança de nick.
+    const linkedId = (p: MergedResult["players"][number]) =>
+      [p.name, ...p.aliases].map((n) => links[n]).find(Boolean) ?? null;
     const idx = matchProfiles(
       result.players,
       profileRows.map((r) => ({ name: r.name })),
     );
+    result.players.forEach((p, i) => {
+      const id = linkedId(p);
+      if (!id) return;
+      const row = profileRows.findIndex((r) => r.userId === id);
+      idx.forEach((v, j) => {
+        if (j !== i && v === row && row >= 0) idx[j] = -1;
+      });
+      idx[i] = row;
+    });
 
     // Lado X do print = time A ou B? Decide pela maioria dos jogadores vinculados.
     let xIsA = 0;
@@ -228,6 +241,15 @@ export function FinalizeForm({
       guests,
       pool.map((p) => ({ name: p.name })),
     );
+    guests.forEach((g, i) => {
+      const id = linkedId(g);
+      const at = id ? pool.findIndex((p) => p.userId === id) : -1;
+      if (at < 0) return;
+      poolIdx.forEach((v, j) => {
+        if (j !== i && v === at) poolIdx[j] = -1;
+      });
+      poolIdx[i] = at;
+    });
     const extra = guests.flatMap((g, i) => {
       const p = poolIdx[i]! >= 0 ? pool[poolIdx[i]!] : undefined;
       return p ? [{ g, p }] : [];
@@ -267,7 +289,7 @@ export function FinalizeForm({
         ...fill(g),
       })),
     ]);
-    setPlatform("gc");
+    setPlatform(Object.keys(links).length || platform === "faceit" ? "faceit" : "gc");
     setWarnings(notes);
   }
 
@@ -278,12 +300,18 @@ export function FinalizeForm({
           <Label htmlFor="platform" className="text-brand">
             Plataforma da partida
           </Label>
-          <Select id="platform" value={platform} onChange={(e) => setPlatform(e.target.value as "manual" | "gc")}>
+          <Select
+            id="platform"
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value as "manual" | "gc" | "faceit")}
+          >
             <option value="gc">GC (imagens das estatísticas)</option>
+            <option value="faceit">Faceit (link da partida)</option>
             <option value="manual">Manual (digitar as estatísticas)</option>
           </Select>
         </div>
         {platform === "gc" && <GcImport maps={maps} onImported={applyImport} />}
+        {platform === "faceit" && <FaceitImport onImported={applyImport} />}
       </div>
       {warnings.length > 0 && (
         <ul className="space-y-1 rounded-md border border-brand/40 bg-brand/5 px-4 py-3 text-sm">
