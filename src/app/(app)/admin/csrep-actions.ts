@@ -49,7 +49,8 @@ export async function fetchCsrepSpec(): Promise<CsrepProbeResult> {
   for (const path of OPENAPI_CANDIDATES) {
     try {
       const r = await csrepRequest(path);
-      tried.push(`${path} → ${r.status}`);
+      const hint = r.status === 200 ? "" : ` (${r.text.replace(/\s+/g, " ").slice(0, 120)})`;
+      tried.push(`${path} → ${r.status}${hint}`);
       if (r.status === 200 && r.json && typeof r.json === "object" && ("openapi" in r.json || "swagger" in r.json)) {
         return {
           ok: true,
