@@ -71,6 +71,18 @@
     @apply bg-brand text-brand-fg;
   }
 
+  /* Lista aberta do <select>: no Windows ela fica branca com texto claro se não for definida. */
+  select {
+    color-scheme: dark;
+  }
+  option,
+  optgroup {
+    @apply bg-surface-2 text-fg;
+  }
+  option:disabled {
+    @apply text-subtle;
+  }
+
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-brand;
   }
