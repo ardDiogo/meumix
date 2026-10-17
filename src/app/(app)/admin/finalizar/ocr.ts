@@ -1,7 +1,7 @@
 "use server";
 
 import { canManageMixes } from "@/lib/auth/permissions";
-import { sanitizeMap, type OcrMap } from "@/lib/gc-ocr";
+import { nickSimilarity, sanitizeMap, type OcrMap } from "@/lib/gc-ocr";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BASE64, visionConfigured, visionJson } from "@/services/ai-vision";
@@ -43,10 +43,85 @@ Regras:
 - "map_name": nome do mapa se aparecer no print (ex.: "Mirage", "de_nuke"); senão null.
 Responda apenas com o JSON no formato pedido.`;
 
-const ADR_REMINDER = `
+const allPlayers = (map: OcrMap) => [...map.teams[0].players, ...map.teams[1].players];
+/** Leitura completa = 10 jogadores, todos com ADR e KAST. */
+const PERFECT = 10 * 100;
+const readScore = (map: OcrMap) =>
+  Math.min(allPlayers(map).length, 10) * 100 - missingAdr(map) - allPlayers(map).filter((p) => p.kast == null).length;
 
-ATENÇÃO: a coluna ADR (5ª coluna, entre DIFF e KDR) tem um número com decimais em TODAS as linhas
-(ex.: 84.36, 130.79). Preencha "adr" de todos os 10 jogadores; não deixe null.`;
+const RETRY_REMINDER = `
+
+ATENÇÃO: o print tem 2 times com 5 jogadores cada — devolva os 10 jogadores, sem pular nenhum.
+A coluna ADR (5ª coluna, entre DIFF e KDR) tem um número com decimais em TODAS as linhas
+(ex.: 84.36, 130.79): preencha "adr" de todos; não deixe null.`;
+
+const ADR_PROMPT = `Neste print do placar da Gamers Club (CS2), leia SOMENTE a coluna ADR (5ª coluna:
+K | A | D | DIFF | ADR | KDR | ...) de cada um dos 10 jogadores, com o nick exatamente como escrito.
+ADR tem decimais (ex.: 84.36). Responda apenas com o JSON.`;
+const ADR_GEMINI = {
+  type: "OBJECT",
+  properties: {
+    players: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: { nick: { type: "STRING" }, adr: { type: "NUMBER" } },
+        required: ["nick", "adr"],
+      },
+    },
+  },
+  required: ["players"],
+};
+const ADR_OPENAI = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    players: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: { nick: { type: "string" }, adr: { type: "number" } },
+        required: ["nick", "adr"],
+      },
+    },
+  },
+  required: ["players"],
+};
+
+/** Completa o ADR que faltou com uma leitura só dessa coluna (casando pelo nick). */
+async function fillAdr(map: OcrMap, image: { mimeType: string; data: string }): Promise<OcrMap> {
+  const r = await visionJson({
+    prompt: ADR_PROMPT,
+    geminiSchema: ADR_GEMINI,
+    openaiSchema: ADR_OPENAI,
+    image,
+    parse: (raw) => {
+      const list = (raw as { players?: { nick?: unknown; adr?: unknown }[] }).players ?? [];
+      return list
+        .map((p) => ({ nick: String(p.nick ?? ""), adr: Number(String(p.adr ?? "").replace(",", ".")) }))
+        .filter((p) => p.nick && Number.isFinite(p.adr) && p.adr >= 0 && p.adr <= 500);
+    },
+  });
+  if (!r.ok || !r.value.length) return map;
+  const fill = (players: OcrMap["teams"][0]["players"]) =>
+    players.map((p) => {
+      if (p.adr != null) return p;
+      let best: { adr: number; sim: number } | null = null;
+      for (const c of r.value) {
+        const sim = nickSimilarity(p.nick, c.nick);
+        if (sim >= 0.6 && (!best || sim > best.sim)) best = { adr: Math.round(c.adr * 100) / 100, sim };
+      }
+      return best ? { ...p, adr: best.adr } : p;
+    });
+  return {
+    ...map,
+    teams: [
+      { ...map.teams[0], players: fill(map.teams[0].players) },
+      { ...map.teams[1], players: fill(map.teams[1].players) },
+    ],
+  };
+}
 
 /** Quantos jogadores ficaram sem ADR. */
 const missingAdr = (map: OcrMap) =>
@@ -165,12 +240,14 @@ export async function analyzeGcPrint(image: { mimeType: string; data: string }):
         return map;
       },
     });
+  // A IA às vezes pula jogadores ou deixa a coluna ADR em branco: relê reforçando
+  // e fica com a leitura mais completa; se ainda faltar ADR, pede só essa coluna.
   let result = await read(PROMPT);
-  // A IA às vezes deixa a coluna ADR em branco: tenta mais uma vez reforçando.
-  if (result.ok && missingAdr(result.value) > 0) {
-    const retry = await read(PROMPT + ADR_REMINDER);
-    if (retry.ok && missingAdr(retry.value) < missingAdr(result.value)) result = retry;
+  if (result.ok && readScore(result.value) < PERFECT) {
+    const retry = await read(PROMPT + RETRY_REMINDER);
+    if (retry.ok && readScore(retry.value) > readScore(result.value)) result = retry;
   }
+  if (result.ok && missingAdr(result.value) > 0) result = { ...result, value: await fillAdr(result.value, image) };
   if (result.ok) {
     const players = result.value.teams[0].players.length + result.value.teams[1].players.length;
     await audit({

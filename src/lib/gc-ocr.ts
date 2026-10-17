@@ -250,6 +250,9 @@ export function mergeMaps(maps: OcrMap[]): MergedResult {
     const noAdr = players.filter((p) => p.adr == null).length;
     const noKast = players.filter((p) => p.kast == null).length;
     const label = m.mapName ? `${m.mapName} (mapa ${i + 1})` : `Mapa ${i + 1}`;
+    if (players.length < 10) {
+      warnings.push(`${label}: só ${players.length} de 10 jogadores lidos; remova e leia esse print de novo.`);
+    }
     if (noAdr) warnings.push(`${label}: ADR não lido para ${noAdr} jogador(es); confira a coluna ADR.`);
     if (noKast) warnings.push(`${label}: KAST não lido para ${noKast} jogador(es); confira a coluna KAST.`);
   });
