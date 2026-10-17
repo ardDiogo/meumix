@@ -227,16 +227,8 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         </Card>
       </div>
 
-      {csrep && (
-        <CsrepCard
-          userId={player.id}
-          view={csrep}
-          canEdit={!!session && (session.id === player.id || canManageMixes)}
-        />
-      )}
-
-      <RecentMatches timeline={timeline} />
       <PlayerForm points={formPoints} />
+      <RecentMatches timeline={timeline} />
       <MapRecords records={mapRecs} />
 
       {(clips.length > 0 || allstarUrl) && (
@@ -270,6 +262,14 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
             </CardContent>
           )}
         </Card>
+      )}
+
+      {csrep && (
+        <CsrepCard
+          userId={player.id}
+          view={csrep}
+          canEdit={!!session && (session.id === player.id || canManageMixes)}
+        />
       )}
 
       <ComparePlayers
