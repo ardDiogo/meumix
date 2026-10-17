@@ -8,6 +8,7 @@ import type { ID, Mix } from "@/types/domain";
 import { EmptyState } from "../ui/empty-state";
 import { ResultBadge, StatusBadge, TeamDot } from "./badges";
 import { mixHref } from "@/lib/mix-slug";
+import { MapIcon } from "@/components/maps/map-icon";
 
 /**
  * Lista de mixes compacta. Com `perspectiveId`, mostra o resultado do ponto
@@ -61,8 +62,13 @@ export function MixList({
                   <TeamDot side="B" />
                   <span className={cn("truncate", winner === "B" ? "text-fg" : "text-muted")}>{b.name}</span>
                 </div>
-                <div className="mt-0.5 truncate text-xs text-subtle">
-                  {mix.maps.map((m) => mapName(m.mapId)).join(" · ")}
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-subtle">
+                  {mix.maps.map((m) => (
+                    <span key={m.order} className="inline-flex items-center gap-1">
+                      <MapIcon id={m.mapId} size={14} />
+                      {mapName(m.mapId)}
+                    </span>
+                  ))}
                 </div>
               </div>
 

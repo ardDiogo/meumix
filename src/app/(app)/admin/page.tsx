@@ -55,6 +55,7 @@ import { listAllMaps } from "@/services/maps";
 import { getAppSetting } from "@/services/settings";
 import { getPermissions } from "@/services/auth";
 import { getNextMix, listPendingFinalization, listSchedules } from "@/services/mix-events";
+import { MapIcon as MapEmblem } from "@/components/maps/map-icon";
 
 export const metadata: Metadata = { title: "Painel administrativo" };
 // A leitura dos prints por IA (finalização no painel) pode levar alguns segundos por imagem.
@@ -148,7 +149,13 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
                           <StatusBadge status={m.status} />
                         </div>
                         <div className="mt-0.5 text-xs text-muted">
-                          {formatDateTime(m.scheduledAt)} · {m.maps.map((x) => mapName(x.mapId)).join(", ")}
+                          {formatDateTime(m.scheduledAt)} ·{" "}
+                          {m.maps.map((x) => (
+                            <span key={x.order} className="mr-1.5 inline-flex items-center gap-1 align-middle">
+                              <MapEmblem id={x.mapId} size={14} />
+                              {mapName(x.mapId)}
+                            </span>
+                          ))}
                         </div>
                       </Link>
                     </li>

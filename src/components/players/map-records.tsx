@@ -4,6 +4,7 @@ import { mixHref } from "@/lib/mix-slug";
 import type { FormPoint, MapRecord } from "@/lib/player-form";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader } from "../ui/card";
+import { MapIcon } from "@/components/maps/map-icon";
 
 const RESULT = {
   win: { label: "Vitória", short: "V", cls: "border-win/50 bg-win/15 text-win" },
@@ -59,7 +60,10 @@ export function MapRecords({ records }: { records: MapRecord[] }) {
           {mostPlayed.map((r) => (
             <li key={r.mapId}>
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{mapName(r.mapId)}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  <MapIcon id={r.mapId} size={22} />
+                  {mapName(r.mapId)}
+                </span>
                 <span className="text-muted tabular">{r.played}</span>
               </div>
               <div className="mt-1 h-1.5 rounded-full bg-surface-2">
@@ -75,7 +79,10 @@ export function MapRecords({ records }: { records: MapRecord[] }) {
           {best.map((r) => (
             <li key={r.mapId}>
               <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">{mapName(r.mapId)}</span>
+                <span className="flex items-center gap-2 font-medium">
+                  <MapIcon id={r.mapId} size={22} />
+                  {mapName(r.mapId)}
+                </span>
                 <span className="tabular">
                   <span className="font-semibold text-fg">{r.winRate}%</span>{" "}
                   <span className="text-xs text-subtle">

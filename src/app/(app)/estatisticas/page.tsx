@@ -11,6 +11,7 @@ import { mapName } from "@/lib/maps";
 import type { Player } from "@/types/domain";
 import type { PlayerAggregate } from "@/types/views";
 import { getCommunityStats } from "@/services/queries";
+import { MapIcon } from "@/components/maps/map-icon";
 
 export const metadata: Metadata = { title: "Estatísticas" };
 
@@ -69,7 +70,12 @@ export default async function StatsPage() {
             <tbody>
               {maps.map((m) => (
                 <TR key={m.mapId}>
-                  <TD className="font-medium">{mapName(m.mapId)}</TD>
+                  <TD className="font-medium">
+                    <span className="flex items-center gap-2">
+                      <MapIcon id={m.mapId} size={22} />
+                      {mapName(m.mapId)}
+                    </span>
+                  </TD>
                   <TD className="text-right">{m.played}</TD>
                   <TD className="text-right text-muted">{formatDecimal(m.rounds / m.played, 1)}</TD>
                   <TD className="text-right">{formatPercent((m.sideAWins / m.played) * 100)}</TD>

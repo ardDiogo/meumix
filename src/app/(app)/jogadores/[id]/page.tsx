@@ -36,6 +36,7 @@ import { getCsrepView } from "@/services/csrep";
 import { BadgeIcon } from "@/components/badges/badge-icon";
 import { playerBadges } from "@/services/badges";
 import { mixHref } from "@/lib/mix-slug";
+import { MapIcon } from "@/components/maps/map-icon";
 
 export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">): Promise<Metadata> {
   const profile = await resolvePlayerProfile((await params).id);
@@ -309,7 +310,16 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                       </Link>
                       {r.isMvp && <span className="ml-2 text-[10px] font-bold text-brand uppercase">MVP</span>}
                     </TD>
-                    <TD className="text-muted">{r.mix.maps.map((m) => mapName(m.mapId)).join(", ")}</TD>
+                    <TD className="text-muted">
+                      <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        {r.mix.maps.map((m) => (
+                          <span key={m.order} className="inline-flex items-center gap-1">
+                            <MapIcon id={m.mapId} size={16} />
+                            {mapName(m.mapId)}
+                          </span>
+                        ))}
+                      </span>
+                    </TD>
                     <TD className="text-center font-semibold">{own ? `${own[0]}–${own[1]}` : "—"}</TD>
                     <TD>
                       <ResultBadge result={r.result} />

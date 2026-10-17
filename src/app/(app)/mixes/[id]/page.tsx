@@ -30,6 +30,7 @@ import { ClipCard } from "@/components/clips/clip-card";
 import { ImportAllstarDialog } from "@/components/clips/import-allstar-dialog";
 import { toClipViews } from "@/services/clips";
 import { allstarProfileUrl } from "@/lib/allstar";
+import { MapIcon } from "@/components/maps/map-icon";
 
 // Importar clipes do Allstar consulta vários jogadores.
 export const maxDuration = 60;
@@ -170,6 +171,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
               key={m.order}
               className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-sm"
             >
+              <MapIcon id={m.mapId} size={20} />
               <span className="font-medium">{mapName(m.mapId)}</span>
               {m.scoreA != null && m.scoreB != null ? (
                 <span className="text-muted tabular">
@@ -229,7 +231,14 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                   .filter((s) => s.rows.length)
                   .map(({ map, rows }) => (
                     <Card key={map.order}>
-                      <CardHeader title={`Mapa ${map.order} · ${mapName(map.mapId)}`} />
+                      <CardHeader
+                        title={
+                          <span className="flex items-center gap-2">
+                            <MapIcon id={map.mapId} size={22} />
+                            Mapa {map.order} · {mapName(map.mapId)}
+                          </span>
+                        }
+                      />
                       <CardContent>
                         <Scoreboard rows={rows} teams={mix.teams} mvpId={null} score={[map.scoreA, map.scoreB]} />
                       </CardContent>

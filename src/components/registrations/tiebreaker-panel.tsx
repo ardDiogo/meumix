@@ -9,6 +9,8 @@ import type { TiebreakerRoundView, TiebreakerView } from "@/services/mix-events"
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
+import { MapIcon as MapEmblem } from "@/components/maps/map-icon";
+import type { MapId } from "@/types/domain";
 
 /** Mapas do mix e desempate (docs/regras-do-mix.md, seção 3). */
 export function TiebreakerPanel({
@@ -43,6 +45,7 @@ export function TiebreakerPanel({
               key={m.id}
               className="inline-flex items-center gap-1.5 rounded-md border border-brand/40 bg-brand/10 px-3 py-1.5 text-sm font-semibold"
             >
+              <MapEmblem id={m.id as MapId} size={18} />
               {m.name}
               {m.random && (
                 <span
@@ -131,7 +134,10 @@ function OpenRound({
                   !canVote && "cursor-default",
                 )}
               >
-                {c.name}
+                <span className="flex items-center gap-2">
+                  <MapEmblem id={c.id as MapId} size={20} />
+                  {c.name}
+                </span>
                 <span className="flex items-center gap-1 text-xs text-muted tabular">
                   {active && <Check className="size-3.5 text-brand" />}
                   {c.votes}

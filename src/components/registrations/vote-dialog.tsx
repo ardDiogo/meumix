@@ -10,6 +10,8 @@ import { CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules"
 import { cn } from "@/lib/utils";
 import { Avatar } from "../ui/avatar";
 import { Button } from "../ui/button";
+import { MapIcon as MapEmblem } from "@/components/maps/map-icon";
+import type { MapId } from "@/types/domain";
 
 type Step = "suggestion" | "captains" | "maps" | "done";
 
@@ -234,7 +236,10 @@ export function VoteDialog({
                               : "border-border bg-surface-2 text-muted hover:border-border-strong hover:text-fg",
                           )}
                         >
-                          {m.name}
+                          <span className="flex items-center gap-2">
+                            <MapEmblem id={m.id as MapId} size={20} />
+                            {m.name}
+                          </span>
                           {active && <Check className="size-4 text-brand" />}
                         </button>
                       </li>

@@ -5,10 +5,12 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addMap, deleteMap, reorderMaps, setMapActive } from "@/app/(app)/admin/config-actions";
 import type { ManagedMap } from "@/services/maps";
+import type { MapId } from "@/types/domain";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Switch } from "../ui/switch";
+import { MapIcon } from "@/components/maps/map-icon";
 
 export function MapsManager({ maps }: { maps: ManagedMap[] }) {
   const [list, setList] = useState(maps);
@@ -121,6 +123,7 @@ export function MapsManager({ maps }: { maps: ManagedMap[] }) {
             )}
           >
             <GripVertical className="size-4 shrink-0 cursor-grab text-subtle" aria-hidden />
+            <MapIcon id={m.id as MapId} size={28} className={cn(!m.active && "opacity-50 grayscale")} />
             <div className={cn("min-w-0 flex-1", !m.active && "text-muted")}>
               <span className="font-semibold">{m.name}</span>
               {m.shortName && <span className="ml-1.5 text-sm text-muted">({m.shortName})</span>}

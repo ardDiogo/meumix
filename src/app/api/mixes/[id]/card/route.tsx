@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { diffOf, kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
-import { mapName } from "@/lib/maps";
+import { mapIcon, mapName } from "@/lib/maps";
 import { seriesScore, seriesWinner } from "@/lib/stats";
 import { getMatchReport } from "@/services/match-report";
 import { getDataSource } from "@/services";
@@ -169,6 +169,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
     ...rows.map((r) => toDataUri(r.avatarUrl)),
   ]);
   const avatarOf = new Map(rows.map((r, i) => [r.key, avatars[i] ?? null]));
+  const mapIcons = await Promise.all(
+    mix.maps.map((mp) => {
+      const icon = mapIcon(mp.mapId);
+      return toDataUri(icon ? (icon.startsWith("/") ? `${origin}${icon}` : icon) : null);
+    }),
+  );
 
   const sideColor = (side: "A" | "B") => (!winner ? C.muted : winner === side ? C.win : C.loss);
   const sideLabel = (side: "A" | "B") => (!winner ? "EMPATE" : winner === side ? "VENCEDOR" : "DERROTA");
@@ -288,7 +294,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
 
       {/* Mapas */}
       <div style={{ display: "flex", gap: 12, marginTop: 16, height: 54 }}>
-        {mix.maps.map((mp) => (
+        {mix.maps.map((mp, mi) => (
           <div
             key={mp.order}
             style={{
@@ -302,6 +308,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
               fontSize: 20,
             }}
           >
+            {mapIcons[mi] && (
+              // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+              <img src={mapIcons[mi]!} width={34} height={34} style={{ objectFit: "contain" }} />
+            )}
             <span style={{ fontWeight: 700 }}>{mapName(mp.mapId)}</span>
             <span style={{ color: mp.winner === "A" ? C.fg : C.muted }}>{mp.scoreA ?? "-"}</span>
             <span style={{ color: C.subtle }}>–</span>

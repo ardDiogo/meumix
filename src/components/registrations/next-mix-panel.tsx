@@ -20,6 +20,8 @@ import { RemoveButton, ResetButton, StartDraftButton } from "./registration-cont
 import { VoteDialog } from "./vote-dialog";
 import { ShareMixButton } from "./share-mix";
 import { TiebreakerPanel } from "./tiebreaker-panel";
+import { MapIcon } from "@/components/maps/map-icon";
+import type { MapId } from "@/types/domain";
 
 const TZ = "America/Sao_Paulo";
 const dayMonth = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TZ });
@@ -373,7 +375,8 @@ export async function NextMixPanel() {
               {topMaps.length ? (
                 <div className="flex flex-wrap gap-1.5">
                   {topMaps.map((m) => (
-                    <Badge key={m.id} variant="brand">
+                    <Badge key={m.id} variant="brand" className="gap-1">
+                      <MapIcon id={m.id as MapId} size={16} />
                       {m.name} · {m.votes}
                     </Badge>
                   ))}
