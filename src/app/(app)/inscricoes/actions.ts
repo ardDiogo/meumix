@@ -34,6 +34,7 @@ const EARLY_TOLERANCE_MS = 1000;
 
 function refresh() {
   revalidatePath("/dashboard");
+  revalidatePath("/confirmar");
   revalidatePath("/admin");
 }
 

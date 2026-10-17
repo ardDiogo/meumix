@@ -69,8 +69,8 @@ function inviteMessage(opts: {
   lines.push(
     "",
     left > 0
-      ? `🔥 Faltam ${left} vaga${left > 1 ? "s" : ""}! Inscreva-se:`
-      : "✅ Vagas preenchidas! Entre como suplente:",
+      ? `🔥 Faltam ${left} vaga${left > 1 ? "s" : ""}! Confirme sua presença com 1 toque:`
+      : "✅ Vagas preenchidas! Entre como suplente com 1 toque:",
     opts.link,
   );
   return lines.join("\n");
@@ -125,7 +125,7 @@ export async function NextMixPanel() {
     classified: classifiedList.map((r) => r.displayName),
     reserves: registrations.filter((r) => r.status === "reserve").map((r) => r.displayName),
     maxPlayers: schedule.maxPlayers,
-    link: `${await siteUrl()}/dashboard`,
+    link: `${await siteUrl()}/confirmar`,
   });
   const topMaps = votes.mapTally.slice(0, MAPS_IN_ROTATION);
   const topCaptains = votes.captainTally.slice(0, CAPTAINS);

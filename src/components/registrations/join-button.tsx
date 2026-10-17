@@ -58,6 +58,8 @@ export function JoinButton({
   opensAt,
   eventAt,
   penaltyDelay,
+  autoJoin = false,
+  loginNext = "/dashboard",
 }: {
   scheduleId: string;
   date: string;
@@ -67,6 +69,10 @@ export function JoinButton({
   eventAt: number;
   /** Atraso (s) de uma punição ativa: a inscrição libera em opensAt + atraso. */
   penaltyDelay: number | null;
+  /** Inscreve sozinho ao abrir a página, se as inscrições já estiverem abertas (link de 1 toque). */
+  autoJoin?: boolean;
+  /** Para onde voltar depois do login. */
+  loginNext?: string;
 }) {
   const { synced, now } = useServerClock();
   useTick(1000);
@@ -139,6 +145,16 @@ export function JoinButton({
     };
   }, [attempt, scheduleId, date, registered]);
 
+  /* ----- Link de 1 toque: só inscreve sozinho se já estava aberto quando a página carregou ----- */
+  const autoDecided = useRef(false);
+  useEffect(() => {
+    if (!autoJoin || autoDecided.current || !synced || !loggedIn) return;
+    autoDecided.current = true;
+    if (registered || started || readQueue() || releaseAt - now() > EARLY_TOLERANCE_MS) return;
+    // A fila é processada pelo intervalo de 250 ms acima.
+    writeQueue({ scheduleId, date, device: detectDevice(), attempt: 0, nextAt: 0 });
+  }, [autoJoin, synced, loggedIn, registered, started, releaseAt, now, scheduleId, date]);
+
   /* ----- Preparação para a abertura: renova a sessão e "acorda" o servidor ----- */
   const lastPing = useRef(0);
   useEffect(() => {
@@ -159,7 +175,7 @@ export function JoinButton({
   if (!loggedIn) {
     return (
       <Button variant="primary" size="lg" className="w-full" asChild>
-        <Link href="/entrar?next=/dashboard">
+        <Link href={`/entrar?next=${encodeURIComponent(loginNext)}`}>
           <LogIn /> Entre ou cadastre-se para participar
         </Link>
       </Button>
