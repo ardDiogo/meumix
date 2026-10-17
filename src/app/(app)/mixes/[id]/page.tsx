@@ -21,6 +21,7 @@ import { MatchStatsTable } from "@/components/mixes/match-stats-table";
 import { LinkGuests } from "@/components/mixes/link-guests";
 import { ShareResult } from "@/components/mixes/share-result";
 import { DeleteMatchButton } from "@/components/mixes/delete-match-button";
+import { EditMatchDate } from "@/components/mixes/edit-match-date";
 import { getPermissions } from "@/services/auth";
 import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +96,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 }`}
               />
             ) : null}
+            {canManageMixes && report && <EditMatchDate matchId={mix.id} date={mix.scheduledAt.slice(0, 10)} />}
             {canManageMixes && report && <DeleteMatchButton matchId={mix.id} label={mix.name} redirectTo="/mixes" />}
             <DemoBadge kind={kind} />
             <StatusBadge status={mix.status} />

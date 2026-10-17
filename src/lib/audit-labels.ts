@@ -19,6 +19,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.link_guests": "Vinculou convidados",
   "admin.faceit_fetch": "Buscou partida na Faceit",
   "admin.delete_match": "Excluiu mix finalizado",
+  "admin.match_date": "Alterou a data do mix",
   "admin.schedule_create": "Criou mix",
   "admin.schedule_end": "Encerrou mix",
   "admin.set_role": "Alterou papel (admin)",

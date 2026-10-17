@@ -60,3 +60,41 @@ export async function deleteMatch(matchId: string): Promise<MatchActionResult> {
   revalidatePath("/", "layout");
   return { ok: true, message: `Mix excluído. ELO desfeito para ${data ?? 0} jogador(es).` };
 }
+
+/** Corrige a data de um mix finalizado (ex.: finalizado na ocorrência errada). */
+export async function updateMatchDate(matchId: string, date: string): Promise<MatchActionResult> {
+  const session = await getSession();
+  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem alterar a data." };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
+  if (!/^[0-9a-f-]{36}$/i.test(matchId)) return { ok: false, message: "Mix inválido." };
+  const valid = /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T12:00:00Z`));
+  if (!valid || new Date(`${date}T12:00:00Z`).toISOString().slice(0, 10) !== date) {
+    return { ok: false, message: "Data inválida." };
+  }
+
+  const { data: match } = await admin
+    .from("mix_matches")
+    .select("schedule_id, event_date")
+    .eq("id", matchId)
+    .maybeSingle();
+  if (!match) return { ok: false, message: "Mix não encontrado." };
+  if (match.event_date === date) return { ok: true, message: "A data já é essa." };
+  const { error } = await admin.from("mix_matches").update({ event_date: date }).eq("id", matchId);
+  if (error) {
+    return {
+      ok: false,
+      message: error.code === "23505" ? "Já existe um mix finalizado nessa data." : "Não foi possível alterar a data.",
+    };
+  }
+  await audit({
+    action: "admin.match_date",
+    outcome: "success",
+    actorId: session!.id,
+    scheduleId: (match.schedule_id as string | null) ?? null,
+    eventDate: date,
+    detail: { de: match.event_date, para: date },
+  });
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Data do mix atualizada." };
+}
