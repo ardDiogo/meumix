@@ -43,6 +43,15 @@ Regras:
 - "map_name": nome do mapa se aparecer no print (ex.: "Mirage", "de_nuke"); senão null.
 Responda apenas com o JSON no formato pedido.`;
 
+const ADR_REMINDER = `
+
+ATENÇÃO: a coluna ADR (5ª coluna, entre DIFF e KDR) tem um número com decimais em TODAS as linhas
+(ex.: 84.36, 130.79). Preencha "adr" de todos os 10 jogadores; não deixe null.`;
+
+/** Quantos jogadores ficaram sem ADR. */
+const missingAdr = (map: OcrMap) =>
+  [...map.teams[0].players, ...map.teams[1].players].filter((p) => p.adr == null).length;
+
 const PLAYER_SCHEMA = {
   type: "OBJECT",
   properties: {
@@ -142,26 +151,33 @@ export async function analyzeGcPrint(image: { mimeType: string; data: string }):
     return { ok: false, message: "Imagem muito grande (máx. 3 MB)." };
   }
 
-  const result = await visionJson({
-    prompt: PROMPT,
-    geminiSchema: RESPONSE_SCHEMA,
-    openaiSchema: OPENAI_SCHEMA,
-    image,
-    parse: (raw) => {
-      const map = sanitizeMap(raw);
-      if (map.teams[0].players.length + map.teams[1].players.length < 2) {
-        throw new Error("Nenhum jogador encontrado no print");
-      }
-      return map;
-    },
-  });
+  const read = (prompt: string) =>
+    visionJson({
+      prompt,
+      geminiSchema: RESPONSE_SCHEMA,
+      openaiSchema: OPENAI_SCHEMA,
+      image,
+      parse: (raw) => {
+        const map = sanitizeMap(raw);
+        if (map.teams[0].players.length + map.teams[1].players.length < 2) {
+          throw new Error("Nenhum jogador encontrado no print");
+        }
+        return map;
+      },
+    });
+  let result = await read(PROMPT);
+  // A IA às vezes deixa a coluna ADR em branco: tenta mais uma vez reforçando.
+  if (result.ok && missingAdr(result.value) > 0) {
+    const retry = await read(PROMPT + ADR_REMINDER);
+    if (retry.ok && missingAdr(retry.value) < missingAdr(result.value)) result = retry;
+  }
   if (result.ok) {
     const players = result.value.teams[0].players.length + result.value.teams[1].players.length;
     await audit({
       action: "admin.ocr_gc",
       outcome: "success",
       actorId: session!.id,
-      detail: { model: result.model, players },
+      detail: { model: result.model, players, sem_adr: missingAdr(result.value) },
     });
     return { ok: true, map: result.value, model: result.model };
   }

@@ -244,6 +244,16 @@ export function mergeMaps(maps: OcrMap[]): MergedResult {
     return swap > keep;
   });
 
+  // Colunas que a IA deixou em branco num mapa distorcem a média: avisa para conferir.
+  maps.forEach((m, i) => {
+    const players = [...m.teams[0].players, ...m.teams[1].players];
+    const noAdr = players.filter((p) => p.adr == null).length;
+    const noKast = players.filter((p) => p.kast == null).length;
+    const label = m.mapName ? `${m.mapName} (mapa ${i + 1})` : `Mapa ${i + 1}`;
+    if (noAdr) warnings.push(`${label}: ADR não lido para ${noAdr} jogador(es); confira a coluna ADR.`);
+    if (noKast) warnings.push(`${label}: KAST não lido para ${noKast} jogador(es); confira a coluna KAST.`);
+  });
+
   // 3) Agregação.
   const acc = new Map<
     number,
