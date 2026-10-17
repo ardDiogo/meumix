@@ -7,6 +7,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { confirmLinkUrl, getOrCreateConfirmToken } from "@/services/confirm-links";
+import { resolveTwitchLogin } from "@/services/twitch";
 import type { ConfirmLinkResult } from "../admin/user-actions";
 
 export type SteamResult =
@@ -105,4 +106,39 @@ export async function myConfirmLink(rotate = false): Promise<ConfirmLinkResult> 
     message: rotate ? "Novo link gerado; o anterior parou de funcionar." : "",
     url: await confirmLinkUrl(token),
   };
+}
+
+export type TwitchResult = { ok: true; message: string; login: string | null } | { ok: false; message: string };
+
+/**
+ * Canal da Twitch (link twitch.tv/canal ou só o nome). Vazio remove.
+ * Com a Twitch configurada, confere se o canal existe.
+ */
+export async function setTwitchChannel(input: string, targetUserId?: string): Promise<TwitchResult> {
+  const auth = await authorize(targetUserId);
+  if ("error" in auth) return { ok: false, message: auth.error! };
+  const result = await resolveTwitchLogin(input);
+  if (!result.ok) return result;
+  const { login } = result;
+
+  const { error } = await auth.admin.from("profiles").update({ twitch_login: login }).eq("id", auth.userId);
+  if (error) {
+    return {
+      ok: false,
+      message:
+        error.code === "23505"
+          ? "Esse canal da Twitch já está cadastrado para outro jogador."
+          : error.code === "42703" || error.code === "PGRST204"
+            ? "Rode a migração 0022_twitch.sql no Supabase."
+            : "Não foi possível salvar.",
+    };
+  }
+  await audit({
+    action: "profile.twitch_link",
+    outcome: "success",
+    actorId: auth.session.id,
+    detail: { userId: auth.userId, twitch: login },
+  });
+  refresh();
+  return { ok: true, message: login ? `Canal da Twitch salvo: ${login}.` : "Canal da Twitch removido.", login };
 }

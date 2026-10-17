@@ -1,5 +1,6 @@
 import "server-only";
 import { allstarClipUrl, allstarEmbedUrl } from "@/lib/allstar";
+import { twitchClipEmbedUrl, twitchClipUrl } from "@/lib/twitch";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { DataSource, ListMixesOptions } from "@/services/data-source";
 import type {
@@ -241,20 +242,22 @@ export const supabaseDataSource: DataSource = {
       .limit(300);
     // Sem a migração 0018 ainda: só não mostra clipes.
     if (error || !data) return [];
-    return data.map(
-      (c): Highlight => ({
+    return data.map((c): Highlight => {
+      const twitch = c.provider === "twitch";
+      return {
         id: c.id as string,
         mixId: (c.match_id as string | null) ?? "",
         playerId: c.user_id as string,
         kind: c.kind as HighlightKind,
         title: c.title as string,
-        url: allstarClipUrl(c.clip_id as string),
-        embedUrl: allstarEmbedUrl(c.clip_id as string),
+        url: twitch ? twitchClipUrl(c.clip_id as string) : allstarClipUrl(c.clip_id as string),
+        embedUrl: twitch ? twitchClipEmbedUrl(c.clip_id as string) : allstarEmbedUrl(c.clip_id as string),
         videoUrl: (c.video_url as string | null | undefined) ?? null,
         thumbnailUrl: (c.thumbnail_url as string | null | undefined) ?? null,
         createdBy: (c.created_by as string | null) ?? null,
         createdAt: c.created_at as string,
-      }),
-    );
+        source: twitch ? "twitch" : "allstar",
+      };
+    });
   },
 };

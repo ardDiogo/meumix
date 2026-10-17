@@ -28,11 +28,15 @@ import { Badge } from "@/components/ui/badge";
 import { AddClipDialog } from "@/components/clips/add-clip-dialog";
 import { ClipCard } from "@/components/clips/clip-card";
 import { ImportAllstarDialog } from "@/components/clips/import-allstar-dialog";
+import { ImportTwitchButton } from "@/components/clips/import-twitch-button";
+import { TwitchStreams } from "@/components/twitch/twitch-streams";
+import { mixBroadcasts, profileTwitch, toStreamItems } from "@/services/twitch";
+import { twitchChannelUrl } from "@/lib/twitch";
 import { toClipViews } from "@/services/clips";
 import { allstarProfileUrl } from "@/lib/allstar";
 import { MapIcon } from "@/components/maps/map-icon";
 
-// Importar clipes do Allstar consulta vários jogadores.
+// Importar clipes do Allstar e da Twitch consulta vários jogadores.
 export const maxDuration = 60;
 
 export async function generateMetadata({ params }: PageProps<"/mixes/[id]">): Promise<Metadata> {
@@ -52,8 +56,18 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const guests = report?.rows.filter((r) => !r.userId) ?? [];
   const { session, canManageMixes } = await getPermissions();
   const canSendClip = kind === "supabase" && !!session;
+  const playerIds = [...new Set([...mix.teams[0].playerIds, ...mix.teams[1].playerIds])];
+  // Lives e gravações da Twitch dos jogadores deste mix.
+  const [broadcasts, twitchLogins] =
+    kind === "supabase"
+      ? await Promise.all([mixBroadcasts(mix.scheduledAt, playerIds), profileTwitch(playerIds)])
+      : [[], new Map<string, string>()];
+  const streams = toStreamItems(broadcasts, players);
+  const channels = [...twitchLogins]
+    .map(([id, login]) => ({ name: players.get(id)?.nickname ?? login, url: twitchChannelUrl(login) }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   // Perfil Allstar (pelo SteamID64) de quem jogou este mix, para achar os clipes da data.
-  const allstarLinks = [...new Set([...mix.teams[0].playerIds, ...mix.teams[1].playerIds])]
+  const allstarLinks = playerIds
     .map((id) => players.get(id))
     .flatMap((p) => {
       const url = p ? allstarProfileUrl(p.steamId) : null;
@@ -186,6 +200,20 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
         </ul>
       </Card>
 
+      {streams.length > 0 && (
+        <TwitchStreams
+          className="mb-4"
+          title={streams.some((s) => s.live) ? "Ao vivo na Twitch" : "Transmissões"}
+          description={`${streams.length} ${streams.length > 1 ? "canais" : "canal"} de jogadores deste mix`}
+          items={streams}
+          footnote={
+            streams.some((s) => !s.live && !s.meta.startsWith("Destaque"))
+              ? "A Twitch apaga as gravações depois de 7 dias (60 para Partner, Turbo ou Prime). Para guardar, o streamer transforma a gravação em Destaque."
+              : undefined
+          }
+        />
+      )}
+
       {/* Com o placar completo, a tabela usa a largura toda e o painel lateral vai para baixo. */}
       <div className={cn("grid gap-4", !report?.rows.length && "xl:grid-cols-[1fr_18rem]")}>
         <div className="min-w-0 space-y-4">
@@ -297,7 +325,21 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 )}
               </InfoRow>
               <InfoRow icon={Tv} label="Transmissão">
-                {mix.twitchUrl ? (
+                {channels.length ? (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {channels.map((c) => (
+                      <a
+                        key={c.url}
+                        href={c.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-brand hover:underline"
+                      >
+                        {c.name} <ExternalLink className="size-3" />
+                      </a>
+                    ))}
+                  </div>
+                ) : mix.twitchUrl ? (
                   <a
                     href={mix.twitchUrl}
                     target="_blank"
@@ -319,6 +361,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
               action={
                 canSendClip && (
                   <div className="flex flex-wrap gap-2">
+                    {canManageMixes && <ImportTwitchButton matchId={mix.id} />}
                     {canManageMixes && <ImportAllstarDialog matchId={mix.id} />}
                     <AddClipDialog
                       currentUserId={session!.id}
@@ -348,7 +391,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
               <EmptyState
                 icon={Clapperboard}
                 title="Nenhum clipe"
-                description="Clipes desta partida (Allstar) aparecerão aqui."
+                description="Clipes desta partida (Allstar e Twitch) aparecerão aqui."
                 className="py-8"
               />
             )}

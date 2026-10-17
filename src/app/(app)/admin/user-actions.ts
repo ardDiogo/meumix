@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { canManageAdmins, canManageMixes, isSuperAdminEmail } from "@/lib/auth/permissions";
 import { validateDisplayName, validatePassword } from "@/lib/auth/validation";
 import { fetchSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
+import { resolveTwitchLogin } from "@/services/twitch";
 import { ELO_CAP, levelForElo } from "@/lib/levels";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
@@ -52,6 +53,8 @@ export interface UserDataInput {
   fullName: string;
   email: string;
   steam: string;
+  /** Canal da Twitch (link ou nome); vazio remove. */
+  twitch: string;
 }
 
 export async function updateUserData(userId: string, input: UserDataInput): Promise<UserActionResult> {
@@ -99,6 +102,19 @@ export async function updateUserData(userId: string, input: UserDataInput): Prom
     }
   }
 
+  // Twitch: só grava se mudou (sem a migração 0022, o resto continua salvando).
+  const { data: twitchRow, error: twitchReadError } = await admin
+    .from("profiles")
+    .select("twitch_login")
+    .eq("id", userId)
+    .maybeSingle();
+  const twitch = await resolveTwitchLogin(input.twitch ?? "");
+  if (!twitch.ok) return { ok: false, message: twitch.message };
+  const twitchChanged = !twitchReadError && (twitchRow?.twitch_login ?? null) !== twitch.login;
+  if (twitchReadError && twitch.login) {
+    return { ok: false, message: "Rode a migração 0022_twitch.sql no Supabase para cadastrar a Twitch." };
+  }
+
   if (email !== (target.email ?? "").toLowerCase()) {
     const { error } = await admin.auth.admin.updateUserById(userId, { email, email_confirm: true });
     if (error) {
@@ -113,14 +129,21 @@ export async function updateUserData(userId: string, input: UserDataInput): Prom
 
   const { error } = await admin
     .from("profiles")
-    .update({ display_name: nick, full_name: fullName || null, ...steamPatch })
+    .update({
+      display_name: nick,
+      full_name: fullName || null,
+      ...steamPatch,
+      ...(twitchChanged ? { twitch_login: twitch.login } : {}),
+    })
     .eq("id", userId);
   if (error) {
     return {
       ok: false,
       message:
         error.code === "23505"
-          ? "Esse perfil Steam já está vinculado a outro jogador."
+          ? error.message.includes("twitch")
+            ? "Esse canal da Twitch já está cadastrado para outro jogador."
+            : "Esse perfil Steam já está vinculado a outro jogador."
           : error.code === "42703"
             ? "Rode as migrações 0008 e 0009 no Supabase."
             : "Não foi possível salvar.",

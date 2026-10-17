@@ -37,6 +37,10 @@ import { BadgeIcon } from "@/components/badges/badge-icon";
 import { playerBadges } from "@/services/badges";
 import { mixHref } from "@/lib/mix-slug";
 import { MapIcon } from "@/components/maps/map-icon";
+import { TwitchIcon } from "@/components/twitch/twitch-icon";
+import { TwitchStreams } from "@/components/twitch/twitch-streams";
+import { twitchChannelUrl } from "@/lib/twitch";
+import { liveChannels, profileTwitch, toStreamItems } from "@/services/twitch";
 
 export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">): Promise<Metadata> {
   const profile = await resolvePlayerProfile((await params).id);
@@ -72,12 +76,15 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const formPoints = formSeries(playedMixes, player.id);
   const mapRecs = mapRecords(playedMixes, player.id);
   const timeline = mapTimeline(playedMixes, player.id);
-  const [{ session, canManageMixes }, csrep, badges, feed] = await Promise.all([
+  const [{ session, canManageMixes }, csrep, badges, feed, twitchLogin, live] = await Promise.all([
     getPermissions(),
     kind === "supabase" ? getCsrepView(player.id, player.steamId) : null,
     playerBadges([player.id]),
     getHighlightsFeed(),
+    kind === "supabase" ? profileTwitch([player.id]).then((m) => m.get(player.id) ?? null) : null,
+    kind === "supabase" ? liveChannels([player.id]) : [],
   ]);
+  const liveItems = toStreamItems(live, new Map([[player.id, player]]));
   const clips = toClipViews(
     feed.highlights.filter((h) => h.playerId === player.id),
     { players: feed.players, mixes: feed.mixes, viewerId: session?.id ?? null, canManage: canManageMixes },
@@ -151,6 +158,18 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 <Button variant="outline" size="sm" asChild>
                   <a href={allstarUrl} target="_blank" rel="noopener noreferrer">
                     <Clapperboard /> Clipes no Allstar
+                  </a>
+                </Button>
+              )}
+              {twitchLogin && (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={twitchChannelUrl(twitchLogin)} target="_blank" rel="noopener noreferrer">
+                    <TwitchIcon className="text-[#9146FF]" /> Twitch
+                    {liveItems.length > 0 && (
+                      <span className="rounded-sm bg-loss px-1 text-[10px] font-bold text-white uppercase">
+                        Ao vivo
+                      </span>
+                    )}
                   </a>
                 </Button>
               )}
@@ -230,6 +249,8 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
           )}
         </Card>
       </div>
+
+      {liveItems.length > 0 && <TwitchStreams className="mt-4" title="Ao vivo agora" items={liveItems} />}
 
       <PlayerForm points={formPoints} />
       <RecentMatches timeline={timeline} />

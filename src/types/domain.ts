@@ -168,6 +168,8 @@ export interface Highlight {
   thumbnailUrl?: string | null;
   /** Quem enviou (para permitir excluir). */
   createdBy?: ID | null;
+  /** Origem do clipe. */
+  source?: "allstar" | "twitch";
   createdAt: ISODateString;
 }
 

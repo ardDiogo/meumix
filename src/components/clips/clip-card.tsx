@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { deleteClip } from "@/app/(app)/clipes/actions";
 import { formatDate } from "@/lib/format";
 import type { HighlightKind } from "@/types/domain";
+import { TwitchEmbed } from "../twitch/twitch-embed";
+import { TwitchIcon } from "../twitch/twitch-icon";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -26,6 +28,7 @@ export interface ClipView {
   title: string;
   url: string | null;
   embedUrl: string | null;
+  source: "allstar" | "twitch";
   videoUrl: string | null;
   thumbnailUrl: string | null;
   createdAt: string;
@@ -34,7 +37,7 @@ export interface ClipView {
   canDelete: boolean;
 }
 
-/** Cartão do clipe: o vídeo abre numa janela dentro do site (player do Allstar). */
+/** Cartão do clipe: o vídeo abre numa janela dentro do site (player do Allstar ou da Twitch). */
 export function ClipCard({ clip }: { clip: ClipView }) {
   const k = CLIP_KINDS[clip.kind];
   const Icon = k.icon;
@@ -61,6 +64,9 @@ export function ClipCard({ clip }: { clip: ClipView }) {
               />
             )}
             <Icon className="absolute top-3 left-3 size-5 text-subtle" />
+            {clip.source === "twitch" && (
+              <TwitchIcon className="absolute top-3 right-3 size-5 text-[#9146FF] drop-shadow" />
+            )}
             <span className="relative flex size-14 items-center justify-center rounded-full bg-brand text-white shadow-lg transition-transform group-hover:scale-110">
               <Play className="size-6 translate-x-0.5" fill="currentColor" />
             </span>
@@ -76,6 +82,8 @@ export function ClipCard({ clip }: { clip: ClipView }) {
               playsInline
               className="aspect-video w-full rounded-md border border-border bg-black"
             />
+          ) : clip.source === "twitch" && clip.embedUrl ? (
+            <TwitchEmbed src={`${clip.embedUrl}&autoplay=true`} title={clip.title} />
           ) : (
             clip.embedUrl && (
               <div className="aspect-video w-full overflow-hidden rounded-md border border-border bg-black">
@@ -101,7 +109,8 @@ export function ClipCard({ clip }: { clip: ClipView }) {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 text-muted hover:text-brand"
               >
-                Não carregou? Abrir no Allstar <ExternalLink className="size-3.5" />
+                Não carregou? Abrir {clip.source === "twitch" ? "na Twitch" : "no Allstar"}{" "}
+                <ExternalLink className="size-3.5" />
               </a>
             )}
           </div>

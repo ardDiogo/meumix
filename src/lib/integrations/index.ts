@@ -28,7 +28,8 @@ export const INTEGRATIONS: IntegrationInfo[] = [
   {
     provider: "twitch",
     name: "Twitch",
-    description: "Vincular transmissões e importar clipes dos mixes.",
-    status: "not_implemented",
+    description:
+      "Cadastre seu canal em Perfil: quem está ao vivo aparece no site, a gravação fica na página do mix e os clipes da live são importados.",
+    status: "available",
   },
 ];

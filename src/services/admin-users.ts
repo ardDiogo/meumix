@@ -16,6 +16,7 @@ export interface ManagedUser {
   mixesPlayed: number;
   avatarUrl: string | null;
   steamUrl: string | null;
+  twitchLogin: string | null;
 }
 
 export type ListUsersResult =
@@ -26,16 +27,21 @@ export async function listManagedUsers(): Promise<ListUsersResult> {
   const admin = createSupabaseAdminClient();
   if (!admin) return { status: "not_configured" };
 
-  const [{ data, error }, profiles, steam] = await Promise.all([
+  const [{ data, error }, profiles, steam, twitch] = await Promise.all([
     admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
     admin.from("profiles").select("id, display_name, role, full_name, elo, gc_level, mixes_played"),
     // Separado: sem a migração 0009 a lista continua funcionando, só sem fotos.
     admin.from("profiles").select("id, avatar_url, steam_url"),
+    // Idem para a migração 0022 (canal da Twitch).
+    admin.from("profiles").select("id, twitch_login"),
   ]);
   if (error) return { status: "error", message: "Não foi possível carregar os usuários." };
 
   const byId = new Map((profiles.data ?? []).map((p) => [p.id as string, p]));
   const steamById = new Map((steam.error ? [] : (steam.data ?? [])).map((p) => [p.id as string, p]));
+  const twitchById = new Map(
+    (twitch.error ? [] : (twitch.data ?? [])).map((p) => [p.id as string, (p.twitch_login as string | null) ?? null]),
+  );
   const users = data.users.map((u): ManagedUser => {
     const profile = byId.get(u.id);
     const email = u.email ?? "";
@@ -54,6 +60,7 @@ export async function listManagedUsers(): Promise<ListUsersResult> {
       mixesPlayed: (profile?.mixes_played as number | undefined) ?? 0,
       avatarUrl: (steamById.get(u.id)?.avatar_url as string | null | undefined) ?? null,
       steamUrl: (steamById.get(u.id)?.steam_url as string | null | undefined) ?? null,
+      twitchLogin: twitchById.get(u.id) ?? null,
     };
   });
   users.sort(

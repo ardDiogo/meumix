@@ -6,6 +6,7 @@ import { MixList } from "@/components/mixes/mix-list";
 import { LevelBadge } from "@/components/players/level-badge";
 import { NextMixPanel } from "@/components/registrations/next-mix-panel";
 import { HeroBanner } from "@/components/dashboard/hero-banner";
+import { LiveNow } from "@/components/twitch/live-now";
 import { Delta } from "@/components/stats/delta";
 import { EloChart } from "@/components/stats/elo-chart";
 import { FormStrip } from "@/components/stats/form-strip";
@@ -48,6 +49,7 @@ export default async function DashboardPage() {
             </Button>
           }
         />
+        <LiveNow />
         <NextMixPanel />
         <Card>
           <EmptyState
@@ -107,6 +109,7 @@ export default async function DashboardPage() {
         }
       />
 
+      <LiveNow />
       <NextMixPanel />
 
       {/* Resumo competitivo */}

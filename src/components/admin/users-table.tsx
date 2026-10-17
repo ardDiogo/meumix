@@ -124,7 +124,7 @@ export function UsersTable({
                   <TD>
                     {manageable && (
                       <div className="flex justify-end gap-1.5">
-                        <IconButton label="Editar dados e Steam" onClick={act("edit")}>
+                        <IconButton label="Editar dados, Steam e Twitch" onClick={act("edit")}>
                           <Pencil />
                         </IconButton>
                         <IconButton label="Editar nível e ELO" onClick={act("elo")}>
@@ -267,6 +267,7 @@ function EditDialog({ user, onDone }: { user: ManagedUser; onDone: () => void })
     fullName: user.fullName ?? "",
     email: user.email,
     steam: user.steamUrl ?? "",
+    twitch: user.twitchLogin ? `https://www.twitch.tv/${user.twitchLogin}` : "",
   });
   const field = (key: keyof typeof form) => ({
     value: form[key],
@@ -294,6 +295,13 @@ function EditDialog({ user, onDone }: { user: ManagedUser; onDone: () => void })
             <Input id="edit-steam" placeholder="https://steamcommunity.com/id/nick" {...field("steam")} />
           </div>
           <p className="mt-1.5 text-xs text-subtle">A foto é importada da Steam ao salvar. Deixe vazio para remover.</p>
+        </div>
+        <div>
+          <Label htmlFor="edit-twitch">Canal da Twitch</Label>
+          <Input id="edit-twitch" placeholder="https://www.twitch.tv/canal" {...field("twitch")} />
+          <p className="mt-1.5 text-xs text-subtle">
+            Para mostrar a live e as gravações dos mixes. Deixe vazio se não transmite.
+          </p>
         </div>
       </div>
       <Footer pending={pending} label="Salvar alterações" onConfirm={() => run(() => updateUserData(user.id, form))} />

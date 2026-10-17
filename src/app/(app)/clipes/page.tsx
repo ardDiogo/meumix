@@ -25,7 +25,7 @@ export default async function ClipsPage() {
     <>
       <PageHeader
         title="Clipes e highlights"
-        description="Aces, clutches e melhores jogadas dos mixes, direto do Allstar."
+        description="Aces, clutches e melhores jogadas dos mixes, direto do Allstar e da Twitch."
         actions={
           <>
             <DemoBadge kind={kind} />

@@ -23,6 +23,7 @@ export function toClipViews(
       title: h.title,
       url: h.url,
       embedUrl: h.embedUrl ?? null,
+      source: h.source ?? "allstar",
       videoUrl: h.videoUrl ?? null,
       thumbnailUrl: h.thumbnailUrl ?? null,
       createdAt: h.createdAt,

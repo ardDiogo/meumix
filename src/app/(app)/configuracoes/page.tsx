@@ -8,10 +8,13 @@ import { Input, Label } from "@/components/ui/input";
 import { INTEGRATIONS } from "@/lib/integrations";
 import { ConfirmLinkBox } from "@/components/players/confirm-link-box";
 import { SteamLinkForm } from "@/components/players/steam-link-form";
+import { TwitchLinkForm } from "@/components/players/twitch-link-form";
+import { TwitchIcon } from "@/components/twitch/twitch-icon";
 import { myConfirmLink } from "./actions";
 import { getDataSource } from "@/services";
 import { getSession } from "@/services/auth";
 import { profileAvatars } from "@/services/avatars";
+import { profileTwitch } from "@/services/twitch";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -19,7 +22,12 @@ export default async function SettingsPage() {
   const ds = getDataSource();
   const [community, playerId] = await Promise.all([ds.getCommunity(), ds.getCurrentPlayerId()]);
   const [player, session] = await Promise.all([playerId ? ds.getPlayer(playerId) : null, getSession()]);
-  const steam = session ? (await profileAvatars([session.id])).get(session.id) : undefined;
+  const [steam, twitch] = session
+    ? await Promise.all([
+        profileAvatars([session.id]).then((m) => m.get(session.id)),
+        profileTwitch([session.id]).then((m) => m.get(session.id) ?? null),
+      ])
+    : [undefined, null];
 
   return (
     <>
@@ -51,6 +59,22 @@ export default async function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {session && (
+          <Card>
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <TwitchIcon className="size-4 text-muted" /> Twitch
+                </span>
+              }
+              description="Se você transmite os mixes, cadastre seu canal: a live aparece no site e a gravação fica na página do mix."
+            />
+            <CardContent>
+              <TwitchLinkForm login={twitch} />
+            </CardContent>
+          </Card>
+        )}
 
         {session && (
           <Card>

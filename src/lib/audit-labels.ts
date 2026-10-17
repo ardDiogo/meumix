@@ -43,11 +43,13 @@ export const AUDIT_LABELS: Record<string, string> = {
   "badge.grant": "Concedeu insígnia",
   "badge.revoke": "Removeu insígnia",
   "profile.steam_link": "Vinculou Steam",
+  "profile.twitch_link": "Cadastrou canal da Twitch",
   "profile.rotate_confirm_link": "Gerou novo link pessoal",
   "player.csrep_ai": "Análise do CSRep por IA",
   "clip.add": "Enviou clipe",
   "clip.delete": "Excluiu clipe",
   "clip.import": "Importou clipes do Allstar",
+  "clip.import_twitch": "Importou clipes da Twitch",
 };
 
 export const AUDIT_CATEGORIES = {

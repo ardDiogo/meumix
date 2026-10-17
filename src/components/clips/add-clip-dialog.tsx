@@ -14,7 +14,7 @@ interface Option {
   label: string;
 }
 
-/** Enviar clipe do Allstar: link, título, tipo, mix e (admins) o jogador. */
+/** Enviar clipe do Allstar ou da Twitch: link, título, tipo, mix e (admins) o jogador. */
 export function AddClipDialog({
   mixes,
   players,
@@ -54,8 +54,8 @@ export function AddClipDialog({
         </Button>
       </DialogTrigger>
       <DialogContent
-        title="Enviar clipe do Allstar"
-        description="No Allstar, abra o clipe → Share → Copy Link e cole aqui."
+        title="Enviar clipe"
+        description="Cole o link do clipe: no Allstar, Share → Copy Link; na Twitch, Compartilhar → Copiar link (clips.twitch.tv/…)."
       >
         <div className="space-y-3">
           <div>
@@ -64,7 +64,7 @@ export function AddClipDialog({
               id="clip-url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://allstar.gg/clip/6acd4a55f20f64fba59f5dfc…"
+              placeholder="https://allstar.gg/clip/… ou https://clips.twitch.tv/…"
               autoComplete="off"
             />
           </div>
