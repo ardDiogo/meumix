@@ -172,13 +172,14 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         </div>
       </Card>
 
-      <section aria-label="Estatísticas gerais" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <section aria-label="Estatísticas gerais" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <StatCard label="Mixes" value={stats.mixes} hint={`${stats.wins}V · ${stats.losses}D`} />
         <StatCard label="Win rate" value={formatPercent(stats.winRate)} />
         <StatCard label="K/D" value={formatDecimal(stats.kd)} hint={`${stats.kills} K · ${stats.deaths} D`} />
         <StatCard label="ADR" value={formatDecimal(stats.adr, 1)} />
         <StatCard label="KAST" value={formatPercent(stats.kast)} />
         <StatCard label="MVPs" value={stats.mvps} />
+        <StatCard label="Lanternas" value={stats.lanterns} hint="Pior saldo K−D do mix" />
       </section>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
