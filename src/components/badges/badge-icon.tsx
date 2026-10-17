@@ -15,6 +15,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { BADGE_IMAGES } from "@/lib/badge-images";
 import { cn } from "@/lib/utils";
 
 /** Ícones disponíveis para as insígnias (a chave fica salva no banco). */
@@ -47,7 +48,7 @@ export const BADGE_COLORS = [
   "#A1A1AA",
 ];
 
-/** Selo da insígnia: ícone na cor escolhida. */
+/** Selo da insígnia: imagem 3D ou ícone na cor escolhida. */
 export function BadgeIcon({
   icon,
   color,
@@ -61,8 +62,17 @@ export function BadgeIcon({
   title?: string;
   className?: string;
 }) {
-  const Icon = (BADGE_ICONS[icon] ?? BADGE_ICONS.trophy!).icon;
   const box = size === "xs" ? "size-6" : size === "sm" ? "size-8" : "size-11";
+  const image = BADGE_IMAGES[icon];
+  if (image) {
+    return (
+      <span title={title} className={cn("inline-flex shrink-0 items-center justify-center", box, className)}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={image.src} alt="" aria-hidden className="size-full object-contain drop-shadow" />
+      </span>
+    );
+  }
+  const Icon = (BADGE_ICONS[icon] ?? BADGE_ICONS.trophy!).icon;
   const glyph = size === "xs" ? "size-3.5" : size === "sm" ? "size-4" : "size-6";
   return (
     <span

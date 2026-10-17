@@ -8,6 +8,7 @@ import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Badge, PlayerBadge } from "@/services/badges";
 import { BADGE_COLORS, BADGE_ICONS, BadgeIcon } from "../badges/badge-icon";
+import { BADGE_IMAGES } from "@/lib/badge-images";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
@@ -125,6 +126,25 @@ function CreateBadge() {
               </button>
             ))}
           </div>
+          <div className="mt-2 grid grid-cols-7 gap-1.5">
+            {Object.entries(BADGE_IMAGES).map(([key, { label, src }]) => (
+              <button
+                key={key}
+                type="button"
+                title={label}
+                aria-label={label}
+                aria-pressed={form.icon === key}
+                onClick={() => setForm((f) => ({ ...f, icon: key }))}
+                className={cn(
+                  "flex h-11 items-center justify-center rounded-md border p-1 transition-colors",
+                  form.icon === key ? "border-brand bg-brand/10" : "border-border hover:border-border-strong",
+                )}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="size-8 object-contain" />
+              </button>
+            ))}
+          </div>
         </div>
         <div>
           <Label>Cor</Label>
@@ -164,7 +184,7 @@ function BadgeRow({ badge }: { badge: Badge }) {
   const [pending, run] = useRun();
   return (
     <li className="flex items-center gap-3 px-4 py-3">
-      <BadgeIcon icon={badge.icon} color={badge.color} />
+      <BadgeIcon icon={badge.icon} color={badge.color} size="md" />
       <div className="min-w-0 flex-1">
         <div className="font-medium">{badge.name}</div>
         {badge.description && <div className="truncate text-xs text-muted">{badge.description}</div>}

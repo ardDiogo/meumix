@@ -5,6 +5,7 @@ import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { BADGE_IMAGES } from "@/lib/badge-images";
 
 export type BadgeResult = { ok: boolean; message: string };
 
@@ -23,6 +24,7 @@ const ICONS = new Set([
   "gem",
   "heart",
   "skull",
+  ...Object.keys(BADGE_IMAGES),
 ]);
 const MIGRATION_HINT = "Rode a migração 0015_badges.sql no Supabase.";
 const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703";
