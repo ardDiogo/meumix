@@ -31,7 +31,12 @@ export async function csrepRequest(path: string, init: RequestInit = {}): Promis
   if (!isSafeCsrepPath(path)) throw new Error("Caminho inválido.");
   const res = await fetch(`${csrepApiBase()}${path}`, {
     ...init,
-    headers: { Accept: "application/json", ...init.headers, "X-API-Key": key },
+    headers: {
+      Accept: "application/json",
+      "User-Agent": "MeuMix/1.0 (+https://meumix.vercel.app)",
+      ...init.headers,
+      "X-API-Key": key,
+    },
     cache: "no-store",
     signal: AbortSignal.timeout(TIMEOUT_MS),
   });

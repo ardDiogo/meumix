@@ -30,6 +30,12 @@ export async function probeCsrep(path: string): Promise<CsrepProbeResult> {
     return { ok: false, message: "Caminho inválido. Use algo como /matches/gamersclub/123." };
   try {
     const r = await csrepRequest(clean);
+    if (r.text.includes("challenges.cloudflare.com"))
+      return {
+        ok: false,
+        status: r.status,
+        message: `HTTP ${r.status}: a proteção Cloudflare do CSRep bloqueou a chamada vinda do servidor (Vercel). É preciso o CSRep liberar o acesso da API.`,
+      };
     const body = r.json !== null ? JSON.stringify(r.json, null, 2) : r.text;
     return {
       ok: r.status >= 200 && r.status < 300,
