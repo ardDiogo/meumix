@@ -161,6 +161,10 @@ export interface Highlight {
   title: string;
   /** URL do clipe (Twitch, YouTube, etc). `null` quando ainda sem mídia. */
   url: string | null;
+  /** Player incorporável (toca no próprio site), quando o provedor permite. */
+  embedUrl?: string | null;
+  /** Quem enviou (para permitir excluir). */
+  createdBy?: ID | null;
   createdAt: ISODateString;
 }
 

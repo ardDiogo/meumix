@@ -1,9 +1,12 @@
 import "server-only";
+import { allstarClipUrl, allstarEmbedUrl } from "@/lib/allstar";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { DataSource, ListMixesOptions } from "@/services/data-source";
 import type {
   Community,
   EloHistoryEntry,
+  Highlight,
+  HighlightKind,
   MapId,
   MapResult,
   Mix,
@@ -230,6 +233,26 @@ export const supabaseDataSource: DataSource = {
   },
 
   async listHighlights() {
-    return [];
+    const supabase = await client();
+    const { data, error } = await supabase
+      .from("clips")
+      .select("id, user_id, match_id, clip_id, title, kind, created_by, created_at")
+      .order("created_at", { ascending: false })
+      .limit(300);
+    // Sem a migração 0018 ainda: só não mostra clipes.
+    if (error || !data) return [];
+    return data.map(
+      (c): Highlight => ({
+        id: c.id as string,
+        mixId: (c.match_id as string | null) ?? "",
+        playerId: c.user_id as string,
+        kind: c.kind as HighlightKind,
+        title: c.title as string,
+        url: allstarClipUrl(c.clip_id as string),
+        embedUrl: allstarEmbedUrl(c.clip_id as string),
+        createdBy: (c.created_by as string | null) ?? null,
+        createdAt: c.created_at as string,
+      }),
+    );
   },
 };
