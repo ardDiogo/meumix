@@ -26,6 +26,8 @@ export interface ClipView {
   title: string;
   url: string | null;
   embedUrl: string | null;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
   createdAt: string;
   player: { name: string; href: string } | null;
   mix: { name: string; href: string } | null;
@@ -45,27 +47,47 @@ export function ClipCard({ clip }: { clip: ClipView }) {
         <DialogTrigger asChild>
           <button
             type="button"
-            disabled={!clip.embedUrl && !clip.url}
-            className="group relative flex aspect-video items-center justify-center border-b border-border bg-gradient-to-br from-surface-2 to-bg"
+            disabled={!clip.embedUrl && !clip.url && !clip.videoUrl}
+            className="group relative flex aspect-video items-center justify-center overflow-hidden border-b border-border bg-gradient-to-br from-surface-2 to-bg"
             aria-label={`Assistir: ${clip.title}`}
           >
+            {clip.thumbnailUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={clip.thumbnailUrl}
+                alt=""
+                loading="lazy"
+                className="absolute inset-0 size-full object-cover opacity-80 transition-opacity group-hover:opacity-100"
+              />
+            )}
             <Icon className="absolute top-3 left-3 size-5 text-subtle" />
-            <span className="flex size-14 items-center justify-center rounded-full bg-brand text-white shadow-lg transition-transform group-hover:scale-110">
+            <span className="relative flex size-14 items-center justify-center rounded-full bg-brand text-white shadow-lg transition-transform group-hover:scale-110">
               <Play className="size-6 translate-x-0.5" fill="currentColor" />
             </span>
           </button>
         </DialogTrigger>
         <DialogContent title={clip.title} className="max-w-4xl">
-          {clip.embedUrl && (
-            <div className="aspect-video w-full overflow-hidden rounded-md border border-border bg-black">
-              <iframe
-                src={clip.embedUrl}
-                title={clip.title}
-                className="size-full"
-                allow="autoplay; fullscreen; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
+          {clip.videoUrl ? (
+            <video
+              src={clip.videoUrl}
+              poster={clip.thumbnailUrl ?? undefined}
+              controls
+              autoPlay
+              playsInline
+              className="aspect-video w-full rounded-md border border-border bg-black"
+            />
+          ) : (
+            clip.embedUrl && (
+              <div className="aspect-video w-full overflow-hidden rounded-md border border-border bg-black">
+                <iframe
+                  src={clip.embedUrl}
+                  title={clip.title}
+                  className="size-full"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )
           )}
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="text-muted">

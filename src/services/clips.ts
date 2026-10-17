@@ -23,6 +23,8 @@ export function toClipViews(
       title: h.title,
       url: h.url,
       embedUrl: h.embedUrl ?? null,
+      videoUrl: h.videoUrl ?? null,
+      thumbnailUrl: h.thumbnailUrl ?? null,
       createdAt: h.createdAt,
       player: player ? { name: player.nickname, href: playerHref(player) } : null,
       mix: mix ? { name: mix.name, href: mixHref(mix) } : null,

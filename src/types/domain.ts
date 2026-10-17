@@ -163,6 +163,9 @@ export interface Highlight {
   url: string | null;
   /** Player incorporável (toca no próprio site), quando o provedor permite. */
   embedUrl?: string | null;
+  /** Vídeo direto (mp4) e miniatura, quando importados do Allstar. */
+  videoUrl?: string | null;
+  thumbnailUrl?: string | null;
   /** Quem enviou (para permitir excluir). */
   createdBy?: ID | null;
   createdAt: ISODateString;

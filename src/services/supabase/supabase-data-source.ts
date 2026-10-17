@@ -236,7 +236,7 @@ export const supabaseDataSource: DataSource = {
     const supabase = await client();
     const { data, error } = await supabase
       .from("clips")
-      .select("id, user_id, match_id, clip_id, title, kind, created_by, created_at")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(300);
     // Sem a migração 0018 ainda: só não mostra clipes.
@@ -250,6 +250,8 @@ export const supabaseDataSource: DataSource = {
         title: c.title as string,
         url: allstarClipUrl(c.clip_id as string),
         embedUrl: allstarEmbedUrl(c.clip_id as string),
+        videoUrl: (c.video_url as string | null | undefined) ?? null,
+        thumbnailUrl: (c.thumbnail_url as string | null | undefined) ?? null,
         createdBy: (c.created_by as string | null) ?? null,
         createdAt: c.created_at as string,
       }),

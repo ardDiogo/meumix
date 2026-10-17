@@ -47,6 +47,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "player.csrep_ai": "Análise do CSRep por IA",
   "clip.add": "Enviou clipe",
   "clip.delete": "Excluiu clipe",
+  "clip.import": "Importou clipes do Allstar",
 };
 
 export const AUDIT_CATEGORIES = {

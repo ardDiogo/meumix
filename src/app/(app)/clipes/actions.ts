@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { parseAllstarClip } from "@/lib/allstar";
+import { clipKindFromAllstar, fetchAllstarMatch, parseAllstarMatchUrl } from "@/lib/integrations/allstar-api";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
@@ -90,4 +91,125 @@ export async function deleteClip(id: string): Promise<ClipResult> {
   await audit({ action: "clip.delete", outcome: "success", actorId: session.id, detail: { id, title: clip.title } });
   refresh();
   return { ok: true, message: "Clipe excluído." };
+}
+
+export interface ImportResult {
+  ok: boolean;
+  message: string;
+  imported?: number;
+  details?: string[];
+}
+
+/**
+ * Admin: importa os clipes de um mix a partir dos links "Full match" do Allstar
+ * (um por mapa). Consulta cada jogador do mix pelo Steam ID e grava os clipes prontos.
+ */
+export async function importAllstarClips(matchId: string, links: string[]): Promise<ImportResult> {
+  const session = await getSession();
+  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem importar clipes." };
+  const admin = createSupabaseAdminClient();
+  if (!admin || !UUID.test(matchId)) return { ok: false, message: "Mix inválido." };
+
+  const parsed = links
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((l) => ({ link: l, ref: parseAllstarMatchUrl(l) }));
+  const bad = parsed.filter((p) => !p.ref);
+  if (!parsed.length || bad.length) {
+    return { ok: false, message: "Cole os links “Full match” do Allstar (allstar.gg/match/…), um por linha." };
+  }
+
+  // Jogadores do mix com Steam ID vinculado.
+  const { data: records } = await admin.from("player_match_records").select("user_id").eq("match_id", matchId);
+  const userIds = [
+    ...new Set((records ?? []).map((r) => r.user_id as string | null).filter((id): id is string => !!id)),
+  ];
+  if (!userIds.length) return { ok: false, message: "Esse mix não tem jogadores cadastrados." };
+  const { data: profiles } = await admin.from("profiles").select("id, display_name, steam_id").in("id", userIds);
+  const withSteam = (profiles ?? []).filter(
+    (p) => typeof p.steam_id === "string" && /^7656119\d{10}$/.test(p.steam_id),
+  );
+  const details: string[] = [];
+  const noSteam = (profiles ?? []).filter((p) => !withSteam.includes(p)).map((p) => p.display_name as string);
+  if (noSteam.length) details.push(`Sem Steam vinculada (não consultados): ${noSteam.join(", ")}.`);
+  if (!withSteam.length) return { ok: false, message: "Nenhum jogador do mix tem a Steam vinculada.", details };
+
+  const rows = new Map<string, Record<string, unknown>>();
+  let pending = 0;
+  for (const { ref } of parsed) {
+    const results = await Promise.all(
+      withSteam.map(async (p) => ({ p, r: await fetchAllstarMatch(ref!.matchId, p.steam_id as string) })),
+    );
+    const auth = results.find((x) => !x.r.ok && x.r.auth);
+    if (auth && !auth.r.ok) {
+      return { ok: false, message: `O Allstar exige login para ler essa partida. ${auth.r.message}`, details };
+    }
+    for (const { p, r } of results) {
+      if (!r.ok) {
+        details.push(`${p.display_name}: ${r.message}`);
+        continue;
+      }
+      for (const m of r.moments) {
+        if (!m.videoUrl) {
+          pending++;
+          continue;
+        }
+        if (rows.has(m.shareId)) continue;
+        rows.set(m.shareId, {
+          user_id: p.id,
+          match_id: matchId,
+          provider: "allstar",
+          clip_id: m.shareId,
+          title: m.title.length >= 1 ? m.title : "Clipe",
+          kind: clipKindFromAllstar(m.title, m.tags),
+          thumbnail_url: m.thumbnailUrl,
+          video_url: m.videoUrl,
+          created_by: session!.id,
+        });
+      }
+    }
+  }
+  if (pending) details.push(`${pending} momento(s) ainda sem clipe pronto no Allstar; importe de novo mais tarde.`);
+  if (!rows.size) return { ok: true, message: "Nenhum clipe pronto encontrado nessas partidas.", imported: 0, details };
+
+  const { data: existing } = await admin
+    .from("clips")
+    .select("clip_id")
+    .in("clip_id", [...rows.keys()]);
+  const known = new Set((existing ?? []).map((c) => c.clip_id as string));
+  const fresh = [...rows.values()].filter((r) => !known.has(r.clip_id as string));
+  if (fresh.length) {
+    const { error } = await admin.from("clips").insert(fresh);
+    if (error) {
+      const missing = error.code === "42703" || isMissing(error.code);
+      return {
+        ok: false,
+        message: missing
+          ? "Rode as migrações 0018_clips.sql e 0019_clip_media.sql no Supabase."
+          : "Não foi possível salvar os clipes.",
+        details,
+      };
+    }
+  }
+  await audit({
+    action: "clip.import",
+    outcome: "success",
+    actorId: session!.id,
+    detail: {
+      match_id: matchId,
+      links: parsed.length,
+      importados: fresh.length,
+      ja_existiam: rows.size - fresh.length,
+    },
+  });
+  refresh();
+  return {
+    ok: true,
+    message: fresh.length
+      ? `${fresh.length} clipe(s) importado(s)${rows.size - fresh.length ? `; ${rows.size - fresh.length} já estavam no MeuMix` : ""}.`
+      : "Todos os clipes encontrados já estavam no MeuMix.",
+    imported: fresh.length,
+    details,
+  };
 }

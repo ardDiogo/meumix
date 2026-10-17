@@ -27,8 +27,12 @@ import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
 import { AddClipDialog } from "@/components/clips/add-clip-dialog";
 import { ClipCard } from "@/components/clips/clip-card";
+import { ImportAllstarDialog } from "@/components/clips/import-allstar-dialog";
 import { toClipViews } from "@/services/clips";
 import { allstarProfileUrl } from "@/lib/allstar";
+
+// Importar clipes do Allstar consulta vários jogadores.
+export const maxDuration = 60;
 
 export async function generateMetadata({ params }: PageProps<"/mixes/[id]">): Promise<Metadata> {
   const detail = await getMixDetail((await params).id);
@@ -305,18 +309,21 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
               title="Clipes e highlights"
               action={
                 canSendClip && (
-                  <AddClipDialog
-                    currentUserId={session!.id}
-                    defaultMixId={mix.id}
-                    mixes={[{ id: mix.id, label: mix.name }]}
-                    players={
-                      canManageMixes
-                        ? [...players.values()]
-                            .map((p) => ({ id: p.id, label: p.nickname }))
-                            .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"))
-                        : null
-                    }
-                  />
+                  <div className="flex flex-wrap gap-2">
+                    {canManageMixes && <ImportAllstarDialog matchId={mix.id} />}
+                    <AddClipDialog
+                      currentUserId={session!.id}
+                      defaultMixId={mix.id}
+                      mixes={[{ id: mix.id, label: mix.name }]}
+                      players={
+                        canManageMixes
+                          ? [...players.values()]
+                              .map((p) => ({ id: p.id, label: p.nickname }))
+                              .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"))
+                          : null
+                      }
+                    />
+                  </div>
                 )
               }
             />
