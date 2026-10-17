@@ -5,29 +5,29 @@
 **Incidente** = acesso não autorizado, vazamento, perda ou alteração indevida de dados, ou chave
 exposta. Na dúvida, trate como incidente.
 
-| Etapa | Prazo | O que fazer |
-|-------|-------|-------------|
-| 1. Conter | Imediato | Revogar a credencial exposta (6.2); se houver abuso em andamento, desligar a funcionalidade (Admin → funcionalidades) ou pausar o deploy na Vercel |
-| 2. Registrar | Mesmo dia | Abrir registro privado (fora do repositório público): data/hora, como foi descoberto, o que foi afetado, ações tomadas |
-| 3. Avaliar | 24 h | Quais dados e quantos titulares; consultar `audit_log`, logs da Vercel e *Auth logs* do Supabase |
-| 4. Comunicar | **3 dias úteis** (Resolução CD/ANPD nº 15/2024) se houver risco ou dano relevante | Comunicar à ANPD e aos titulares afetados: natureza dos dados, riscos, medidas tomadas e o canal de contato |
-| 5. Corrigir | Conforme gravidade | Corrigir a causa, adicionar teste que reproduz o problema ([04](04-plano-de-testes.md)) |
-| 6. Revisar | 2 semanas | Atualizar estes documentos e as [pendências](05-pendencias.md) |
+| Etapa        | Prazo                                                                             | O que fazer                                                                                                                                        |
+| ------------ | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Conter    | Imediato                                                                          | Revogar a credencial exposta (6.2); se houver abuso em andamento, desligar a funcionalidade (Admin → funcionalidades) ou pausar o deploy na Vercel |
+| 2. Registrar | Mesmo dia                                                                         | Abrir registro privado (fora do repositório público): data/hora, como foi descoberto, o que foi afetado, ações tomadas                             |
+| 3. Avaliar   | 24 h                                                                              | Quais dados e quantos titulares; consultar `audit_log`, logs da Vercel e _Auth logs_ do Supabase                                                   |
+| 4. Comunicar | **3 dias úteis** (Resolução CD/ANPD nº 15/2024) se houver risco ou dano relevante | Comunicar à ANPD e aos titulares afetados: natureza dos dados, riscos, medidas tomadas e o canal de contato                                        |
+| 5. Corrigir  | Conforme gravidade                                                                | Corrigir a causa, adicionar teste que reproduz o problema ([04](04-plano-de-testes.md))                                                            |
+| 6. Revisar   | 2 semanas                                                                         | Atualizar estes documentos e as [pendências](05-pendencias.md)                                                                                     |
 
 ## 6.2 Revogar credenciais
 
-| Credencial | Onde revogar | Depois |
-|------------|--------------|--------|
-| Chave secreta do Supabase | Supabase → Project Settings → API Keys → criar nova *secret key* e apagar a antiga | Atualizar `SUPABASE_SECRET_KEY` na Vercel e fazer Redeploy |
-| Sessões de usuários | Supabase → Authentication → Users → usuário → *Sign out* / reset de senha | Avisar o usuário |
-| `GEMINI_API_KEY` | aistudio.google.com/apikey → apagar e criar | Vercel + Redeploy |
-| `FACEIT_API_KEY` | developers.faceit.com → App → API Keys | Vercel + Redeploy |
-| `TWITCH_CLIENT_SECRET` | dev.twitch.tv/console → MeuMix → Gerenciar → **Novo segredo** | Vercel + Redeploy |
-| `CSREP_API_KEY` | csrep.gg → conta → API | Vercel + Redeploy |
-| Senha de app do Gmail (SMTP) | myaccount.google.com → Segurança → Senhas de app → revogar | Supabase → Authentication → SMTP |
-| Link pessoal de um jogador | Admin → Jogadores → ícone de link → gerar novo | Mandar o link novo ao jogador |
+| Credencial                   | Onde revogar                                                                       | Depois                                                     |
+| ---------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Chave secreta do Supabase    | Supabase → Project Settings → API Keys → criar nova _secret key_ e apagar a antiga | Atualizar `SUPABASE_SECRET_KEY` na Vercel e fazer Redeploy |
+| Sessões de usuários          | Supabase → Authentication → Users → usuário → _Sign out_ / reset de senha          | Avisar o usuário                                           |
+| `GEMINI_API_KEY`             | aistudio.google.com/apikey → apagar e criar                                        | Vercel + Redeploy                                          |
+| `FACEIT_API_KEY`             | developers.faceit.com → App → API Keys                                             | Vercel + Redeploy                                          |
+| `TWITCH_CLIENT_SECRET`       | dev.twitch.tv/console → MeuMix → Gerenciar → **Novo segredo**                      | Vercel + Redeploy                                          |
+| `CSREP_API_KEY`              | csrep.gg → conta → API                                                             | Vercel + Redeploy                                          |
+| Senha de app do Gmail (SMTP) | myaccount.google.com → Segurança → Senhas de app → revogar                         | Supabase → Authentication → SMTP                           |
+| Link pessoal de um jogador   | Admin → Jogadores → ícone de link → gerar novo                                     | Mandar o link novo ao jogador                              |
 
-Toda chave fica só na Vercel (marcada *Sensitive*) ou no Supabase. Nunca no Git, em prints ou no chat.
+Toda chave fica só na Vercel (marcada _Sensitive_) ou no Supabase. Nunca no Git, em prints ou no chat.
 
 ## 6.3 Backups e restauração
 
@@ -45,8 +45,8 @@ Toda chave fica só na Vercel (marcada *Sensitive*) ou no Supabase. Nunca no Git
 - **Configuração:** a lista de variáveis está em `.env.example` (sem valores).
 
 | Data | Teste de restauração | Responsável | Resultado |
-|------|----------------------|-------------|-----------|
-| — | ainda não realizado | — | — |
+| ---- | -------------------- | ----------- | --------- |
+| —    | ainda não realizado  | —           | —         |
 
 ## 6.4 Logs
 
