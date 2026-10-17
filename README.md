@@ -120,6 +120,10 @@ O login usa **Supabase Auth** (e-mail e senha, confirmação por e-mail e recupe
 4. Integração Steam (OpenID + Web API) e, depois, CSRep e Twitch.
 5. Suporte a múltiplas comunidades (seletor de comunidade, rankings por comunidade).
 
+## Segurança e LGPD
+
+Modelo de permissões e ameaças, tabelas e RLS, inventário de dados pessoais, plano de testes, pendências e resposta a incidentes: [`docs/seguranca/`](docs/seguranca/README.md).
+
 ## API pública de histórico
 
 `GET /api/historico` devolve os mixes finalizados em JSON (sem e-mails), com placar, mapas e estatísticas por jogador.
