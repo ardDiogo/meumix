@@ -24,7 +24,7 @@ const BOARDS: { title: string; value: (s: PlayerAggregate) => number | null; for
 ];
 
 export default async function StatsPage() {
-  const { kind, community, totals, maps, leaders } = await getCommunityStats();
+  const { kind, community, totals, maps, leaders, minMixes } = await getCommunityStats();
 
   return (
     <>
@@ -78,7 +78,10 @@ export default async function StatsPage() {
       </div>
 
       <h2 className="mt-6 mb-3 font-display text-sm font-semibold tracking-wide text-muted uppercase">
-        Líderes <span className="tracking-normal text-subtle normal-case">· mínimo de 3 mixes</span>
+        Líderes{" "}
+        <span className="tracking-normal text-subtle normal-case">
+          · mínimo de {minMixes} {minMixes === 1 ? "mix" : "mixes"}
+        </span>
       </h2>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {BOARDS.map((board) => (

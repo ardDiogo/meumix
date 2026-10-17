@@ -172,9 +172,11 @@ export async function getCommunityStats() {
       maps.set(m.mapId, entry);
     }
   }
+  // Mínimo de mixes para entrar nos líderes: 3, ou menos enquanto a comunidade jogou poucos.
+  const minMixes = Math.min(3, Math.max(1, mixes.length));
   const leaders = players
     .map((player) => ({ player, stats: aggregatePlayer(player.id, mixes) }))
-    .filter((r) => r.stats.mixes >= 3);
+    .filter((r) => r.stats.mixes >= minMixes);
 
   return {
     kind: ds.kind,
@@ -187,6 +189,7 @@ export async function getCommunityStats() {
     },
     maps: [...maps.entries()].map(([mapId, v]) => ({ mapId, ...v })).sort((a, b) => b.played - a.played),
     leaders,
+    minMixes,
   };
 }
 
