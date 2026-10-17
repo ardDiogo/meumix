@@ -48,6 +48,11 @@ pessoal ou permite abuso hoje · **Média** = falta controle importante · **Bai
 
 ## 5.4 Ordem sugerida
 
+> **Decisão de 17/10/2026:** as fases 2 e 3 foram adiadas pelo responsável. Os itens abertos
+> (P-03, P-06, P-07, P-08, P-11 em CI, P-12, P-14, P-15, P-16) continuam como **riscos
+> aceitos e conhecidos** — em especial P-03 (sem limite de requisições, com custo de IA) — e devem
+> ser reavaliados antes de crescer a base de usuários ou abrir uma segunda comunidade.
+
 1. **Agora (sem mudar funcionalidade):** ~~P-01, P-13, P-04~~ (feitos em 17/10/2026), O-02, O-03.
 2. **Fase 1 — direitos do titular (feita em 17/10/2026, exceto revisão jurídica):** P-09 (Minha conta) + P-05 (exclusão com anonimização) +
    P-10/L-01 (páginas legais e canal) + testes S-01 a S-06, S-09.
