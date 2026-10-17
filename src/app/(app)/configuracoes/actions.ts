@@ -6,6 +6,8 @@ import { fetchSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { confirmLinkUrl, getOrCreateConfirmToken } from "@/services/confirm-links";
+import type { ConfirmLinkResult } from "../admin/user-actions";
 
 export type SteamResult =
   { ok: true; message: string; avatarUrl: string | null; steamUrl: string | null } | { ok: false; message: string };
@@ -89,4 +91,18 @@ export async function unlinkSteamProfile(targetUserId?: string): Promise<SteamRe
   if (error) return { ok: false, message: dbError(error) };
   refresh();
   return { ok: true, message: "Perfil Steam removido.", avatarUrl: null, steamUrl: null };
+}
+
+/** O próprio jogador: link pessoal de confirmação; `rotate` gera um novo. */
+export async function myConfirmLink(rotate = false): Promise<ConfirmLinkResult> {
+  const session = await getSession();
+  if (!session) return { ok: false, message: "Entre na sua conta para continuar." };
+  const token = await getOrCreateConfirmToken(session.id, rotate);
+  if (!token) return { ok: false, message: "Link pessoal indisponível no momento." };
+  if (rotate) await audit({ action: "profile.rotate_confirm_link", outcome: "success", actorId: session.id });
+  return {
+    ok: true,
+    message: rotate ? "Novo link gerado; o anterior parou de funcionar." : "",
+    url: await confirmLinkUrl(token),
+  };
 }

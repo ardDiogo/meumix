@@ -5,6 +5,7 @@ import {
   Copy,
   HelpCircle,
   KeyRound,
+  Link2,
   Loader2,
   Pencil,
   ShieldMinus,
@@ -17,6 +18,7 @@ import { toast } from "sonner";
 import { setUserRole } from "@/app/(app)/admin/actions";
 import {
   deleteUser,
+  getConfirmLink,
   resetUserPassword,
   suggestPassword,
   updateUserData,
@@ -26,6 +28,7 @@ import { formatDate } from "@/lib/format";
 import { ELO_CAP, initialEloFromGc, levelForElo } from "@/lib/levels";
 import { cn } from "@/lib/utils";
 import type { ManagedUser } from "@/services/admin-users";
+import { ConfirmLinkBox } from "../players/confirm-link-box";
 import { LevelBadge } from "../players/level-badge";
 import { useLevels } from "../players/levels-context";
 import { Avatar } from "../ui/avatar";
@@ -35,7 +38,7 @@ import { Dialog, DialogClose, DialogContent } from "../ui/dialog";
 import { Input, Label, Select } from "../ui/input";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 
-type Action = "edit" | "elo" | "password" | "role" | "delete";
+type Action = "edit" | "elo" | "password" | "link" | "role" | "delete";
 
 /**
  * Gerenciamento de usuários (admin): editar dados e Steam, ELO, senha,
@@ -130,6 +133,9 @@ export function UsersTable({
                         <IconButton label="Resetar senha" onClick={act("password")}>
                           <KeyRound />
                         </IconButton>
+                        <IconButton label="Link pessoal de confirmação" onClick={act("link")}>
+                          <Link2 />
+                        </IconButton>
                         {canManageAdmins && !u.isSuperAdmin && (
                           <IconButton
                             label={u.role === "admin" ? "Remover administrador" : "Tornar administrador"}
@@ -166,6 +172,14 @@ export function UsersTable({
         {open?.action === "edit" && <EditDialog user={open.user} onDone={close} />}
         {open?.action === "elo" && <EloDialog user={open.user} onDone={close} />}
         {open?.action === "password" && <PasswordDialog user={open.user} onDone={close} />}
+        {open?.action === "link" && (
+          <DialogContent
+            title="Link pessoal de confirmação"
+            description={`Envie no privado de ${open.user.displayName}. Ao abrir uma vez, o celular fica lembrado e o link do grupo confirma presença sem login.`}
+          >
+            <ConfirmLinkBox name={open.user.displayName} load={(rotate) => getConfirmLink(open.user.id, rotate)} />
+          </DialogContent>
+        )}
         {open?.action === "role" && <RoleDialog user={open.user} onDone={close} />}
         {open?.action === "delete" && <DeleteDialog user={open.user} onDone={close} />}
       </Dialog>

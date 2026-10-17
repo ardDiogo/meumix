@@ -1,13 +1,13 @@
-import { CalendarClock, CheckCircle2 } from "lucide-react";
+import { CalendarClock, CheckCircle2, Link2Off, LogIn } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { JoinButton } from "@/components/registrations/join-button";
 import { LiveRefresh } from "@/components/registrations/live-refresh";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getPermissions } from "@/services/auth";
+import { confirmLinkUser } from "@/services/confirm-links";
 import { getNextMix } from "@/services/mix-events";
 
 export const metadata: Metadata = { title: "Confirmar presença" };
@@ -22,13 +22,40 @@ const when = (d: Date) => {
 
 /**
  * Link de 1 toque compartilhado no WhatsApp: com as inscrições abertas,
- * inscreve quem abre a página (mesmas regras do Dashboard).
+ * inscreve quem abre a página (mesmas regras do Dashboard). Reconhece o
+ * jogador pelo login ou pelo link pessoal lembrado neste navegador.
  */
-export default async function ConfirmarPage() {
+export default async function ConfirmarPage({ searchParams }: PageProps<"/confirmar">) {
+  const { link } = await searchParams;
   const { session } = await getPermissions();
-  if (!session) redirect("/entrar?next=/confirmar");
+  const linked = session ? null : await confirmLinkUser();
+  const viewer = session ? { id: session.id, displayName: session.displayName } : linked;
 
-  const result = await getNextMix(session.id).catch(() => null);
+  if (!viewer) {
+    const invalid = link === "invalido";
+    return (
+      <Card className="mx-auto max-w-lg">
+        <EmptyState
+          icon={invalid ? Link2Off : LogIn}
+          title={invalid ? "Link pessoal inválido ou substituído" : "Quem é você?"}
+          description={
+            invalid
+              ? "Esse link foi trocado por um novo. Peça o link atualizado a um administrador ou entre na sua conta."
+              : "Entre na sua conta ou abra uma vez o seu link pessoal (peça a um administrador) para confirmar sem login."
+          }
+          action={
+            <Button variant="primary" asChild>
+              <Link href="/entrar?next=/confirmar">
+                <LogIn /> Entrar
+              </Link>
+            </Button>
+          }
+        />
+      </Card>
+    );
+  }
+
+  const result = await getNextMix(viewer.id).catch(() => null);
   if (!result || result.status !== "ok") {
     return (
       <Card className="mx-auto max-w-lg">
@@ -49,7 +76,7 @@ export default async function ConfirmarPage() {
   }
 
   const { schedule, occurrence, registrations } = result.mix;
-  const mine = registrations.find((r) => r.userId === session.id);
+  const mine = registrations.find((r) => r.userId === viewer.id);
   const classified = registrations.filter((r) => r.status === "classified").length;
 
   return (
@@ -85,9 +112,18 @@ export default async function ConfirmarPage() {
             autoJoin
             loginNext="/confirmar"
           />
-          <Link href="/dashboard" className="inline-block text-sm text-muted hover:text-brand">
-            Ver lista completa e votações no Dashboard →
-          </Link>
+          {linked ? (
+            <p className="text-xs text-subtle">
+              Confirmando como <span className="font-medium text-fg">{linked.displayName}</span> pelo link pessoal ·{" "}
+              <a href="/confirmar/sair" className="underline hover:text-brand">
+                Não é você?
+              </a>
+            </p>
+          ) : (
+            <Link href="/dashboard" className="inline-block text-sm text-muted hover:text-brand">
+              Ver lista completa e votações no Dashboard →
+            </Link>
+          )}
         </div>
       </Card>
     </div>

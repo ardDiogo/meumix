@@ -1,4 +1,4 @@
-import { Database, Plug, UserRound, Users } from "lucide-react";
+import { Database, Link2, Plug, UserRound, Users } from "lucide-react";
 import type { Metadata } from "next";
 import { NotImplementedButton } from "@/components/not-implemented";
 import { PageHeader } from "@/components/page-header";
@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { INTEGRATIONS } from "@/lib/integrations";
+import { ConfirmLinkBox } from "@/components/players/confirm-link-box";
 import { SteamLinkForm } from "@/components/players/steam-link-form";
+import { myConfirmLink } from "./actions";
 import { getDataSource } from "@/services";
 import { getSession } from "@/services/auth";
 import { profileAvatars } from "@/services/avatars";
@@ -49,6 +51,22 @@ export default async function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {session && (
+          <Card>
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <Link2 className="size-4 text-muted" /> Confirmação rápida (sem login)
+                </span>
+              }
+              description="Abra este link uma vez no celular: depois, o link do grupo do WhatsApp confirma sua presença com 1 toque, mesmo sem login."
+            />
+            <CardContent>
+              <ConfirmLinkBox load={myConfirmLink} />
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader

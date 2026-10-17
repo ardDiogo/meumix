@@ -9,6 +9,7 @@ import { ELO_CAP, levelForElo } from "@/lib/levels";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { confirmLinkUrl, getOrCreateConfirmToken } from "@/services/confirm-links";
 import { getLevels } from "@/services/levels";
 
 export type UserActionResult = { ok: true; message: string } | { ok: false; message: string };
@@ -207,4 +208,29 @@ export async function deleteUser(userId: string): Promise<UserActionResult> {
   });
   refresh();
   return { ok: true, message: "Usuário excluído. O histórico de partidas foi mantido." };
+}
+
+/* --------------------------- Link pessoal (sem login) --------------------------- */
+
+export type ConfirmLinkResult = { ok: true; message: string; url: string } | { ok: false; message: string };
+
+/** Link pessoal de confirmação do jogador; `rotate` gera um novo e invalida o antigo. */
+export async function getConfirmLink(userId: string, rotate = false): Promise<ConfirmLinkResult> {
+  const auth = await authorize(userId);
+  if ("error" in auth) return { ok: false, message: auth.error! };
+  const token = await getOrCreateConfirmToken(userId, rotate);
+  if (!token) return { ok: false, message: "Rode a migração 0017_confirm_links.sql no Supabase." };
+  if (rotate) {
+    await audit({
+      action: "admin.rotate_confirm_link",
+      outcome: "success",
+      actorId: auth.session.id,
+      detail: { user_id: userId },
+    });
+  }
+  return {
+    ok: true,
+    message: rotate ? "Novo link gerado; o anterior parou de funcionar." : "",
+    url: await confirmLinkUrl(token),
+  };
 }

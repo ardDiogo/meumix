@@ -36,11 +36,13 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.map_toggle": "Ativou/desativou mapa",
   "admin.map_delete": "Excluiu mapa",
   "admin.levels_save": "Alterou os níveis",
+  "admin.rotate_confirm_link": "Gerou novo link pessoal",
   "badge.create": "Criou insígnia",
   "badge.delete": "Excluiu insígnia",
   "badge.grant": "Concedeu insígnia",
   "badge.revoke": "Removeu insígnia",
   "profile.steam_link": "Vinculou Steam",
+  "profile.rotate_confirm_link": "Gerou novo link pessoal",
   "player.csrep_ai": "Análise do CSRep por IA",
 };
 

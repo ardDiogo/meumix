@@ -7,6 +7,7 @@ import { currentOccurrence, registrationWindow } from "@/lib/mix-schedule";
 import { captainsDecided, CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
+import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
@@ -81,13 +82,17 @@ export async function joinMix(
   device?: string,
   clientTimestamp?: number,
 ): Promise<ActionResult> {
+  // Logado, ou reconhecido pelo link pessoal de confirmação (sem login).
   const session = await getSession();
-  if (!session) return fail("Entre na sua conta para participar do mix.", "denied");
-  const base = { action: "registration.join", actorId: session.id, scheduleId, eventDate: date };
+  const linked = session ? null : await confirmLinkUser();
+  const userId = session?.id ?? linked?.id;
+  if (!userId) return fail("Entre na sua conta para participar do mix.", "denied");
+  const base = { action: "registration.join", actorId: userId, scheduleId, eventDate: date };
   // Dados da tentativa para o log (seção 1.2: inscription_audit_logs).
   const h = await headers();
   const serverTs = Date.now();
   const meta = {
+    via: linked ? "personal_link" : "session",
     device: device ?? null,
     client_timestamp: Number.isFinite(clientTimestamp) ? new Date(clientTimestamp!).toISOString() : null,
     server_timestamp: new Date(serverTs).toISOString(),
@@ -108,7 +113,7 @@ export async function joinMix(
     .select("id")
     .eq("schedule_id", scheduleId)
     .eq("event_date", date)
-    .eq("user_id", session.id)
+    .eq("user_id", userId)
     .maybeSingle();
   if (existing) {
     await audit({ ...base, outcome: "already_registered", detail: meta });
@@ -116,7 +121,7 @@ export async function joinMix(
   }
 
   // 2. Punição ativa: atraso a partir do horário de liberação (fail-open em erro).
-  const penalty = (await activePenalties([session.id])).get(session.id);
+  const penalty = (await activePenalties([userId])).get(userId);
   if (penalty) {
     const releaseAt = ctx.occurrence.opensAt.getTime() + penalty.delaySeconds * 1000;
     const remaining = releaseAt - ctx.now.getTime();
@@ -148,7 +153,7 @@ export async function joinMix(
   const { error } = await ctx.admin.from("mix_registrations").insert({
     schedule_id: scheduleId,
     event_date: date,
-    user_id: session.id,
+    user_id: userId,
     device: device === "mobile" || device === "desktop" ? device : null,
   });
   if (error?.code === "23505") {
@@ -195,15 +200,16 @@ async function deleteRegistration(
 /** Cancela a inscrição do usuário logado (até o início do mix). */
 export async function leaveMix(scheduleId: string, date: string): Promise<ActionResult> {
   const session = await getSession();
-  if (!session) return fail("Entre na sua conta para gerenciar sua inscrição.", "denied");
+  const userId = session?.id ?? (await confirmLinkUser())?.id;
+  if (!userId) return fail("Entre na sua conta para gerenciar sua inscrição.", "denied");
 
   const ctx = await loadOccurrence(scheduleId, date);
   if ("error" in ctx) return fail(ctx.error!, "unavailable");
   if (ctx.window === "closed") return fail("O mix já começou; a inscrição não pode mais ser cancelada.", "closed");
 
-  const result = await deleteRegistration(ctx.admin, { scheduleId, date, userId: session.id }, session.id);
+  const result = await deleteRegistration(ctx.admin, { scheduleId, date, userId }, userId);
   if (result.found && "error" in result) return fail("Não foi possível cancelar a inscrição.", "error");
-  await audit({ action: "registration.leave", outcome: "success", actorId: session.id, scheduleId, eventDate: date });
+  await audit({ action: "registration.leave", outcome: "success", actorId: userId, scheduleId, eventDate: date });
 
   refresh();
   return { ok: true, message: "Inscrição cancelada." };
