@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { AddClipDialog } from "@/components/clips/add-clip-dialog";
 import { ClipCard } from "@/components/clips/clip-card";
 import { toClipViews } from "@/services/clips";
+import { allstarProfileUrl } from "@/lib/allstar";
 
 export async function generateMetadata({ params }: PageProps<"/mixes/[id]">): Promise<Metadata> {
   const detail = await getMixDetail((await params).id);
@@ -42,6 +43,14 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const guests = report?.rows.filter((r) => !r.userId) ?? [];
   const { session, canManageMixes } = await getPermissions();
   const canSendClip = kind === "supabase" && !!session;
+  // Perfil Allstar (pelo SteamID64) de quem jogou este mix, para achar os clipes da data.
+  const allstarLinks = [...new Set([...mix.teams[0].playerIds, ...mix.teams[1].playerIds])]
+    .map((id) => players.get(id))
+    .flatMap((p) => {
+      const url = p ? allstarProfileUrl(p.steamId) : null;
+      return p && url ? [{ name: p.nickname, url }] : [];
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   const clips = toClipViews(highlights, {
     players,
     mixes: new Map([[mix.id, mix]]),
@@ -321,6 +330,26 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 description="Clipes desta partida (Allstar) aparecerão aqui."
                 className="py-8"
               />
+            )}
+            {allstarLinks.length > 0 && (
+              <div className="border-t border-border px-4 py-3">
+                <p className="mb-2 text-xs text-muted">
+                  Procure os clipes de {formatDateTime(mix.scheduledAt)} no Allstar de cada jogador:
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {allstarLinks.map((l) => (
+                    <a
+                      key={l.url}
+                      href={l.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1 text-xs text-fg transition-colors hover:border-brand/50 hover:text-brand"
+                    >
+                      {l.name} <ExternalLink className="size-3" />
+                    </a>
+                  ))}
+                </div>
+              </div>
             )}
           </Card>
         </aside>
