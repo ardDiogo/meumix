@@ -44,6 +44,8 @@ export const AUDIT_LABELS: Record<string, string> = {
   "profile.steam_link": "Vinculou Steam",
   "profile.rotate_confirm_link": "Gerou novo link pessoal",
   "player.csrep_ai": "Análise do CSRep por IA",
+  "clip.add": "Enviou clipe",
+  "clip.delete": "Excluiu clipe",
 };
 
 export const AUDIT_CATEGORIES = {
@@ -53,6 +55,7 @@ export const AUDIT_CATEGORIES = {
   badge: "Insígnias",
   profile: "Perfil",
   player: "IA / CSRep",
+  clip: "Clipes",
 } as const;
 
 export const auditLabel = (action: string) => AUDIT_LABELS[action] ?? action;

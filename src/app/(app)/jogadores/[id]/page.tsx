@@ -1,4 +1,4 @@
-import { ArrowLeft, Crosshair, Flame, Link2, ShieldCheck, Trophy } from "lucide-react";
+import { ArrowLeft, Clapperboard, Crosshair, ExternalLink, Flame, Link2, ShieldCheck, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -19,10 +19,13 @@ import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import { eloChangeSince, toEloSeries } from "@/lib/elo";
 import { formatDate, formatDecimal, formatPercent } from "@/lib/format";
 import { steamProfileUrl } from "@/lib/integrations/steam";
+import { allstarProfileUrl } from "@/lib/allstar";
+import { ClipCard } from "@/components/clips/clip-card";
+import { toClipViews } from "@/services/clips";
 import { mapName } from "@/lib/maps";
 import { seriesScore } from "@/lib/stats";
 import { getDataSource } from "@/services";
-import { getPlayerHighlights, resolvePlayerProfile, searchPlayers } from "@/services/queries";
+import { getHighlightsFeed, getPlayerHighlights, resolvePlayerProfile, searchPlayers } from "@/services/queries";
 import { playerHref, playerSlug } from "@/lib/player-slug";
 import { CsrepCard } from "@/components/players/csrep-card";
 import { getPermissions } from "@/services/auth";
@@ -59,11 +62,17 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const series = toEloSeries(eloHistory, new Map(recentMixes.map((r) => [r.mix.id, r.mix.name])));
   const recentChange = eloChangeSince(eloHistory, new Date(ds.now().getTime() - 30 * 86_400_000));
   const steamUrl = steamProfileUrl(player.steamId);
-  const [{ session, canManageMixes }, csrep, badges] = await Promise.all([
+  const allstarUrl = allstarProfileUrl(player.steamId);
+  const [{ session, canManageMixes }, csrep, badges, feed] = await Promise.all([
     getPermissions(),
     kind === "supabase" ? getCsrepView(player.id, player.steamId) : null,
     playerBadges([player.id]),
+    getHighlightsFeed(),
   ]);
+  const clips = toClipViews(
+    feed.highlights.filter((h) => h.playerId === player.id),
+    { players: feed.players, mixes: feed.mixes, viewerId: session?.id ?? null, canManage: canManageMixes },
+  );
 
   return (
     <>
@@ -123,6 +132,13 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 <Button variant="outline" size="sm" asChild>
                   <a href={csrep.url} target="_blank" rel="noopener noreferrer">
                     <Link2 /> CSRep
+                  </a>
+                </Button>
+              )}
+              {allstarUrl && (
+                <Button variant="outline" size="sm" asChild>
+                  <a href={allstarUrl} target="_blank" rel="noopener noreferrer">
+                    <Clapperboard /> Clipes no Allstar
                   </a>
                 </Button>
               )}
@@ -208,6 +224,39 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
           view={csrep}
           canEdit={!!session && (session.id === player.id || canManageMixes)}
         />
+      )}
+
+      {(clips.length > 0 || allstarUrl) && (
+        <Card className="mt-4">
+          <CardHeader
+            title="Clipes"
+            description={
+              clips.length
+                ? `${clips.length} clipe${clips.length > 1 ? "s" : ""} enviado${clips.length > 1 ? "s" : ""} ao MeuMix`
+                : "Nenhum clipe enviado ao MeuMix ainda."
+            }
+            action={
+              allstarUrl && (
+                <Button variant="ghost" size="sm" asChild>
+                  <a href={allstarUrl} target="_blank" rel="noopener noreferrer">
+                    Todos no Allstar <ExternalLink />
+                  </a>
+                </Button>
+              )
+            }
+          />
+          {clips.length > 0 && (
+            <CardContent>
+              <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {clips.slice(0, 6).map((c) => (
+                  <li key={c.id}>
+                    <ClipCard clip={c} />
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          )}
+        </Card>
       )}
 
       <ComparePlayers

@@ -24,6 +24,9 @@ import { DeleteMatchButton } from "@/components/mixes/delete-match-button";
 import { getPermissions } from "@/services/auth";
 import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
+import { AddClipDialog } from "@/components/clips/add-clip-dialog";
+import { ClipCard } from "@/components/clips/clip-card";
+import { toClipViews } from "@/services/clips";
 
 export async function generateMetadata({ params }: PageProps<"/mixes/[id]">): Promise<Metadata> {
   const detail = await getMixDetail((await params).id);
@@ -37,7 +40,14 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const report = kind === "supabase" && mix.status === "finished" ? await getMatchReport(mix.id) : null;
   const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;
   const guests = report?.rows.filter((r) => !r.userId) ?? [];
-  const { canManageMixes } = report ? await getPermissions() : { canManageMixes: false };
+  const { session, canManageMixes } = await getPermissions();
+  const canSendClip = kind === "supabase" && !!session;
+  const clips = toClipViews(highlights, {
+    players,
+    mixes: new Map([[mix.id, mix]]),
+    viewerId: session?.id ?? null,
+    canManage: canManageMixes,
+  });
   const linked = new Set(report?.rows.map((r) => r.userId).filter(Boolean));
   const linkable =
     canManageMixes && guests.length
@@ -277,26 +287,38 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
           </Card>
 
           <Card>
-            <CardHeader title="Clipes e highlights" />
-            {highlights.length ? (
-              <ul className="divide-y divide-border">
-                {highlights.map((h) => {
-                  const p = h.playerId ? players.get(h.playerId) : undefined;
-                  return (
-                    <li key={h.id} className="px-4 py-3 text-sm">
-                      <div className="font-medium">
-                        {p?.nickname} — {h.title}
-                      </div>
-                      <div className="text-xs text-subtle">{h.url ? "Clipe disponível" : "Sem mídia vinculada"}</div>
-                    </li>
-                  );
-                })}
+            <CardHeader
+              title="Clipes e highlights"
+              action={
+                canSendClip && (
+                  <AddClipDialog
+                    currentUserId={session!.id}
+                    defaultMixId={mix.id}
+                    mixes={[{ id: mix.id, label: mix.name }]}
+                    players={
+                      canManageMixes
+                        ? [...players.values()]
+                            .map((p) => ({ id: p.id, label: p.nickname }))
+                            .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"))
+                        : null
+                    }
+                  />
+                )
+              }
+            />
+            {clips.length ? (
+              <ul className="space-y-3 p-4 pt-0">
+                {clips.map((c) => (
+                  <li key={c.id}>
+                    <ClipCard clip={{ ...c, mix: null }} />
+                  </li>
+                ))}
               </ul>
             ) : (
               <EmptyState
                 icon={Clapperboard}
-                title="Nenhum highlight"
-                description="Clipes desta partida aparecerão aqui."
+                title="Nenhum clipe"
+                description="Clipes desta partida (Allstar) aparecerão aqui."
                 className="py-8"
               />
             )}

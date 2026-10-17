@@ -1,7 +1,6 @@
--- MeuMix — clipes (Allstar) e link do perfil Allstar
+-- MeuMix — clipes do Allstar enviados pelos jogadores
+-- (o perfil Allstar sai do Steam ID: allstar.gg/u/<SteamID64>)
 -- Executar depois de 0017. Pode ser executado mais de uma vez.
-
-alter table public.profiles add column if not exists allstar_url text;
 
 create table if not exists public.clips (
   id uuid primary key default gen_random_uuid(),
