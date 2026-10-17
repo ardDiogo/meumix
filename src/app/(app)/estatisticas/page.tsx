@@ -21,6 +21,9 @@ const BOARDS: { title: string; value: (s: PlayerAggregate) => number | null; for
   { title: "Maior ADR", value: (s) => s.adr, format: (n) => formatDecimal(n, 1) },
   { title: "Maior win rate", value: (s) => s.winRate, format: (n) => formatPercent(n) },
   { title: "Mais MVPs", value: (s) => s.mvps, format: (n) => String(n) },
+  { title: "Mais assistências", value: (s) => s.assists, format: (n) => formatInt(n) },
+  { title: "Mais first kills (FK)", value: (s) => s.firstKills, format: (n) => formatInt(n) },
+  { title: "Mais lanternas", value: (s) => s.lanterns, format: (n) => String(n) },
 ];
 
 export default async function StatsPage() {
