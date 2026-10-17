@@ -18,6 +18,7 @@ import {
 import type { Metadata } from "next";
 import { cache } from "react";
 import { BulkUsersForm } from "@/components/admin/bulk-users-form";
+import { BulkConfirmLinks } from "@/components/admin/bulk-confirm-links";
 import { AuditLogTable } from "@/components/admin/audit-log-table";
 import { BadgesAdmin } from "@/components/admin/badges-admin";
 import { AUDIT_CATEGORIES } from "@/lib/audit-labels";
@@ -187,6 +188,7 @@ async function UsersPanel({ canManageAdmins, currentUserId }: { canManageAdmins:
       <CardHeader
         title="Jogadores cadastrados"
         description="Edite dados e Steam, ajuste o ELO, redefina a senha ou exclua contas. Somente o master concede ou remove o papel de administrador e altera outros administradores."
+        action={<BulkConfirmLinks />}
       />
       {result.status === "ok" ? (
         result.users.length ? (

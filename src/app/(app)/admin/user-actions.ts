@@ -9,7 +9,7 @@ import { ELO_CAP, levelForElo } from "@/lib/levels";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
-import { confirmLinkUrl, getOrCreateConfirmToken } from "@/services/confirm-links";
+import { confirmLinkUrl, ensureConfirmTokens, getOrCreateConfirmToken } from "@/services/confirm-links";
 import { getLevels } from "@/services/levels";
 
 export type UserActionResult = { ok: true; message: string } | { ok: false; message: string };
@@ -232,5 +232,31 @@ export async function getConfirmLink(userId: string, rotate = false): Promise<Co
     ok: true,
     message: rotate ? "Novo link gerado; o anterior parou de funcionar." : "",
     url: await confirmLinkUrl(token),
+  };
+}
+
+export type ConfirmLinksResult =
+  { ok: true; links: { userId: string; name: string; url: string }[] } | { ok: false; message: string };
+
+/** Links pessoais de todos os jogadores (cria os que faltam), para enviar no privado. */
+export async function listConfirmLinks(): Promise<ConfirmLinksResult> {
+  const session = await getSession();
+  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem ver os links." };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "Banco de dados não configurado no servidor." };
+  const { data, error } = await admin.from("profiles").select("id, display_name").order("display_name");
+  if (error || !data) return { ok: false, message: "Não foi possível carregar os jogadores." };
+  const tokens = await ensureConfirmTokens(data.map((p) => p.id as string));
+  if (!tokens) return { ok: false, message: "Rode a migração 0017_confirm_links.sql no Supabase." };
+  const base = (await confirmLinkUrl("x")).slice(0, -1);
+  return {
+    ok: true,
+    links: data
+      .filter((p) => tokens.has(p.id as string))
+      .map((p) => ({
+        userId: p.id as string,
+        name: (p.display_name as string) ?? "Jogador",
+        url: base + tokens.get(p.id as string)!,
+      })),
   };
 }

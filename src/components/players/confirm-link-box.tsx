@@ -4,6 +4,7 @@ import { Copy, Loader2, MessageCircle, RefreshCw } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
 import type { ConfirmLinkResult } from "@/app/(app)/admin/user-actions";
+import { confirmLinkMessage } from "@/lib/confirm-link-message";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 
@@ -45,9 +46,7 @@ export function ConfirmLinkBox({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const message = url
-    ? `${name ? `Fala, ${name}! ` : ""}Esse é o seu link pessoal do MeuMix 🎮\nAbra uma vez neste celular: depois é só tocar no link do grupo para confirmar presença, sem login.\n${url}\n\n⚠️ Não repasse: quem tiver o link confirma presença no seu nome.`
-    : "";
+  const message = url ? confirmLinkMessage(url, name) : "";
 
   if (error) return <p className="text-sm text-loss">{error}</p>;
   if (!url) {

@@ -57,6 +57,32 @@ export async function getOrCreateConfirmToken(userId: string, rotate = false): P
   return error ? null : token;
 }
 
+/** Códigos de vários jogadores de uma vez, criando os que faltam. */
+export async function ensureConfirmTokens(userIds: string[]): Promise<Map<string, string> | null> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return null;
+  const { data, error } = await admin.from("confirm_links").select("user_id, token").in("user_id", userIds);
+  if (error) return null;
+  const tokens = new Map((data ?? []).map((r) => [r.user_id as string, r.token as string]));
+  const missing = userIds
+    .filter((id) => !tokens.has(id))
+    .map((user_id) => ({ user_id, token: newToken(), created_at: new Date().toISOString() }));
+  if (missing.length) {
+    // ignoreDuplicates: se outro admin criou ao mesmo tempo, relê abaixo.
+    const ins = await admin.from("confirm_links").upsert(missing, { onConflict: "user_id", ignoreDuplicates: true });
+    if (ins.error) return null;
+    const again = await admin
+      .from("confirm_links")
+      .select("user_id, token")
+      .in(
+        "user_id",
+        missing.map((m) => m.user_id),
+      );
+    for (const r of again.data ?? []) tokens.set(r.user_id as string, r.token as string);
+  }
+  return tokens;
+}
+
 export async function confirmLinkUrl(token: string) {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host");
