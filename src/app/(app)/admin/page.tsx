@@ -3,6 +3,7 @@ import {
   CalendarClock,
   Flag,
   KeyRound,
+  Plug,
   Map as MapIcon,
   Music,
   ScrollText,
@@ -29,6 +30,8 @@ import { GcExample } from "@/components/admin/gc-example";
 import { LevelsEditor } from "@/components/admin/levels-editor";
 import { MapsManager } from "@/components/admin/maps-manager";
 import { MusicSettings } from "@/components/admin/music-settings";
+import { CsrepApiPanel } from "@/components/admin/csrep-api-panel";
+import { csrepApiConfigured } from "@/lib/integrations/csrep-api";
 import { ScheduleList } from "@/components/admin/schedule-list";
 import { FeatureToggles } from "@/components/admin/feature-toggles";
 import { PenaltiesPanel } from "@/components/admin/penalties-panel";
@@ -327,6 +330,13 @@ async function SettingsTab({ canManageAdmins }: { canManageAdmins: boolean }) {
           description="Configure os níveis de ELO e suas faixas de pontuação. Os jogadores são classificados automaticamente com base no ELO acumulado nos resultados dos mixes."
         />
         <LevelsEditor levels={levels} canEdit={canManageAdmins} />
+      </Card>
+      <Card>
+        <CardHeader
+          title={title(Plug, "API do CSRep")}
+          description="Diagnóstico da integração: busca a especificação da API e testa endpoints usando a chave salva na Vercel."
+        />
+        <CsrepApiPanel configured={csrepApiConfigured()} />
       </Card>
     </div>
   );
