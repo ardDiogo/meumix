@@ -42,9 +42,13 @@ export function MixList({
           <li key={mix.id} className="flex items-center">
             <Link
               href={mixHref(mix)}
-              className="group grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-surface-2 sm:grid-cols-[9rem_1fr_auto_auto]"
+              className={cn(
+                "group grid min-w-0 flex-1 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-surface-2",
+                // Lista completa: primeiro o jogo, depois a data.
+                compact ? "sm:grid-cols-[9rem_1fr_auto_auto]" : "sm:grid-cols-[1fr_11rem_auto_auto]",
+              )}
             >
-              <div className="min-w-0">
+              <div className={cn("min-w-0", !compact && "sm:col-start-2 sm:row-start-1")}>
                 <div className="font-medium text-fg">{mix.name}</div>
                 <div className="text-xs text-muted">{formatDateTime(mix.scheduledAt)}</div>
               </div>
@@ -52,7 +56,7 @@ export function MixList({
               <div
                 className={cn(
                   "col-span-2 row-start-2 min-w-0 sm:col-span-1 sm:row-start-auto",
-                  compact && "sm:hidden lg:block",
+                  compact ? "sm:hidden lg:block" : "sm:col-start-1 sm:row-start-1",
                 )}
               >
                 <div className="flex min-w-0 items-center gap-2 text-sm">
