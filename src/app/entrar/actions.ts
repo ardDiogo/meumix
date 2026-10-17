@@ -82,7 +82,19 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
       emailRedirectTo: `${await origin()}/auth/callback?next=/dashboard`,
     },
   });
-  if (error) return { status: "error", message: authErrorMessage(error.code), email };
+  if (error) {
+    // 5xx no cadastro costuma ser o envio do e-mail de confirmação recusado pelo SMTP.
+    if ((error.status ?? 0) >= 500) {
+      console.error("[signUp]", error.status, error.code, error.message);
+      return {
+        status: "error",
+        message:
+          "Não foi possível enviar o e-mail de confirmação. Tente mais tarde ou peça a um administrador para criar sua conta.",
+        email,
+      };
+    }
+    return { status: "error", message: authErrorMessage(error.code), email };
+  }
 
   // Com confirmação de e-mail desativada no Supabase, a sessão já vem pronta.
   if (data.session) redirect("/dashboard");
