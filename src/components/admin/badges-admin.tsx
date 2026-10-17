@@ -73,7 +73,13 @@ export function BadgesAdmin({
 
 function CreateBadge() {
   const [pending, run] = useRun();
-  const [form, setForm] = useState({ name: "", description: "", icon: "trophy", color: BADGE_COLORS[0]! });
+  const [form, setForm] = useState({
+    name: "",
+    description: "",
+    unlock: "",
+    icon: "trophy",
+    color: BADGE_COLORS[0]!,
+  });
   return (
     <Card className="self-start">
       <CardHeader title="Criar insígnia" description="Escolha nome, ícone e cor." />
@@ -104,6 +110,16 @@ function CreateBadge() {
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
             placeholder="Ex.: Venceu 3 clutches 1v3 no mesmo mix"
+          />
+        </div>
+        <div>
+          <Label htmlFor="badge-unlock">Como desbloquear (opcional)</Label>
+          <Input
+            id="badge-unlock"
+            maxLength={200}
+            value={form.unlock}
+            onChange={(e) => setForm((f) => ({ ...f, unlock: e.target.value }))}
+            placeholder="Ex.: Participar de 50 mixes completos"
           />
         </div>
         <div>
@@ -169,7 +185,7 @@ function CreateBadge() {
           onClick={() =>
             run(
               () => createBadge(form),
-              () => setForm((f) => ({ ...f, name: "", description: "" })),
+              () => setForm((f) => ({ ...f, name: "", description: "", unlock: "" })),
             )
           }
         >
@@ -188,6 +204,11 @@ function BadgeRow({ badge }: { badge: Badge }) {
       <div className="min-w-0 flex-1">
         <div className="font-medium">{badge.name}</div>
         {badge.description && <div className="truncate text-xs text-muted">{badge.description}</div>}
+        {badge.unlock && (
+          <div className="text-xs text-subtle">
+            <span className="font-medium text-muted">Desbloqueio:</span> {badge.unlock}
+          </div>
+        )}
       </div>
       <span className="text-xs text-muted tabular">
         {badge.holders} {badge.holders === 1 ? "jogador" : "jogadores"}

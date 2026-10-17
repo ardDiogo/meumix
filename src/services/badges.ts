@@ -5,6 +5,8 @@ export interface Badge {
   id: string;
   name: string;
   description: string | null;
+  /** Como conquistar (concedida pelo admin). */
+  unlock: string | null;
   icon: string;
   color: string;
   holders: number;
@@ -16,6 +18,7 @@ export interface PlayerBadge {
   userId: string;
   name: string;
   description: string | null;
+  unlock: string | null;
   icon: string;
   color: string;
   note: string | null;
@@ -27,7 +30,7 @@ export async function listBadges(): Promise<Badge[] | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
   const [{ data, error }, { data: links }] = await Promise.all([
-    supabase.from("badges").select("id, name, description, icon, color").order("created_at"),
+    supabase.from("badges").select("*").order("created_at"),
     supabase.from("player_badges").select("badge_id"),
   ]);
   if (error) return null;
@@ -37,6 +40,7 @@ export async function listBadges(): Promise<Badge[] | null> {
     id: b.id as string,
     name: b.name as string,
     description: (b.description as string | null) ?? null,
+    unlock: (b.unlock_rule as string | null | undefined) ?? null,
     icon: b.icon as string,
     color: b.color as string,
     holders: count.get(b.id as string) ?? 0,
@@ -49,7 +53,7 @@ export async function playerBadges(userIds?: string[]): Promise<PlayerBadge[]> {
   if (!supabase || (userIds && !userIds.length)) return [];
   let query = supabase
     .from("player_badges")
-    .select("id, user_id, badge_id, note, created_at, badges(name, description, icon, color)")
+    .select("id, user_id, badge_id, note, created_at, badges(*)")
     .order("created_at", { ascending: false });
   if (userIds) query = query.in("user_id", userIds);
   const { data, error } = await query;
@@ -58,6 +62,7 @@ export async function playerBadges(userIds?: string[]): Promise<PlayerBadge[]> {
     const b = (Array.isArray(r.badges) ? r.badges[0] : r.badges) as {
       name: string;
       description: string | null;
+      unlock_rule?: string | null;
       icon: string;
       color: string;
     } | null;
@@ -67,6 +72,7 @@ export async function playerBadges(userIds?: string[]): Promise<PlayerBadge[]> {
       userId: r.user_id as string,
       name: b?.name ?? "Insígnia",
       description: b?.description ?? null,
+      unlock: b?.unlock_rule ?? null,
       icon: b?.icon ?? "trophy",
       color: b?.color ?? "#FF6A00",
       note: (r.note as string | null) ?? null,

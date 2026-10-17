@@ -44,6 +44,7 @@ function refresh() {
 export async function createBadge(input: {
   name: string;
   description: string;
+  unlock?: string;
   icon: string;
   color: string;
 }): Promise<BadgeResult> {
@@ -53,6 +54,8 @@ export async function createBadge(input: {
   const description = input.description.trim();
   if (name.length < 2 || name.length > 40) return { ok: false, message: "Nome: de 2 a 40 caracteres." };
   if (description.length > 200) return { ok: false, message: "Descrição: até 200 caracteres." };
+  const unlock = (input.unlock ?? "").trim();
+  if (unlock.length > 200) return { ok: false, message: "Desbloqueio: até 200 caracteres." };
   if (!ICONS.has(input.icon)) return { ok: false, message: "Ícone inválido." };
   if (!/^#[0-9a-f]{6}$/i.test(input.color)) return { ok: false, message: "Cor inválida." };
   const { error } = await auth.admin.from("badges").insert({
@@ -61,6 +64,8 @@ export async function createBadge(input: {
     icon: input.icon,
     color: input.color.toUpperCase(),
     created_by: auth.session.id,
+    // Só envia a coluna quando preenchida (ela vem da migração 0021).
+    ...(unlock ? { unlock_rule: unlock } : {}),
   });
   if (error) {
     return {
@@ -69,7 +74,9 @@ export async function createBadge(input: {
         error.code === "23505"
           ? "Já existe uma insígnia com esse nome."
           : missing(error.code)
-            ? MIGRATION_HINT
+            ? unlock
+              ? "Rode a migração 0021_badges_more.sql no Supabase para salvar o desbloqueio."
+              : MIGRATION_HINT
             : "Não foi possível criar.",
     };
   }

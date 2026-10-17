@@ -105,7 +105,10 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 {badges.map((b) => (
                   <li
                     key={b.id}
-                    title={[b.description, b.note].filter(Boolean).join(" · ") || b.name}
+                    title={
+                      [b.description, b.unlock && `Desbloqueio: ${b.unlock}`, b.note].filter(Boolean).join(" · ") ||
+                      b.name
+                    }
                     className="flex items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-0.5 text-xs font-semibold"
                     style={{ borderColor: `${b.color}55`, color: b.color }}
                   >
