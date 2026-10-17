@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { currentOccurrence, registrationWindow } from "@/lib/mix-schedule";
-import { CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
+import { captainsDecided, CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { activePenalties } from "@/services/penalties";
@@ -73,14 +74,30 @@ async function orderedRegistrations(
 /* ------------------------------- Inscrição ------------------------------- */
 
 /** Inscreve o usuário logado no mix (seção 2). */
-export async function joinMix(scheduleId: string, date: string, device?: string): Promise<ActionResult> {
+export async function joinMix(
+  scheduleId: string,
+  date: string,
+  device?: string,
+  clientTimestamp?: number,
+): Promise<ActionResult> {
   const session = await getSession();
   if (!session) return fail("Entre na sua conta para participar do mix.", "denied");
   const base = { action: "registration.join", actorId: session.id, scheduleId, eventDate: date };
+  // Dados da tentativa para o log (seção 1.2: inscription_audit_logs).
+  const h = await headers();
+  const serverTs = Date.now();
+  const meta = {
+    device: device ?? null,
+    client_timestamp: Number.isFinite(clientTimestamp) ? new Date(clientTimestamp!).toISOString() : null,
+    server_timestamp: new Date(serverTs).toISOString(),
+    time_diff_ms: Number.isFinite(clientTimestamp) ? serverTs - clientTimestamp! : null,
+    user_agent: h.get("user-agent")?.slice(0, 200) ?? null,
+    ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null,
+  };
 
   const ctx = await loadOccurrence(scheduleId, date);
   if ("error" in ctx) {
-    await audit({ ...base, outcome: "error", detail: { reason: ctx.error } });
+    await audit({ ...base, outcome: "error", detail: { ...meta, reason: ctx.error } });
     return fail(ctx.error!, "retryable" in ctx ? "error" : "unavailable");
   }
 
@@ -93,7 +110,7 @@ export async function joinMix(scheduleId: string, date: string, device?: string)
     .eq("user_id", session.id)
     .maybeSingle();
   if (existing) {
-    await audit({ ...base, outcome: "already_registered" });
+    await audit({ ...base, outcome: "already_registered", detail: meta });
     return { ok: true, message: "Você já está inscrito neste mix." };
   }
 
@@ -106,7 +123,7 @@ export async function joinMix(scheduleId: string, date: string, device?: string)
       await audit({
         ...base,
         outcome: "penalty",
-        detail: { penalty_id: penalty.id, seconds_remaining: Math.ceil(remaining / 1000) },
+        detail: { ...meta, penalty_id: penalty.id, seconds_remaining: Math.ceil(remaining / 1000) },
       });
       return fail(
         `Você está com uma punição ativa. Sua inscrição libera em ${Math.ceil(remaining / 1000)}s.`,
@@ -118,11 +135,11 @@ export async function joinMix(scheduleId: string, date: string, device?: string)
   // 3. Cedo demais (relógio do servidor, tolerância de 1s).
   const msToOpen = ctx.occurrence.opensAt.getTime() - ctx.now.getTime();
   if (msToOpen > EARLY_TOLERANCE_MS) {
-    await audit({ ...base, outcome: "too_early", detail: { ms_to_open: msToOpen } });
+    await audit({ ...base, outcome: "too_early", detail: { ...meta, ms_to_open: msToOpen } });
     return fail(`As inscrições abrem em ${Math.ceil(msToOpen / 1000)}s.`, "too_early");
   }
   if (ctx.window === "closed") {
-    await audit({ ...base, outcome: "closed" });
+    await audit({ ...base, outcome: "closed", detail: meta });
     return fail("As inscrições para este mix já foram encerradas.", "closed");
   }
 
@@ -134,15 +151,15 @@ export async function joinMix(scheduleId: string, date: string, device?: string)
     device: device === "mobile" || device === "desktop" ? device : null,
   });
   if (error?.code === "23505") {
-    await audit({ ...base, outcome: "already_registered" });
+    await audit({ ...base, outcome: "already_registered", detail: meta });
     return { ok: true, message: "Você já está inscrito neste mix." };
   }
   if (error) {
-    await audit({ ...base, outcome: "error", detail: { code: error.code, message: error.message } });
+    await audit({ ...base, outcome: "error", detail: { ...meta, code: error.code, message: error.message } });
     return fail("Falha temporária ao registrar a inscrição.", "error");
   }
 
-  await audit({ ...base, outcome: "success", detail: { device } });
+  await audit({ ...base, outcome: "success", detail: meta });
   refresh();
   return { ok: true, message: "Inscrição confirmada!" };
 }
@@ -316,8 +333,13 @@ export async function submitCaptainVotes(
 
   // Todos os classificados votaram nos 2 capitães: a disputa começa sozinha.
   if (v.classified.length >= v.ctx.schedule.maxPlayers) {
-    const { data: votes } = await v.ctx.admin.from("captain_votes").select("voter_id").match(occurrence);
+    const { data: votes } = await v.ctx.admin.from("captain_votes").select("voter_id, candidate_id").match(occurrence);
     const cast = (votes ?? []).filter((x) => v.classified.includes(x.voter_id as string)).length;
+    // Começa antes se o 2º colocado já não pode ser alcançado (seção 4).
+    const decided = captainsDecided(
+      v.classified,
+      (votes ?? []).map((x) => ({ voter: x.voter_id as string, candidate: x.candidate_id as string })),
+    );
     // Com sugestão de times ainda em votação, espera o resultado dela.
     const { data: pending } = await v.ctx.admin
       .from("mix_team_suggestions")
@@ -325,7 +347,7 @@ export async function submitCaptainVotes(
       .match(occurrence)
       .eq("status", "pending")
       .maybeSingle();
-    if (cast >= v.ctx.schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER && !pending) {
+    if ((cast >= v.ctx.schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER || decided) && !pending) {
       await v.ctx.admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
     }
   }

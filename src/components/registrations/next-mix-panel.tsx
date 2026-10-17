@@ -407,7 +407,7 @@ export async function NextMixPanel() {
           <span className="font-semibold text-fg">
             {votes.captainVotesCast}/{votesNeeded} votações
           </span>{" "}
-          para iniciar a seleção de equipes.
+          para iniciar a seleção de equipes (começa antes se os 2 capitães já estiverem garantidos).
         </div>
       </Card>
     </section>

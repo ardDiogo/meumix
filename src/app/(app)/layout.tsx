@@ -35,7 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
-      <MusicSettingsWatcher />
+      <MusicSettingsWatcher snapshot={JSON.stringify({ features, musicUrl })} />
       {features.background_music && musicUrl && <BackgroundMusic url={musicUrl} />}
     </LevelsProvider>
   );

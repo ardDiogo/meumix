@@ -23,7 +23,7 @@ function describe(detail: Record<string, unknown> | null, names: Map<string, str
   };
   return Object.entries(detail)
     .filter(([, v]) => v != null && v !== "")
-    .slice(0, 5)
+    .slice(0, 8)
     .map(([k, v]) => `${k}: ${fmt(v)}`)
     .join(" · ");
 }

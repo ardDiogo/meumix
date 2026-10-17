@@ -84,9 +84,35 @@ export function BackgroundMusic({ url }: { url: string }) {
   );
 }
 
-/** Atualiza a página quando o admin liga/desliga a música (até em abas já abertas). */
-export function MusicSettingsWatcher() {
+/**
+ * Atualiza a página quando o admin muda as chaves de funcionalidade ou a música
+ * (até em abas já abertas): tempo real + consulta de segurança a cada 10 s.
+ */
+export function MusicSettingsWatcher({ snapshot }: { snapshot: string }) {
   const router = useRouter();
+  const current = useRef(snapshot);
+  useEffect(() => {
+    current.current = snapshot;
+  }, [snapshot]);
+
+  useEffect(() => {
+    const id = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch("/api/flags", { cache: "no-store" });
+        if (!res.ok) return;
+        const next = JSON.stringify(await res.json());
+        if (next !== current.current) {
+          current.current = next;
+          router.refresh();
+        }
+      } catch {
+        // Sem rede: tenta na próxima.
+      }
+    }, 10_000);
+    return () => clearInterval(id);
+  }, [router]);
+
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;

@@ -118,3 +118,9 @@ O login usa **Supabase Auth** (e-mail e senha, confirmação por e-mail e recupe
 3. Persistir criação de mixes (Server Actions) e registro de placares/estatísticas.
 4. Integração Steam (OpenID + Web API) e, depois, CSRep e Twitch.
 5. Suporte a múltiplas comunidades (seletor de comunidade, rankings por comunidade).
+
+## API pública de histórico
+
+`GET /api/historico` devolve os mixes finalizados em JSON (sem e-mails), com placar, mapas e estatísticas por jogador.
+Parâmetros opcionais: `jogador` (nick ou id), `de` e `ate` (AAAA-MM-DD) e `limite` (1–100, padrão 20).
+Exemplo: `https://meumix.vercel.app/api/historico?jogador=barker&limite=5`.

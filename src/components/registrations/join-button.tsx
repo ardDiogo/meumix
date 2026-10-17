@@ -89,7 +89,7 @@ export function JoinButton({
     setProcessing(true);
     let result: Awaited<ReturnType<typeof joinMix>> | null = null;
     try {
-      result = await joinMix(scheduleId, date, item.device);
+      result = await joinMix(scheduleId, date, item.device, Date.now());
     } catch {
       result = null; // Falha de rede/servidor: tenta de novo.
     }
