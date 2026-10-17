@@ -1,4 +1,4 @@
-import { ArrowLeft, Clapperboard, Crosshair, ExternalLink, Flame, Link2, ShieldCheck, Trophy } from "lucide-react";
+import { ArrowLeft, Crosshair, ExternalLink, Flame, Link2, ShieldCheck, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -151,14 +151,14 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
               {csrep?.url && (
                 <Button variant="outline" size="sm" asChild>
                   <a href={csrep.url} target="_blank" rel="noopener noreferrer">
-                    <Link2 /> CSRep
+                    <BrandLogo src="/brands/csrep.png" /> CSRep
                   </a>
                 </Button>
               )}
               {allstarUrl && (
                 <Button variant="outline" size="sm" asChild>
                   <a href={allstarUrl} target="_blank" rel="noopener noreferrer">
-                    <Clapperboard /> Clipes no Allstar
+                    <BrandLogo src="/brands/allstar.png" /> Clipes no Allstar
                   </a>
                 </Button>
               )}
@@ -389,4 +389,10 @@ function Highlight({
       <dd className="mt-1 font-display text-xl font-bold tabular">{value}</dd>
     </div>
   );
+}
+
+/** Logo de um serviço externo (PNG sem fundo) no tamanho dos ícones dos botões. */
+function BrandLogo({ src }: { src: string }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt="" aria-hidden className="size-4 shrink-0 object-contain" />;
 }
