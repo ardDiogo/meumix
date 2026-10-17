@@ -23,12 +23,12 @@ Legenda — **Leitura**: quem lê pela API com a chave pública. **Escrita**: se
 
 ### Contas e perfis
 
-| Tabela           | Leitura (API)               | Escrita (servidor)                     | Dados pessoais                                                | Situação      |
-| ---------------- | --------------------------- | -------------------------------------- | ------------------------------------------------------------- | ------------- |
-| `profiles`       | **todos, todas as colunas** | jogador (próprio nick via API!), admin | nick, **nome completo**, Steam ID, avatar, Twitch, CSRep, ELO | ❌ P-01, P-13 |
-| `confirm_links`  | ninguém                     | servidor                               | token do link pessoal                                         | ✅            |
-| `user_penalties` | ninguém                     | admin                                  | penalidades                                                   | ✅            |
-| `audit_log`      | ninguém                     | servidor                               | ator, **IP, user agent** (em `detail`)                        | ⚠️ P-02       |
+| Tabela           | Leitura (API)                                   | Escrita (servidor)                    | Dados pessoais                                                      | Situação      |
+| ---------------- | ----------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------- | ------------- |
+| `profiles`       | todos, **menos `full_name`** (grant por coluna) | servidor (jogador pelas ações; admin) | nick, nome completo (privado), Steam ID, avatar, Twitch, CSRep, ELO | ✅ P-01, P-13 |
+| `confirm_links`  | ninguém                                         | servidor                              | token do link pessoal                                               | ✅            |
+| `user_penalties` | ninguém                                         | admin                                 | penalidades                                                         | ✅            |
+| `audit_log`      | ninguém                                         | servidor                              | ator, **IP, user agent** (em `detail`)                              | ⚠️ P-02       |
 
 ### Mixes, inscrições e votações
 
@@ -66,24 +66,20 @@ Legenda — **Leitura**: quem lê pela API com a chave pública. **Escrita**: se
 leitura, vazias. **Proposta (P-08):** remover numa migração, ou reaproveitar `community_members`
 quando houver várias comunidades.
 
-## 2.3 Políticas alvo — mudanças propostas
+## 2.3 Políticas aplicadas na 0023 (P-01, P-13)
 
-```sql
--- P-01: nome completo e campos internos fora da leitura pública (grant por coluna).
-revoke select on public.profiles from anon, authenticated;
-grant select (id, display_name, elo, level, gc_level, mixes_played, total_kills, total_deaths,
-              total_wins, total_losses, avg_adr, avg_kast, avatar_url, steam_id, steam_url,
-              csrep_url, twitch_login, role, created_at)
-  on public.profiles to anon, authenticated;
--- full_name, steam_synced_at e futuros campos privados: só service_role.
+Ver `supabase/migrations/0023_profiles_privacy.sql`:
 
--- P-13: o nick deixa de ser editável direto pela API (passa pela validação do servidor).
-revoke update (display_name) on public.profiles from authenticated;
-drop policy if exists "usuario edita o proprio perfil" on public.profiles;
-```
+- **P-01:** `revoke select` da tabela inteira e `grant select (colunas)` para `anon` e
+  `authenticated` com **todas as colunas menos `full_name`**. O nome completo só é lido pelo
+  servidor (painel de admin).
+- **P-13:** `revoke update` de `anon`/`authenticated` e remoção da política
+  `"usuario edita o proprio perfil"`. O nick só muda pelas ações do servidor, que validam.
 
-A lista exata de colunas será conferida contra as consultas do código antes de aplicar (uma
-coluna esquecida quebra a tela que a lê).
+**Regra para colunas novas em `profiles`:** com o _grant_ por coluna, uma coluna nova **não** fica
+legível pela API até a migração que a cria incluir
+`grant select (coluna) on public.profiles to anon, authenticated` — o que é o comportamento
+seguro (privado por padrão). Se a coluna for pública e lida pelo site, a migração precisa do _grant_.
 
 ## 2.4 Comunidades (isolamento)
 

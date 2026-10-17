@@ -57,6 +57,13 @@ fluxo de exclusão de conta, download dos dados.
 - Todas as migrações aplicam do zero e são idempotentes (Postgres 16 local).
 - Todas as ações `"use server"` têm checagem de sessão/papel ou só chamam auxiliares que checam
   (`suggestPassword` não acessa dados).
-- `UPDATE` em `profiles` limitado à coluna `display_name` por _grant_.
 
-Nada disso substitui os testes automatizados acima, que ainda não existem (P-11).
+## 4.4 Automatizados (camada 1)
+
+`npm run test:rls` (`scripts/test-rls.sh` + `supabase/tests/rls.sql`) cria um Postgres descartável,
+aplica todas as migrações e roda **S-01, S-01b, S-02b, S-02c, S-05, S-05b e S-05c**, além de
+conferir que **toda** tabela de `public` tem RLS e que não existe política de escrita para
+`anon`/`authenticated`. As tabelas privadas recebem dados antes do teste, para que uma leitura
+indevida apareça como falha. Controle negativo feito: sem a migração 0023 o teste **falha** em S-01b.
+
+Ainda faltam: rodar no GitHub Actions, a camada 2 (server actions) e a 3 (ponta a ponta) — P-11.

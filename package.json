@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:rls": "bash scripts/test-rls.sh"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.3.1",
