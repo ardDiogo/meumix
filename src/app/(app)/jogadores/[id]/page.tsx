@@ -37,6 +37,7 @@ import { BadgeIcon } from "@/components/badges/badge-icon";
 import { playerBadges } from "@/services/badges";
 import { mixHref } from "@/lib/mix-slug";
 import { MapIcon } from "@/components/maps/map-icon";
+import { SteamIcon } from "@/components/players/steam-icon";
 import { TwitchIcon } from "@/components/twitch/twitch-icon";
 import { TwitchStreams } from "@/components/twitch/twitch-streams";
 import { twitchChannelUrl } from "@/lib/twitch";
@@ -139,7 +140,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
               {steamUrl ? (
                 <Button variant="outline" size="sm" asChild>
                   <a href={steamUrl} target="_blank" rel="noopener noreferrer">
-                    <Link2 /> Perfil Steam
+                    <SteamIcon className="text-[#66C0F4]" /> Perfil Steam
                   </a>
                 </Button>
               ) : (
