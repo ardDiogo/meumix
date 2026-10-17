@@ -6,6 +6,7 @@ import { canManageAdmins, canManageMixes, isSuperAdminEmail } from "@/lib/auth/p
 import { validateDisplayName, validatePassword } from "@/lib/auth/validation";
 import { fetchSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
 import { resolveTwitchLogin } from "@/services/twitch";
+import { deleteAccount } from "@/services/account";
 import { ELO_CAP, levelForElo } from "@/lib/levels";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
@@ -221,16 +222,13 @@ export async function deleteUser(userId: string): Promise<UserActionResult> {
   const auth = await authorize(userId);
   if ("error" in auth) return { ok: false, message: auth.error! };
   if (auth.isSelf) return { ok: false, message: "Você não pode excluir a própria conta por aqui." };
-  const { error } = await auth.admin.auth.admin.deleteUser(userId);
-  if (error) return { ok: false, message: "Não foi possível excluir o usuário." };
-  await audit({
-    action: "admin.user_delete",
-    outcome: "success",
-    actorId: auth.session.id,
-    detail: { userId, email: auth.target.email },
-  });
+  // Mesma exclusão do "Excluir minha conta": placares anonimizados, resto apagado.
+  const result = await deleteAccount(auth.admin, userId);
+  if (!result.ok) return { ok: false, message: result.message ?? "Não foi possível excluir o usuário." };
+  // Sem e-mail nem nick no log: o titular não existe mais.
+  await audit({ action: "admin.user_delete", outcome: "success", actorId: auth.session.id });
   refresh();
-  return { ok: true, message: "Usuário excluído. O histórico de partidas foi mantido." };
+  return { ok: true, message: "Usuário excluído. Nos placares ele aparece como “Jogador removido”." };
 }
 
 /* --------------------------- Link pessoal (sem login) --------------------------- */

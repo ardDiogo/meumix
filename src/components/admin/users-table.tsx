@@ -531,8 +531,8 @@ function DeleteDialog({ user, onDone }: { user: ManagedUser; onDone: () => void 
     <DialogContent title="Excluir usuário">
       <p className="text-sm text-muted">
         A conta de <span className="font-semibold text-fg">{user.displayName}</span> ({user.email}) será excluída
-        permanentemente, junto com inscrições, votos e punições. As partidas já jogadas continuam no histórico com o
-        nick dele.
+        permanentemente, junto com inscrições, votos, clipes, insígnias e punições. Nas partidas já jogadas, o nick vira
+        “Jogador removido” (os resultados dos outros não mudam).
       </p>
       <div className="mt-4">
         <Label htmlFor="delete-confirm">

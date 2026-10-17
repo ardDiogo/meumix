@@ -66,4 +66,19 @@ conferir que **toda** tabela de `public` tem RLS e que não existe política de 
 `anon`/`authenticated`. As tabelas privadas recebem dados antes do teste, para que uma leitura
 indevida apareça como falha. Controle negativo feito: sem a migração 0023 o teste **falha** em S-01b.
 
+Também cobertos: **S-06** (exclusão: perfil, link pessoal e penalidades apagados; placar vira
+“Jogador removido” sem tocar no dos outros; IP e nick fora do log), **P-02** (retenção: IP com mais
+de 6 meses removido, evento com mais de 24 meses apagado) e as funções novas
+(`anonymize_account`, `purge_audit_log`) negadas a `anon`/`authenticated`.
+
+## 4.5 Verificado no navegador (17/10/2026, servidor simulado)
+
+- `/conta`: senha atual errada recusada; senha curta recusada; troca com sucesso encerra outras sessões.
+- Bloqueio: após 5 senhas erradas em 15 min, a 6ª tentativa é recusada **sem** consultar o login.
+- Exclusão: botão só habilita com a senha e “EXCLUIR”; senha errada recusada; super admin não se
+  exclui; com sucesso chama `anonymize_account` e depois apaga o usuário no Auth.
+- Download: JSON com só os dados do titular (nenhum e-mail de outro jogador) — S-06c.
+- Visitante: `/conta` redireciona ao login; `/conta/dados` responde 401 — S-01c.
+- Cadastro sem aceitar os Termos é recusado; `/api/cron/retencao` sem o segredo responde 401.
+
 Ainda faltam: rodar no GitHub Actions, a camada 2 (server actions) e a 3 (ponta a ponta) — P-11.

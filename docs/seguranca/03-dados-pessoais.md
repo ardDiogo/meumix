@@ -54,14 +54,14 @@ passa a ser obrigatório.
 
 ## 3.4 Direitos do titular (art. 18) — como atender
 
-| Direito                           | Como                                                                       | Situação                   |
-| --------------------------------- | -------------------------------------------------------------------------- | -------------------------- |
-| Confirmação e acesso              | Botão **Baixar meus dados** (JSON) em Minha conta                          | A implementar (P-09)       |
-| Correção                          | Configurações (nick via servidor, Steam, Twitch) + pedido ao canal         | Parcial                    |
-| Exclusão / anonimização           | Botão **Excluir minha conta** (exige senha), com anonimização dos placares | A implementar (P-05, P-09) |
-| Portabilidade                     | Mesmo JSON do acesso                                                       | A implementar              |
-| Informação sobre compartilhamento | Política de Privacidade                                                    | A escrever (P-10)          |
-| Revogação de consentimento        | Desvincular Steam/Twitch/CSRep, apagar análise                             | Parcial                    |
-| Canal do titular                  | E-mail do encarregado na Política                                          | A definir (P-10)           |
+| Direito                           | Como                                                                                     | Situação                       |
+| --------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------ |
+| Confirmação e acesso              | Botão **Baixar meus dados** (JSON) em `/conta`                                           | ✅                             |
+| Correção                          | Configurações (nick via servidor, Steam, Twitch) + pedido ao canal                       | Parcial                        |
+| Exclusão / anonimização           | **Excluir minha conta** em `/conta` (senha + EXCLUIR); placares viram “Jogador removido” | ✅                             |
+| Portabilidade                     | Mesmo JSON do acesso                                                                     | ✅                             |
+| Informação sobre compartilhamento | `/privacidade`                                                                           | ✅ (revisão jurídica pendente) |
+| Revogação de consentimento        | Desvincular Steam/Twitch/CSRep, apagar análise                                           | Parcial                        |
+| Canal do titular                  | `meumix.cs@gmail.com` na Política, em `/conta` e no rodapé                               | ✅                             |
 
 Prazo de resposta a pedidos pelo canal: **15 dias** (art. 19, II), registrado no `audit_log`.

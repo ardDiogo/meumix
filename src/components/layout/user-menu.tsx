@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, KeyRound, LogIn, LogOut, Settings, ShieldCheck } from "lucide-react";
+import { ChevronDown, LogIn, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { signOut } from "@/app/entrar/actions";
 import { Avatar } from "../ui/avatar";
@@ -57,8 +57,8 @@ export function UserMenu({ user, showAdmin }: { user: MenuUser | null; showAdmin
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
-          <Link href="/redefinir-senha">
-            <KeyRound /> Alterar senha
+          <Link href="/conta">
+            <UserRound /> Minha conta
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>

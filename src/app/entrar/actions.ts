@@ -10,6 +10,7 @@ import {
   validatePassword,
   type FieldErrors,
 } from "@/lib/auth/validation";
+import { LEGAL } from "@/lib/legal";
 import { REMEMBER_COOKIE } from "@/lib/supabase/cookies";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -58,6 +59,7 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
   const email = str(fd, "email").trim().toLowerCase();
   const password = str(fd, "password");
   const confirm = str(fd, "confirm");
+  const terms = str(fd, "terms") === "on";
 
   const fields: FieldErrors = {
     displayName: validateDisplayName(displayName),
@@ -68,6 +70,7 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
       gcRaw !== "" && Number.isInteger(gcLevel) && gcLevel >= 0 && gcLevel <= 20
         ? undefined
         : "Selecione seu nível na GC.",
+    terms: terms ? undefined : "Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.",
   };
   if (Object.values(fields).some(Boolean)) return { status: "error", fields, email };
 
@@ -78,7 +81,13 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
     email,
     password,
     options: {
-      data: { display_name: displayName, gc_level: gcLevel },
+      // Versão dos Termos/Política aceita no cadastro (docs/seguranca, L-07).
+      data: {
+        display_name: displayName,
+        gc_level: gcLevel,
+        terms_version: LEGAL.version,
+        terms_accepted_at: new Date().toISOString(),
+      },
       emailRedirectTo: `${await origin()}/auth/callback?next=/dashboard`,
     },
   });

@@ -208,6 +208,29 @@ function SignUpForm({ disabled }: { disabled: boolean }) {
         disabled={disabled}
         required
       />
+      <div>
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            name="terms"
+            disabled={disabled}
+            aria-invalid={!!errors.terms}
+            className="mt-0.5 size-4 shrink-0 cursor-pointer rounded-sm border-border-strong accent-brand"
+          />
+          <span>
+            Li e aceito os{" "}
+            <a href="/termos" target="_blank" className="text-brand hover:underline">
+              Termos de Uso
+            </a>{" "}
+            e a{" "}
+            <a href="/privacidade" target="_blank" className="text-brand hover:underline">
+              Política de Privacidade
+            </a>
+            . Tenho 18 anos ou mais.
+          </span>
+        </label>
+        {errors.terms && <p className="mt-1.5 text-xs text-loss">{errors.terms}</p>}
+      </div>
       <Button type="submit" variant="primary" size="lg" className="w-full" disabled={disabled || pending}>
         {pending && <Loader2 className="animate-spin" />}
         {pending ? "Criando conta…" : "Criar conta"}

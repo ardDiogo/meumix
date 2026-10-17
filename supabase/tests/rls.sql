@@ -68,6 +68,8 @@ select pg_temp.expect_denied('S-05 jogador apaga partidas', 'delete from public.
 select pg_temp.expect_denied('S-05b jogador chama delete_match', $q$select public.delete_match(gen_random_uuid(), '00000000-0000-4000-8000-000000000001')$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-05b jogador chama save_level_configs', $q$select public.save_level_configs('[]'::jsonb)$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-05b jogador chama draft_start', $q$select public.draft_start(gen_random_uuid(), current_date)$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
+select pg_temp.expect_denied('S-05b jogador chama anonymize_account', $q$select public.anonymize_account('00000000-0000-4000-8000-000000000002')$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
+select pg_temp.expect_denied('S-05b visitante chama purge_audit_log', 'select public.purge_audit_log()', 'anon');
 -- Toda tabela de public com RLS ligado
 do $$
 declare t text;
@@ -87,6 +89,61 @@ begin
     raise exception 'FALHOU: política de escrita % em %', p.policyname, p.tablename;
   end loop;
   raise notice 'ok  nenhuma política de escrita para anon/authenticated';
+end $$;
+rollback;
+
+-- S-06: exclusão de conta (como o servidor faz: anonimiza e depois apaga no Auth)
+begin;
+insert into public.mix_matches (id, event_date, platform) values ('11111111-1111-4111-8111-111111111111', current_date, 'manual');
+insert into public.player_match_records (match_id, user_id, player_name, team) values
+  ('11111111-1111-4111-8111-111111111111', '00000000-0000-4000-8000-000000000001', 'Jogador', 'A'),
+  ('11111111-1111-4111-8111-111111111111', '00000000-0000-4000-8000-000000000002', 'Outro', 'B');
+insert into public.audit_log (action, outcome, actor_id, detail) values
+  ('admin.user_edit', 'success', '00000000-0000-4000-8000-000000000002', '{"userId":"00000000-0000-4000-8000-000000000001","nick":"Jogador"}');
+select public.anonymize_account('00000000-0000-4000-8000-000000000001');
+delete from auth.users where id = '00000000-0000-4000-8000-000000000001';
+do $$
+begin
+  if exists (select 1 from public.profiles where id = '00000000-0000-4000-8000-000000000001') then
+    raise exception 'FALHOU S-06: perfil continua existindo';
+  end if;
+  if exists (select 1 from public.confirm_links where user_id = '00000000-0000-4000-8000-000000000001')
+     or exists (select 1 from public.user_penalties where user_id = '00000000-0000-4000-8000-000000000001') then
+    raise exception 'FALHOU S-06: link pessoal ou penalidade não foram apagados';
+  end if;
+  if (select player_name from public.player_match_records where team = 'A') <> 'Jogador removido'
+     or (select user_id from public.player_match_records where team = 'A') is not null then
+    raise exception 'FALHOU S-06: placar não foi anonimizado';
+  end if;
+  if (select player_name from public.player_match_records where team = 'B') <> 'Outro' then
+    raise exception 'FALHOU S-06: placar de outro jogador foi alterado';
+  end if;
+  if exists (select 1 from public.audit_log where detail::text ~ '203\.0\.113\.7|"nick"') then
+    raise exception 'FALHOU S-06: IP ou nick do titular continuam no log';
+  end if;
+  raise notice 'ok  S-06 exclusão: perfil e dados apagados, placar anonimizado, log sem IP/nick';
+end $$;
+rollback;
+
+-- P-02: retenção do log
+begin;
+insert into public.audit_log (action, outcome, detail, created_at) values
+  ('registration.join', 'success', '{"ip":"198.51.100.1","user_agent":"x","via":"session"}', now() - interval '7 months'),
+  ('registration.join', 'success', '{"ip":"198.51.100.2","user_agent":"y"}', now() - interval '1 month'),
+  ('admin.old', 'success', '{}', now() - interval '25 months');
+select public.purge_audit_log();
+do $$
+begin
+  if exists (select 1 from public.audit_log where detail ->> 'ip' = '198.51.100.1') then
+    raise exception 'FALHOU P-02: IP com mais de 6 meses continua no log';
+  end if;
+  if not exists (select 1 from public.audit_log where detail ->> 'ip' = '198.51.100.2') then
+    raise exception 'FALHOU P-02: IP recente foi apagado cedo demais';
+  end if;
+  if exists (select 1 from public.audit_log where action = 'admin.old') then
+    raise exception 'FALHOU P-02: evento com mais de 24 meses não foi apagado';
+  end if;
+  raise notice 'ok  P-02 retenção: IP > 6 meses removido, evento > 24 meses apagado';
 end $$;
 rollback;
 \echo 'Todos os testes de RLS passaram.'
