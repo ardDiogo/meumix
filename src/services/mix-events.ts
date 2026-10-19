@@ -238,11 +238,11 @@ export async function listRegistrations(
   };
 }
 
-/** Datas de mix deletadas pelo admin ("agenda|data"). Falha aberta: sem a migração 0010, nada é pulado. */
+/** Datas de mix deletadas pelo admin ("agenda|data"). Falha aberta: sem a migração 0027, nada é pulado. */
 async function cancelledOccurrences(): Promise<Set<string>> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return new Set();
-  const { data, error } = await supabase.from("mix_cancellations").select("schedule_id, event_date");
+  const { data, error } = await supabase.from("mix_skips").select("schedule_id, event_date");
   if (error) return new Set();
   return new Set((data ?? []).map((c) => `${c.schedule_id}|${c.event_date}`));
 }

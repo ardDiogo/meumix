@@ -200,9 +200,18 @@ export async function cancelMix(scheduleId: string, date: string): Promise<Confi
   if (finalized) return { ok: false, message: "Esse mix já foi finalizado e está no histórico." };
 
   const cancel = await admin
-    .from("mix_cancellations")
+    .from("mix_skips")
     .upsert({ schedule_id: scheduleId, event_date: date, cancelled_by: session.id });
-  if (cancel.error) return { ok: false, message: dbMessage(cancel.error, "Não foi possível deletar o mix.") };
+  if (cancel.error) {
+    console.error("[cancelMix]", cancel.error.code, cancel.error.message);
+    return {
+      ok: false,
+      message:
+        cancel.error.code === "42P01" || cancel.error.code === "PGRST205"
+          ? "Rode a migração 0027_mix_skips.sql no Supabase."
+          : dbMessage(cancel.error, "Não foi possível deletar o mix."),
+    };
+  }
 
   const match = { schedule_id: scheduleId, event_date: date };
   await admin.from("mix_draft_state").delete().match(match);
