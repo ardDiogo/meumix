@@ -26,7 +26,26 @@ export type BadgeRule =
   | "map_king"
   | "veteran"
   | "latest_lanterna"
-  | "lanterna_streak";
+  | "lanterna_streak"
+  | "latest_top_kills"
+  | "latest_top_adr"
+  | "latest_top_kdr"
+  | "latest_top_fk"
+  | "latest_top_assists"
+  | "latest_top_deaths"
+  | "latest_low_fk";
+
+/** Destaques do último mix (os mesmos cards de "Destaques da partida"). */
+export const TOP_RULES = {
+  latest_top_kills: { key: "kills", label: "Maior matador", goal: "Ter mais kills no próximo mix" },
+  latest_top_adr: { key: "adr", label: "Maior ADR", goal: "Ter o maior ADR no próximo mix" },
+  latest_top_kdr: { key: "kdr", label: "Maior KDR", goal: "Ter o maior KDR no próximo mix" },
+  latest_top_fk: { key: "fk", label: "Mais first kills", goal: "Ter mais first kills no próximo mix" },
+  latest_top_assists: { key: "assists", label: "Mais assistências", goal: "Ter mais assistências no próximo mix" },
+  latest_top_deaths: { key: "deaths", label: "Mais mortes", goal: "Morrer mais vezes no próximo mix" },
+  latest_low_fk: { key: "lowfk", label: "Menos first kills", goal: "Ter menos first kills no próximo mix" },
+} as const;
+export type TopKey = (typeof TOP_RULES)[keyof typeof TOP_RULES]["key"];
 
 export const BADGE_RULES: Record<
   BadgeRule,
@@ -42,6 +61,48 @@ export const BADGE_RULES: Record<
   loss_streak: { label: "Derrotas seguidas", kind: "dynamic", defaults: { n: 3 }, priority: 30 },
   latest_lanterna: { label: "Lanterna do último mix", kind: "dynamic", defaults: {}, priority: 25 },
   lanterna_streak: { label: "Lanterna em mixes seguidos", kind: "dynamic", defaults: { n: 3 }, priority: 20 },
+  latest_top_kills: {
+    label: TOP_RULES.latest_top_kills.label + " do último mix",
+    kind: "dynamic",
+    defaults: {},
+    priority: 69,
+  },
+  latest_top_adr: {
+    label: TOP_RULES.latest_top_adr.label + " do último mix",
+    kind: "dynamic",
+    defaults: {},
+    priority: 68,
+  },
+  latest_top_kdr: {
+    label: TOP_RULES.latest_top_kdr.label + " do último mix",
+    kind: "dynamic",
+    defaults: {},
+    priority: 67,
+  },
+  latest_top_fk: {
+    label: TOP_RULES.latest_top_fk.label + " do último mix",
+    kind: "dynamic",
+    defaults: {},
+    priority: 66,
+  },
+  latest_top_assists: {
+    label: TOP_RULES.latest_top_assists.label + " do último mix",
+    kind: "dynamic",
+    defaults: {},
+    priority: 65,
+  },
+  latest_top_deaths: {
+    label: TOP_RULES.latest_top_deaths.label + " do último mix",
+    kind: "dynamic",
+    defaults: {},
+    priority: 22,
+  },
+  latest_low_fk: {
+    label: TOP_RULES.latest_low_fk.label + " do último mix",
+    kind: "dynamic",
+    defaults: {},
+    priority: 21,
+  },
 };
 
 /** Prioridade para mostrar no PICK (manuais ficam no meio). */
@@ -68,6 +129,11 @@ export interface EngineMatch {
   finalizedAt: string;
   maps: { mapId: string; scoreA: number | null; scoreB: number | null }[];
   records: EngineRecord[];
+  /**
+   * Destaques da partida (calculados com todos os jogadores, inclusive
+   * convidados, pela mesma função da página do mix). `null` = ninguém com conta.
+   */
+  tops?: Partial<Record<TopKey, string | null>>;
 }
 
 export interface EngineBadge {
@@ -252,6 +318,20 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
           stop(b, u, when, lanterna ? `Novo lanterna no mix de ${label}` : `Mix de ${label} sem lanterna`);
       }
       if (lanterna) start(b, lanterna, match.id, when, `Lanterna do mix de ${label}`);
+    }
+
+    // Destaques do último mix (maior matador, ADR, KDR, first kills, assistências, mortes).
+    for (const [rule, cfg] of Object.entries(TOP_RULES) as [
+      keyof typeof TOP_RULES,
+      (typeof TOP_RULES)[keyof typeof TOP_RULES],
+    ][]) {
+      const top = match.tops?.[cfg.key] ?? null;
+      for (const b of byRule(rule)) {
+        for (const u of holders(b)) {
+          if (u !== top) stop(b, u, when, `Outro jogador foi o ${cfg.label.toLowerCase()} no mix de ${label}`);
+        }
+        if (top) start(b, top, match.id, when, `${cfg.label} do mix de ${label}`);
+      }
     }
 
     // Lanterna em mixes seguidos (contando só os mixes que o jogador jogou).
@@ -439,6 +519,12 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
     }
     for (const b of byRule("latest_lanterna")) {
       push(u, b, 0, 1, "Ser o lanterna do próximo mix");
+    }
+    for (const [rule, cfg] of Object.entries(TOP_RULES) as [
+      keyof typeof TOP_RULES,
+      (typeof TOP_RULES)[keyof typeof TOP_RULES],
+    ][]) {
+      for (const b of byRule(rule)) push(u, b, 0, 1, cfg.goal);
     }
     for (const b of byRule("map_king")) {
       const minMaps = param(b, "min_maps");

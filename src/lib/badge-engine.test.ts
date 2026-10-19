@@ -285,3 +285,41 @@ describe("Progresso de todas as regras", () => {
     assert.match(rei.detail, /2º no ranking · faltam 120 de ELO/);
   });
 });
+
+describe("Destaques do último mix", () => {
+  const MATADOR: EngineBadge = { id: "b-k", rule: "latest_top_kills" };
+  const BAITER: EngineBadge = { id: "b-bait", rule: "latest_low_fk" };
+  const withTops = (tops: EngineMatch["tops"]) => ({ ...mix([W]), tops });
+
+  it("Maior Matador vai para o destaque do último mix e passa adiante", () => {
+    const { rows } = computeBadges({
+      matches: [withTops({ kills: "ard" }), withTops({ kills: "barker" })],
+      badges: [MATADOR],
+    });
+    assert.equal(active(rows, "b-k", "ard").length, 0);
+    assert.equal(active(rows, "b-k", "barker").length, 1);
+    assert.match(of(rows, "b-k", "barker")[0]!.reason, /Maior matador do mix/);
+  });
+
+  it("mesmo jogador em mixes seguidos mantém uma conquista só", () => {
+    const { rows } = computeBadges({
+      matches: [withTops({ kills: "ard" }), withTops({ kills: "ard" })],
+      badges: [MATADOR],
+    });
+    assert.equal(of(rows, "b-k", "ard").length, 1);
+  });
+
+  it("destaque de convidado (sem conta) tira a insígnia de quem tinha", () => {
+    const { rows } = computeBadges({
+      matches: [withTops({ kills: "ard" }), withTops({ kills: null })],
+      badges: [MATADOR],
+    });
+    assert.equal(active(rows, "b-k", "ard").length, 0);
+  });
+
+  it("Baiter vai para quem teve menos first kills", () => {
+    const { rows, progress } = computeBadges({ matches: [withTops({ lowfk: "barker" })], badges: [BAITER] });
+    assert.equal(active(rows, "b-bait", "barker").length, 1);
+    assert.match(progress.find((p) => p.userId === "ard" && p.badgeId === "b-bait")!.detail, /menos first kills/);
+  });
+});

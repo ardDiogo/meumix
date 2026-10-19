@@ -1,5 +1,6 @@
 import "server-only";
-import { computeBadges, type BadgeRule, type EngineBadge, type EngineMatch } from "@/lib/badge-engine";
+import { computeBadges, type BadgeRule, type EngineBadge, type EngineMatch, type TopKey } from "@/lib/badge-engine";
+import { matchHighlights, type StatRow } from "@/lib/match-highlights";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Page = PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
@@ -48,7 +49,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     }));
   if (!badges.length) return { ok: true, inseridas: 0, atualizadas: 0, removidas: 0, badges: 0 };
 
-  const [matches, records, profiles, maps] = await Promise.all([
+  const [matches, records, profiles, maps, allRows] = await Promise.all([
     admin.from("mix_matches").select("id, event_date, finalized_at, maps"),
     // O Supabase devolve no máximo 1000 linhas por consulta: lê em páginas.
     allPages((from, to) =>
@@ -63,6 +64,18 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     ),
     admin.from("profiles").select("id, elo"),
     admin.from("maps").select("id, name"),
+    // Todas as linhas (com convidados), para os destaques serem os mesmos da página do mix.
+    allPages((from, to) =>
+      admin
+        .from("player_match_records")
+        .select(
+          "id, match_id, user_id, player_name, team, kills, deaths, assists, adr, first_kills, is_mvp, is_lanterna",
+        )
+        .order("match_id")
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
   ]);
   if (matches.error || records.error || profiles.error) {
     return { ok: false, message: "Não foi possível ler os resultados." };
@@ -85,6 +98,46 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     });
     byMatch.set(r.match_id as string, list);
   }
+  // Destaques de cada partida → id do jogador (ou null se for convidado).
+  const rowsByMatch = new Map<string, StatRow[]>();
+  for (const r of allRows.data ?? []) {
+    const list = rowsByMatch.get(r.match_id as string) ?? [];
+    list.push({
+      key: r.id as string,
+      userId: (r.user_id as string | null) ?? null,
+      name: r.player_name as string,
+      team: r.team as "A" | "B",
+      elo: null,
+      avatarUrl: null,
+      k: r.kills as number,
+      a: r.assists as number,
+      d: r.deaths as number,
+      adr: r.adr == null ? null : Number(r.adr),
+      kast: null,
+      s: null,
+      fa: 0,
+      mk: 0,
+      fk: (r.first_kills as number) ?? 0,
+      rp: 0,
+      drop: 0,
+      isMvp: !!r.is_mvp,
+      isLanterna: !!r.is_lanterna,
+    });
+    rowsByMatch.set(r.match_id as string, list);
+  }
+  const topsOf = (matchId: string) => {
+    const tops: Partial<Record<TopKey, string | null>> = {};
+    for (const h of matchHighlights(rowsByMatch.get(matchId) ?? [])) {
+      if (h.key === "mvp" || h.key === "worst") continue;
+      tops[h.key] = h.row.userId;
+    }
+    // Menos first kills (Baiter): o primeiro com o menor número, como os outros destaques.
+    const rows = rowsByMatch.get(matchId) ?? [];
+    const low = rows.reduce<StatRow | null>((best, r) => (best == null || r.fk < best.fk ? r : best), null);
+    if (low) tops.lowfk = low.userId;
+    return tops;
+  };
+
   const engineMatches: EngineMatch[] = (matches.data ?? []).map((m) => ({
     id: m.id as string,
     date: m.event_date as string,
@@ -95,6 +148,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
       scoreB: x.score_b ?? null,
     })),
     records: byMatch.get(m.id as string) ?? [],
+    tops: topsOf(m.id as string),
   }));
 
   const { rows, progress } = computeBadges({
