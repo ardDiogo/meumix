@@ -10,6 +10,7 @@ import { BackgroundMusic, MusicSettingsWatcher } from "@/components/layout/backg
 import { getFeatures } from "@/services/features";
 import { getAppSetting } from "@/services/settings";
 import { LEGAL } from "@/lib/legal";
+import { InstallBanner, InstallLink } from "@/components/pwa/pwa";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ds = getDataSource();
@@ -51,9 +52,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <a href={`mailto:${LEGAL.contactEmail}`} className="hover:text-fg">
               {LEGAL.contactEmail}
             </a>
+            <InstallLink className="text-brand hover:text-brand-hover" />
           </nav>
         </footer>
       </div>
+      <InstallBanner />
       <MusicSettingsWatcher snapshot={JSON.stringify({ features, musicUrl })} />
       {features.background_music && musicUrl && <BackgroundMusic url={musicUrl} />}
     </LevelsProvider>
