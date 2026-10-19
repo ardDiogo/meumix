@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus, Power, RefreshCw, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Loader2, Pencil, Plus, Power, RefreshCw, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
@@ -11,6 +11,7 @@ import {
   revokeBadge,
   setBadgeEnabled,
   setPlayerBadgeActive,
+  updateBadgeDescription,
   updateBadgeParams,
 } from "@/app/(app)/admin/badge-actions";
 import { BADGE_RULES } from "@/lib/badge-engine";
@@ -241,6 +242,8 @@ function RecomputeButton() {
 function BadgeRow({ badge }: { badge: Badge }) {
   const [pending, run] = useRun();
   const [editing, setEditing] = useState(false);
+  const [editingText, setEditingText] = useState(false);
+  const [description, setDescription] = useState(badge.description ?? "");
   const [params, setParams] = useState(badge.params);
   return (
     <li className={cn("px-4 py-3", !badge.enabled && "opacity-60")}>
@@ -255,7 +258,46 @@ function BadgeRow({ badge }: { badge: Badge }) {
             <Tag variant={badge.autoRule ? "win" : "neutral"}>{badge.autoRule ? "Automática" : "Manual"}</Tag>
             {!badge.enabled && <Tag variant="loss">Desabilitada</Tag>}
           </div>
-          {badge.description && <div className="truncate text-xs text-muted">{badge.description}</div>}
+          {editingText ? (
+            <div className="mt-1 space-y-2">
+              <Textarea
+                aria-label={`Descrição de ${badge.name}`}
+                rows={2}
+                maxLength={200}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                autoFocus
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() =>
+                    run(
+                      () => updateBadgeDescription(badge.id, description),
+                      () => setEditingText(false),
+                    )
+                  }
+                >
+                  {pending && <Loader2 className="animate-spin" />} Salvar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setDescription(badge.description ?? "");
+                    setEditingText(false);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <span className="ml-auto text-[11px] text-subtle tabular">{description.length}/200</span>
+              </div>
+            </div>
+          ) : (
+            badge.description && <div className="text-xs text-muted">{badge.description}</div>
+          )}
           {badge.unlock && (
             <div className="text-xs text-subtle">
               <span className="font-medium text-muted">Desbloqueio:</span> {badge.unlock}
@@ -274,6 +316,16 @@ function BadgeRow({ badge }: { badge: Badge }) {
             {badge.conquests} {badge.conquests === 1 ? "conquista" : "conquistas"}
           </span>
         </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Editar descrição de ${badge.name}`}
+          title="Editar descrição"
+          className="px-1.5"
+          onClick={() => setEditingText((e) => !e)}
+        >
+          <Pencil />
+        </Button>
         {badge.autoRule && Object.keys(badge.params).length > 0 && (
           <Button
             variant="ghost"

@@ -46,6 +46,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "badge.disable": "Desabilitou insígnia",
   "badge.params": "Ajustou regra de insígnia",
   "badge.recompute": "Recalculou insígnias",
+  "badge.edit": "Editou insígnia",
   "badge.deactivate": "Desativou insígnia de jogador",
   "badge.reactivate": "Reativou insígnia de jogador",
   "profile.steam_link": "Vinculou Steam",

@@ -292,3 +292,26 @@ export async function setPlayerBadgeActive(playerBadgeId: string, active: boolea
           "Reativada, mas o jogador não cumpre mais a regra e o recálculo a encerrou. Para manter mesmo assim, conceda manualmente.",
       };
 }
+
+/** Admin altera a descrição de qualquer insígnia (manual ou automática). */
+export async function updateBadgeDescription(badgeId: string, description: string): Promise<BadgeResult> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { ok: false, message: auth.error! };
+  const text = description.trim().replace(/\s+/g, " ");
+  if (text.length > 200) return { ok: false, message: "Descrição: até 200 caracteres." };
+  const { data, error } = await auth.admin
+    .from("badges")
+    .update({ description: text || null })
+    .eq("id", badgeId)
+    .select("name")
+    .maybeSingle();
+  if (error || !data) return { ok: false, message: "Não foi possível salvar." };
+  await audit({
+    action: "badge.edit",
+    outcome: "success",
+    actorId: auth.session.id,
+    detail: { name: data.name, description: text },
+  });
+  refresh();
+  return { ok: true, message: `Descrição de "${data.name}" atualizada.` };
+}
