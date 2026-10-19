@@ -102,6 +102,8 @@ export interface BadgeProgress {
   badgeId: string;
   current: number;
   target: number;
+  /** O que falta, em texto (ex.: "3º no ranking · faltam 120 de ELO"). */
+  detail: string;
 }
 
 const at = (date: string) => `${date}T23:00:00.000Z`;
@@ -348,20 +350,37 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
     }
   }
 
-  // Progresso atual.
+  // Progresso atual de todas as regras (o perfil mostra das que o jogador ainda não tem).
   const progress: BadgeProgress[] = [];
+  const push = (u: string, b: EngineBadge, current: number, target: number, detail: string) =>
+    progress.push({
+      userId: u,
+      badgeId: b.id,
+      current: Math.max(0, Math.min(Math.round(current), target)),
+      target: Math.max(1, Math.round(target)),
+      detail,
+    });
+  const finalOrder = standings((u) => input.currentElo?.get(u) ?? elo.get(u));
+  const finalPos = new Map(finalOrder.map((u, i) => [u, i + 1]));
+  const eloNow = (u: string) => input.currentElo?.get(u) ?? elo.get(u) ?? 0;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
   for (const u of mixes.keys()) {
+    const played = mixes.get(u) ?? 0;
     for (const b of byRule("win_streak")) {
       const n = param(b, "n");
-      progress.push({ userId: u, badgeId: b.id, current: Math.min(winStreak.get(u) ?? 0, n), target: n });
+      const cur = winStreak.get(u) ?? 0;
+      push(u, b, cur, n, `${Math.min(cur, n)} de ${n} mapas vencidos seguidos`);
     }
     for (const b of byRule("loss_streak")) {
       const n = param(b, "n");
-      progress.push({ userId: u, badgeId: b.id, current: Math.min(lossStreak.get(u) ?? 0, n), target: n });
+      const cur = lossStreak.get(u) ?? 0;
+      push(u, b, cur, n, `${Math.min(cur, n)} de ${n} mapas perdidos seguidos`);
     }
     for (const b of byRule("lanterna_streak")) {
       const n = param(b, "n");
-      progress.push({ userId: u, badgeId: b.id, current: Math.min(lanternaStreak.get(u) ?? 0, n), target: n });
+      const cur = lanternaStreak.get(u) ?? 0;
+      push(u, b, cur, n, `Lanterna em ${Math.min(cur, n)} de ${n} mixes seguidos`);
     }
     for (const b of byRule("consistent")) {
       const n = param(b, "mixes");
@@ -369,11 +388,89 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
       const list = ratings.get(u) ?? [];
       let streak = 0;
       for (let i = list.length - 1; i >= 0 && list[i] != null && list[i]! >= min; i--) streak++;
-      progress.push({ userId: u, badgeId: b.id, current: Math.min(streak, n), target: n });
+      push(
+        u,
+        b,
+        streak,
+        n,
+        `${Math.min(streak, n)} de ${n} mixes seguidos com nota ${min.toFixed(2).replace(".", ",")}+`,
+      );
     }
     for (const b of byRule("veteran")) {
       const n = param(b, "mixes");
-      progress.push({ userId: u, badgeId: b.id, current: Math.min(mixes.get(u) ?? 0, n), target: n });
+      push(u, b, played, n, `${Math.min(played, n)} de ${n} mixes concluídos`);
+    }
+    for (const b of byRule("ranking_leader")) {
+      const min = param(b, "min_mixes");
+      const pos = finalPos.get(u);
+      const leader = finalOrder.find((x) => (mixes.get(x) ?? 0) >= min);
+      if (played < min) {
+        push(
+          u,
+          b,
+          played,
+          min,
+          `Faltam ${plural(min - played, "mix", "mixes")} para entrar na disputa (mínimo ${min})`,
+        );
+      } else if (leader && pos) {
+        const gap = Math.max(0, eloNow(leader) - eloNow(u));
+        push(u, b, eloNow(u), Math.max(eloNow(leader), 1), `${pos}º no ranking · faltam ${gap} de ELO para o 1º`);
+      }
+    }
+    for (const b of byRule("rank_climber")) {
+      const window = param(b, "window");
+      const need = param(b, "positions");
+      const before = positions.length > window ? positions[positions.length - 1 - window]! : null;
+      const old = before?.get(u);
+      const now = positions[positions.length - 1]?.get(u);
+      const rise = old != null && now != null ? Math.max(0, old - now) : 0;
+      push(
+        u,
+        b,
+        rise,
+        need,
+        before
+          ? `Subiu ${plural(rise, "posição", "posições")} de ${need} nos últimos ${window} mixes`
+          : `Precisa de ${window} mixes de histórico`,
+      );
+    }
+    for (const b of byRule("latest_mvp")) {
+      push(u, b, 0, 1, "Ser o MVP do próximo mix");
+    }
+    for (const b of byRule("latest_lanterna")) {
+      push(u, b, 0, 1, "Ser o lanterna do próximo mix");
+    }
+    for (const b of byRule("map_king")) {
+      const minMaps = param(b, "min_maps");
+      const minRate = param(b, "min_win_rate");
+      // O mapa em que o jogador está mais perto do posto: mais jogado, depois melhor aproveitamento.
+      const mine = [...mapStats.entries()]
+        .map(([mapId, per]) => ({ mapId, s: per.get(u) }))
+        .filter((x): x is { mapId: string; s: { played: number; won: number } } => !!x.s)
+        .sort((a, c) => c.s.played - a.s.played || c.s.won / c.s.played - a.s.won / a.s.played)[0];
+      if (!mine) continue;
+      const rate = Math.round((mine.s.won / mine.s.played) * 100);
+      if (mine.s.played < minMaps) {
+        push(
+          u,
+          b,
+          mine.s.played,
+          minMaps,
+          `${mapName(mine.mapId)}: ${mine.s.played} de ${minMaps} partidas para disputar`,
+        );
+      } else {
+        const king = holders(b, mine.mapId).find((x) => x !== u);
+        const kingStats = king ? mapStats.get(mine.mapId)?.get(king) : undefined;
+        const kingRate = kingStats ? Math.round((kingStats.won / kingStats.played) * 100) : 0;
+        const target = Math.max(minRate, kingRate + 1);
+        push(
+          u,
+          b,
+          rate,
+          target,
+          `${mapName(mine.mapId)}: ${rate}% de vitórias · precisa de ${target}%${king ? " para passar o atual rei" : ""}`,
+        );
+      }
     }
   }
   return { rows, progress };

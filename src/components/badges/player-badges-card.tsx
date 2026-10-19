@@ -22,17 +22,12 @@ export function PlayerBadgesCard({
   const permanent = active.filter((b) => b.kind === "permanent");
   const history = badges.filter((b) => b.deactivatedAt);
   const owned = new Set(active.map((b) => b.badgeId));
-  // Progresso só do que ainda não está ativo (Pé Frio não aparece como "meta").
+  // Progresso de toda insígnia automática que o jogador ainda não tem.
   const inProgress = progress
     .map((p) => ({ p, badge: catalog.find((b) => b.id === p.badgeId) }))
     .filter(
       (x): x is { p: BadgeProgressView; badge: Badge } =>
-        !!x.badge &&
-        x.badge.enabled &&
-        x.badge.autoRule !== "loss_streak" &&
-        !owned.has(x.badge.id) &&
-        x.p.current > 0 &&
-        x.p.current < x.p.target,
+        !!x.badge && x.badge.enabled && !owned.has(x.badge.id) && x.p.current < x.p.target,
     );
   if (!badges.length && !inProgress.length) return null;
 
@@ -65,6 +60,7 @@ export function PlayerBadgesCard({
                       {p.current}/{p.target}
                     </span>
                   </div>
+                  {p.detail && <div className="text-xs text-subtle">{p.detail}</div>}
                   <div className="mt-1 h-1.5 rounded-full bg-surface-2">
                     <div
                       className="h-full rounded-full bg-brand"

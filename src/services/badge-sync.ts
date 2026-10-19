@@ -117,7 +117,13 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
       reason: r.reason.slice(0, 200),
       end_reason: r.endReason?.slice(0, 200) ?? null,
     })),
-    p_progress: progress.map((p) => ({ user_id: p.userId, badge_id: p.badgeId, current: p.current, target: p.target })),
+    p_progress: progress.map((p) => ({
+      user_id: p.userId,
+      badge_id: p.badgeId,
+      current: p.current,
+      target: p.target,
+      detail: p.detail.slice(0, 120),
+    })),
   });
   if (error) {
     console.error("[badges] sync:", error.code, error.message);

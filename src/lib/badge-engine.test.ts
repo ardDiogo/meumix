@@ -56,15 +56,9 @@ describe("Foguinho (vitórias seguidas em mapas)", () => {
   it("2 vitórias não bastam e o progresso mostra 2/3", () => {
     const { rows, progress } = computeBadges({ matches: [mix([W, W])], badges: [FOGUINHO] });
     assert.equal(of(rows, "b-fog", "ard").length, 0);
-    assert.deepEqual(
-      progress.find((p) => p.userId === "ard" && p.badgeId === "b-fog"),
-      {
-        userId: "ard",
-        badgeId: "b-fog",
-        current: 2,
-        target: 3,
-      },
-    );
+    const p = progress.find((x) => x.userId === "ard" && x.badgeId === "b-fog")!;
+    assert.deepEqual([p.current, p.target], [2, 3]);
+    assert.match(p.detail, /2 de 3 mapas/);
   });
 
   it("uma derrota desativa (sem apagar o histórico) e nova sequência conquista de novo", () => {
@@ -237,11 +231,8 @@ describe("Lanterna", () => {
   it("Lanterna Vermelha: 3 mixes seguidos como lanterna", () => {
     const two = computeBadges({ matches: [lanterna("ard"), lanterna("ard")], badges: [LANTERNA_VERMELHA] });
     assert.equal(of(two.rows, "b-lv", "ard").length, 0);
-    assert.deepEqual(
-      two.progress.find((p) => p.userId === "ard" && p.badgeId === "b-lv"),
-      { userId: "ard", badgeId: "b-lv", current: 2, target: 3 },
-      "progresso 2/3",
-    );
+    const p = two.progress.find((x) => x.userId === "ard" && x.badgeId === "b-lv")!;
+    assert.deepEqual([p.current, p.target], [2, 3], "progresso 2/3");
     const three = computeBadges({
       matches: [lanterna("ard"), lanterna("ard"), lanterna("ard")],
       badges: [LANTERNA_VERMELHA],
@@ -265,5 +256,32 @@ describe("Lanterna", () => {
       badges: [LANTERNA_VERMELHA],
     });
     assert.equal(active(rows, "b-lv", "ard").length, 1);
+  });
+});
+
+describe("Progresso de todas as regras", () => {
+  it("toda insígnia automática gera progresso com texto", () => {
+    const all: EngineBadge[] = [
+      FOGUINHO,
+      PE_FRIO,
+      REI,
+      MVP,
+      VETERANO,
+      CONSISTENTE,
+      REI_MAPA,
+      FOGUETE,
+      LANTERNA,
+      LANTERNA_VERMELHA,
+    ];
+    const m = (a: number, b: number) =>
+      mix([W], { records: [rec("ard", "A", { eloAfter: a }), rec("barker", "B", { eloAfter: b })] });
+    const { progress } = computeBadges({ matches: [m(1000, 900), m(1010, 890)], badges: all });
+    for (const b of all) {
+      const p = progress.find((x) => x.userId === "barker" && x.badgeId === b.id);
+      assert.ok(p, `sem progresso para ${b.rule}`);
+      assert.ok(p.detail.length > 0 && p.current <= p.target);
+    }
+    const rei = progress.find((x) => x.userId === "barker" && x.badgeId === "b-rei")!;
+    assert.match(rei.detail, /2º no ranking · faltam 120 de ELO/);
   });
 });

@@ -57,6 +57,8 @@ export interface BadgeProgressView {
   badgeId: string;
   current: number;
   target: number;
+  /** O que falta (ex.: "3º no ranking · faltam 120 de ELO"). */
+  detail: string | null;
 }
 
 type BadgeRow = Record<string, unknown>;
@@ -164,6 +166,7 @@ export async function badgeProgress(userIds: string[]): Promise<BadgeProgressVie
     badgeId: p.badge_id as string,
     current: p.current as number,
     target: p.target as number,
+    detail: (p.detail as string | null | undefined) ?? null,
   }));
 }
 
