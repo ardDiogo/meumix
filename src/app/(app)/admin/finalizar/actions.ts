@@ -1,5 +1,6 @@
 "use server";
 
+import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { pickMvpAndLanterna } from "@/lib/match-rules";
@@ -123,6 +124,8 @@ export async function finalizeMix(input: {
     eventDate: input.date,
     detail: { match_id: data, players: players.length, maps: maps.length, platform: input.platform },
   });
+  // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
+  await recomputeBadgesSafely();
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
     revalidatePath(path, "layout");
   return { ok: true, matchId: data as string };

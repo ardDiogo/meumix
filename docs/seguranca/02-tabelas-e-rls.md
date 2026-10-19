@@ -44,13 +44,13 @@ Legenda — **Leitura**: quem lê pela API com a chave pública. **Escrita**: se
 
 ### Partidas, ELO e conteúdo
 
-| Tabela                                | Leitura | Escrita                  | Situação                                                             |
-| ------------------------------------- | ------- | ------------------------ | -------------------------------------------------------------------- |
-| `mix_matches`, `player_match_records` | todos   | admin (`finalize_mix`)   | ⚠️ `player_name` fica após excluir conta (P-05)                      |
-| `elo_change_logs`                     | todos   | servidor                 | ✅                                                                   |
-| `clips`                               | todos   | jogador (próprio), admin | ✅                                                                   |
-| `player_ai_analyses`                  | todos   | jogador (próprio), admin | ✅ (análise é pública por escolha do jogador — informar na política) |
-| `badges`, `player_badges`             | todos   | admin                    | ✅                                                                   |
+| Tabela                                      | Leitura | Escrita                                                              | Situação                                                             |
+| ------------------------------------------- | ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `mix_matches`, `player_match_records`       | todos   | admin (`finalize_mix`)                                               | ⚠️ `player_name` fica após excluir conta (P-05)                      |
+| `elo_change_logs`                           | todos   | servidor                                                             | ✅                                                                   |
+| `clips`                                     | todos   | jogador (próprio), admin                                             | ✅                                                                   |
+| `player_ai_analyses`                        | todos   | jogador (próprio), admin                                             | ✅ (análise é pública por escolha do jogador — informar na política) |
+| `badges`, `player_badges`, `badge_progress` | todos   | admin (manuais); servidor via `sync_auto_badges` (automáticas, 0025) | ✅                                                                   |
 
 ### Configuração
 

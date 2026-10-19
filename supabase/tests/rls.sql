@@ -70,6 +70,9 @@ select pg_temp.expect_denied('S-05b jogador chama save_level_configs', $q$select
 select pg_temp.expect_denied('S-05b jogador chama draft_start', $q$select public.draft_start(gen_random_uuid(), current_date)$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-05b jogador chama anonymize_account', $q$select public.anonymize_account('00000000-0000-4000-8000-000000000002')$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-05b visitante chama purge_audit_log', 'select public.purge_audit_log()', 'anon');
+select pg_temp.expect_denied('S-05b jogador chama sync_auto_badges', $q$select public.sync_auto_badges(array[]::uuid[], '[]', '[]')$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
+select pg_temp.expect_denied('S-05 jogador concede insígnia automática direto', $q$insert into public.player_badges (user_id, badge_id, source, source_ref) select '00000000-0000-4000-8000-000000000001', id, 'auto', 'x' from public.badges where auto_rule = 'win_streak'$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
+select pg_temp.expect_denied('S-05 jogador escreve progresso', $q$insert into public.badge_progress (user_id, badge_id, current, target) select '00000000-0000-4000-8000-000000000001', id, 3, 3 from public.badges where auto_rule = 'win_streak'$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
 -- Toda tabela de public com RLS ligado
 do $$
 declare t text;
@@ -122,6 +125,61 @@ begin
     raise exception 'FALHOU S-06: IP ou nick do titular continuam no log';
   end if;
   raise notice 'ok  S-06 exclusão: perfil e dados apagados, placar anonimizado, log sem IP/nick';
+end $$;
+rollback;
+
+-- Insígnias automáticas: sincronização (src/services/badge-sync.ts → sync_auto_badges)
+begin;
+do $$
+declare
+  fog uuid := (select id from public.badges where auto_rule = 'win_streak');
+  vet uuid := (select id from public.badges where auto_rule = 'veteran');
+  manual uuid := (select id from public.badges where auto_rule is null limit 1);
+  u1 uuid := '00000000-0000-4000-8000-000000000001';
+  rows1 jsonb;
+  n int;
+  r jsonb;
+begin
+  if fog is null or vet is null or manual is null then raise exception 'FALHOU: catálogo de insígnias automáticas ausente'; end if;
+  insert into public.player_badges (user_id, badge_id) values (u1, manual);  -- manual, como antes da 0025
+
+  rows1 := jsonb_build_array(
+    jsonb_build_object('user_id', u1, 'badge_id', fog, 'source_ref', 'win_streak::m1:3', 'scope', '',
+      'activated_at', '2026-09-01T23:00:00Z', 'deactivated_at', null, 'reason', '3 vitórias seguidas', 'end_reason', null),
+    jsonb_build_object('user_id', u1, 'badge_id', vet, 'source_ref', 'veteran::marco', 'scope', '',
+      'activated_at', '2026-09-01T23:00:00Z', 'deactivated_at', null, 'reason', '50 mixes', 'end_reason', null));
+  perform public.sync_auto_badges(array[fog, vet], rows1,
+    jsonb_build_array(jsonb_build_object('user_id', u1, 'badge_id', fog, 'current', 3, 'target', 3)));
+  r := public.sync_auto_badges(array[fog, vet], rows1, '[]');
+  select count(*) into n from public.player_badges where user_id = u1 and badge_id in (fog, vet);
+  if n <> 2 or (r ->> 'inseridas')::int <> 0 then raise exception 'FALHOU: reprocessar duplicou (% linhas, %)', n, r; end if;
+  raise notice 'ok  insígnias: reprocessar os mesmos dados não duplica';
+
+  -- Derrota: a mesma conquista volta encerrada; a linha continua (histórico).
+  perform public.sync_auto_badges(array[fog, vet], jsonb_build_array(
+    jsonb_set(jsonb_set(rows1 -> 0, '{deactivated_at}', '"2026-09-02T23:00:00Z"'), '{end_reason}', '"derrota"'),
+    rows1 -> 1), '[]');
+  if not exists (select 1 from public.player_badges where user_id = u1 and badge_id = fog and deactivated_at is not null and end_reason = 'derrota') then
+    raise exception 'FALHOU: desativar apagou ou não encerrou a conquista';
+  end if;
+  raise notice 'ok  insígnias: desativar mantém o histórico';
+
+  -- Nova sequência: segunda conquista, a primeira continua no histórico.
+  perform public.sync_auto_badges(array[fog, vet], jsonb_build_array(
+    jsonb_set(jsonb_set(rows1 -> 0, '{deactivated_at}', '"2026-09-02T23:00:00Z"'), '{end_reason}', '"derrota"'),
+    jsonb_set(rows1 -> 0, '{source_ref}', '"win_streak::m3:3"'),
+    rows1 -> 1), '[]');
+  select count(*) into n from public.player_badges where user_id = u1 and badge_id = fog;
+  if n <> 2 then raise exception 'FALHOU: reconquista deveria ter 2 linhas, tem %', n; end if;
+  raise notice 'ok  insígnias: reconquistar cria nova conquista e preserva a anterior';
+
+  -- Correção de resultado: nada derivado → dinâmicas somem; permanente e manual ficam.
+  perform public.sync_auto_badges(array[fog, vet], '[]', '[]');
+  if exists (select 1 from public.player_badges where badge_id = fog) then raise exception 'FALHOU: dinâmica inválida não foi removida'; end if;
+  if not exists (select 1 from public.player_badges where badge_id = vet and user_id = u1) then raise exception 'FALHOU: permanente foi removida'; end if;
+  if not exists (select 1 from public.player_badges where badge_id = manual and user_id = u1) then raise exception 'FALHOU: manual foi mexida'; end if;
+  if exists (select 1 from public.badge_progress where badge_id = fog) then raise exception 'FALHOU: progresso não foi substituído'; end if;
+  raise notice 'ok  insígnias: correção recalcula dinâmicas; permanentes e manuais ficam';
 end $$;
 rollback;
 

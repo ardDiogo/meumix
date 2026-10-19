@@ -1,5 +1,6 @@
 "use server";
 
+import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -53,6 +54,7 @@ export async function linkGuests(
     actorId: session!.id,
     detail: { matchId, linked: done.length, failed, applyElo },
   });
+  if (done.length) await recomputeBadgesSafely();
   revalidatePath("/", "layout");
   if (!done.length) return { ok: false, message: `Nenhum vínculo feito (${failed.join(", ")}).` };
   return {

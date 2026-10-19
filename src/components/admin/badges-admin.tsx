@@ -1,15 +1,25 @@
 "use client";
 
-import { Loader2, Plus, Search, Trash2, X } from "lucide-react";
+import { Loader2, Plus, Power, RefreshCw, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { createBadge, deleteBadge, grantBadge, revokeBadge } from "@/app/(app)/admin/badge-actions";
+import {
+  createBadge,
+  deleteBadge,
+  grantBadge,
+  recomputeBadgesNow,
+  revokeBadge,
+  setBadgeEnabled,
+  updateBadgeParams,
+} from "@/app/(app)/admin/badge-actions";
+import { BADGE_RULES } from "@/lib/badge-engine";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { Badge, PlayerBadge } from "@/services/badges";
 import { BADGE_COLORS, BADGE_ICONS, BadgeIcon } from "../badges/badge-icon";
 import { BADGE_IMAGES } from "@/lib/badge-images";
 import { Button } from "../ui/button";
+import { Badge as Tag } from "../ui/badge";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
 import { Input, Label, Select, Textarea } from "../ui/input";
@@ -37,12 +47,17 @@ export function BadgesAdmin({
   players: { id: string; name: string }[];
 }) {
   const names = new Map(players.map((p) => [p.id, p.name]));
+  const manual = badges.filter((b) => !b.autoRule && b.enabled);
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[24rem_1fr]">
         <CreateBadge />
         <Card className="self-start">
-          <CardHeader title="Insígnias" description="Clique na lixeira para excluir (remove também dos jogadores)." />
+          <CardHeader
+            title="Insígnias"
+            description="Automáticas são concedidas e removidas pelos resultados; manuais, pelo admin. Desabilitar esconde sem apagar o histórico."
+            action={<RecomputeButton />}
+          />
           {badges.length ? (
             <ul className="divide-y divide-border">
               {badges.map((b) => (
@@ -54,9 +69,9 @@ export function BadgesAdmin({
           )}
         </Card>
       </div>
-      {badges.length > 0 && <GrantBadge badges={badges} players={players} />}
+      {manual.length > 0 && <GrantBadge badges={manual} players={players} />}
       <Card>
-        <CardHeader title={`Concedidas (${granted.length})`} />
+        <CardHeader title={`Ativas agora (${granted.length})`} />
         {granted.length ? (
           <ul className="divide-y divide-border">
             {granted.map((g) => (
@@ -196,33 +211,134 @@ function CreateBadge() {
   );
 }
 
-function BadgeRow({ badge }: { badge: Badge }) {
+const PARAM_LABELS: Record<string, string> = {
+  n: "Mapas seguidos",
+  min_mixes: "Mínimo de mixes",
+  positions: "Posições",
+  window: "Janela (mixes)",
+  mixes: "Mixes",
+  min_rating: "Nota mínima",
+  min_maps: "Mínimo de partidas no mapa",
+  min_win_rate: "Vitórias mínimas (%)",
+};
+
+function RecomputeButton() {
   const [pending, run] = useRun();
   return (
-    <li className="flex items-center gap-3 px-4 py-3">
-      <BadgeIcon icon={badge.icon} color={badge.color} size="md" />
-      <div className="min-w-0 flex-1">
-        <div className="font-medium">{badge.name}</div>
-        {badge.description && <div className="truncate text-xs text-muted">{badge.description}</div>}
-        {badge.unlock && (
-          <div className="text-xs text-subtle">
-            <span className="font-medium text-muted">Desbloqueio:</span> {badge.unlock}
+    <Button variant="outline" size="sm" disabled={pending} onClick={() => run(() => recomputeBadgesNow())}>
+      {pending ? <Loader2 className="animate-spin" /> : <RefreshCw />} Recalcular
+    </Button>
+  );
+}
+
+function BadgeRow({ badge }: { badge: Badge }) {
+  const [pending, run] = useRun();
+  const [editing, setEditing] = useState(false);
+  const [params, setParams] = useState(badge.params);
+  return (
+    <li className={cn("px-4 py-3", !badge.enabled && "opacity-60")}>
+      <div className="flex items-center gap-3">
+        <BadgeIcon icon={badge.icon} color={badge.color} size="md" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-medium">{badge.name}</span>
+            <Tag variant={badge.kind === "dynamic" ? "brand" : "neutral"}>
+              {badge.kind === "dynamic" ? "Dinâmica" : "Permanente"}
+            </Tag>
+            <Tag variant={badge.autoRule ? "win" : "neutral"}>{badge.autoRule ? "Automática" : "Manual"}</Tag>
+            {!badge.enabled && <Tag variant="loss">Desabilitada</Tag>}
           </div>
+          {badge.description && <div className="truncate text-xs text-muted">{badge.description}</div>}
+          {badge.unlock && (
+            <div className="text-xs text-subtle">
+              <span className="font-medium text-muted">Desbloqueio:</span> {badge.unlock}
+            </div>
+          )}
+          {badge.deactivation && (
+            <div className="text-xs text-subtle">
+              <span className="font-medium text-muted">Desativação:</span> {badge.deactivation}
+            </div>
+          )}
+        </div>
+        <span className="text-right text-xs text-muted tabular">
+          {badge.holders} {badge.holders === 1 ? "ativo" : "ativos"}
+          <br />
+          <span className="text-subtle">
+            {badge.conquests} {badge.conquests === 1 ? "conquista" : "conquistas"}
+          </span>
+        </span>
+        {badge.autoRule && Object.keys(badge.params).length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Regra de ${badge.name}`}
+            className="px-1.5"
+            onClick={() => setEditing((e) => !e)}
+          >
+            <SlidersHorizontal />
+          </Button>
         )}
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={badge.enabled ? `Desabilitar ${badge.name}` : `Habilitar ${badge.name}`}
+          title={badge.enabled ? "Desabilitar (mantém o histórico)" : "Habilitar"}
+          disabled={pending}
+          className={cn("px-1.5", badge.enabled ? "text-win hover:text-win" : "text-subtle")}
+          onClick={() => run(() => setBadgeEnabled(badge.id, !badge.enabled))}
+        >
+          <Power />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={`Excluir ${badge.name}`}
+          disabled={pending}
+          className="px-1.5 text-loss hover:text-loss"
+          onClick={() =>
+            confirm(
+              `Excluir a insígnia "${badge.name}"? Isso apaga também o histórico. Para só esconder, desabilite.`,
+            ) && run(() => deleteBadge(badge.id))
+          }
+        >
+          {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+        </Button>
       </div>
-      <span className="text-xs text-muted tabular">
-        {badge.holders} {badge.holders === 1 ? "jogador" : "jogadores"}
-      </span>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label={`Excluir ${badge.name}`}
-        disabled={pending}
-        className="px-1.5 text-loss hover:text-loss"
-        onClick={() => confirm(`Excluir a insígnia "${badge.name}"?`) && run(() => deleteBadge(badge.id))}
-      >
-        {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-      </Button>
+      {editing && badge.autoRule && (
+        <div className="mt-3 rounded-md border border-border bg-surface-2/50 p-3">
+          <div className="mb-2 text-xs text-muted">Regra: {BADGE_RULES[badge.autoRule].label}</div>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {Object.entries(params).map(([key, value]) => (
+              <div key={key}>
+                <Label htmlFor={`p-${badge.id}-${key}`}>{PARAM_LABELS[key] ?? key}</Label>
+                <Input
+                  id={`p-${badge.id}-${key}`}
+                  type="number"
+                  step={key === "min_rating" ? "0.05" : "1"}
+                  min={key === "min_rating" ? "0.1" : "1"}
+                  value={value}
+                  onChange={(e) => setParams((p) => ({ ...p, [key]: Number(e.target.value) }))}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex justify-end">
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                run(
+                  () => updateBadgeParams(badge.id, params),
+                  () => setEditing(false),
+                )
+              }
+            >
+              {pending && <Loader2 className="animate-spin" />} Salvar e recalcular
+            </Button>
+          </div>
+        </div>
+      )}
     </li>
   );
 }
@@ -328,18 +444,25 @@ function GrantedRow({ item, player }: { item: PlayerBadge; player: string }) {
         <span className="font-medium">{player}</span> <span className="text-muted">recebeu</span>{" "}
         <span className="font-medium">{item.name}</span>
         {item.note && <span className="text-muted"> · {item.note}</span>}
+        {item.auto && item.reason && <span className="text-muted"> · {item.reason}</span>}
       </div>
       <span className="hidden text-xs text-subtle sm:block">{formatDate(item.createdAt)}</span>
-      <Button
-        variant="ghost"
-        size="sm"
-        aria-label="Remover insígnia do jogador"
-        disabled={pending}
-        className="px-1.5"
-        onClick={() => confirm(`Remover "${item.name}" de ${player}?`) && run(() => revokeBadge(item.id))}
-      >
-        {pending ? <Loader2 className="animate-spin" /> : <X />}
-      </Button>
+      {item.auto ? (
+        <Tag variant="win" className="shrink-0">
+          Automática
+        </Tag>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Remover insígnia do jogador"
+          disabled={pending}
+          className="px-1.5"
+          onClick={() => confirm(`Remover "${item.name}" de ${player}?`) && run(() => revokeBadge(item.id))}
+        >
+          {pending ? <Loader2 className="animate-spin" /> : <X />}
+        </Button>
+      )}
     </li>
   );
 }

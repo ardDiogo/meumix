@@ -1,5 +1,6 @@
 "use server";
 
+import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -57,6 +58,7 @@ export async function deleteMatch(matchId: string): Promise<MatchActionResult> {
       jogadoresComEloDesfeito: data ?? 0,
     },
   });
+  await recomputeBadgesSafely();
   revalidatePath("/", "layout");
   return { ok: true, message: `Mix excluído. ELO desfeito para ${data ?? 0} jogador(es).` };
 }
@@ -95,6 +97,8 @@ export async function updateMatchDate(matchId: string, date: string): Promise<Ma
     eventDate: date,
     detail: { de: match.event_date, para: date },
   });
+  // A ordem dos mixes muda as sequências.
+  await recomputeBadgesSafely();
   revalidatePath("/", "layout");
   return { ok: true, message: "Data do mix atualizada." };
 }

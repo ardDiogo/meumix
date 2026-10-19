@@ -6,6 +6,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { BADGE_IMAGES } from "@/lib/badge-images";
+import { BADGE_RULES, type BadgeRule } from "@/lib/badge-engine";
+import { recomputeBadges } from "@/services/badge-sync";
 
 export type BadgeResult = { ok: boolean; message: string };
 
@@ -102,16 +104,31 @@ export async function grantBadge(badgeId: string, userIds: string[], note: strin
   const ids = [...new Set(userIds)].filter(Boolean);
   if (!ids.length) return { ok: false, message: "Escolha ao menos um jogador." };
   if (note.trim().length > 140) return { ok: false, message: "Observação: até 140 caracteres." };
+  const { data: badge } = await auth.admin.from("badges").select("*").eq("id", badgeId).maybeSingle();
+  if (!badge) return { ok: false, message: "Insígnia não encontrada." };
+  if (badge.auto_rule) {
+    return { ok: false, message: "Essa insígnia é automática: o sistema concede e remove pelos resultados." };
+  }
   const { error } = await auth.admin.from("player_badges").upsert(
     ids.map((user_id) => ({
       user_id,
       badge_id: badgeId,
+      source: "manual",
+      source_ref: "manual",
       note: note.trim() || null,
       assigned_by: auth.session.id,
     })),
-    { onConflict: "user_id,badge_id", ignoreDuplicates: true },
+    { onConflict: "user_id,badge_id,source_ref", ignoreDuplicates: true },
   );
-  if (error) return { ok: false, message: missing(error.code) ? MIGRATION_HINT : "Não foi possível conceder." };
+  if (error) {
+    return {
+      ok: false,
+      message:
+        missing(error.code) || error.code === "42P10"
+          ? "Rode a migração 0025_badges_auto.sql no Supabase."
+          : "Não foi possível conceder.",
+    };
+  }
   await audit({
     action: "badge.grant",
     outcome: "success",
@@ -128,11 +145,10 @@ export async function grantBadge(badgeId: string, userIds: string[], note: strin
 export async function revokeBadge(playerBadgeId: string): Promise<BadgeResult> {
   const auth = await requireAdmin();
   if ("error" in auth) return { ok: false, message: auth.error! };
-  const { data } = await auth.admin
-    .from("player_badges")
-    .select("user_id, badge_id")
-    .eq("id", playerBadgeId)
-    .maybeSingle();
+  const { data } = await auth.admin.from("player_badges").select("*").eq("id", playerBadgeId).maybeSingle();
+  if (data?.source === "auto") {
+    return { ok: false, message: "Conquista automática: ela sai sozinha quando o jogador deixa de cumprir a regra." };
+  }
   const { error } = await auth.admin.from("player_badges").delete().eq("id", playerBadgeId);
   if (error) return { ok: false, message: "Não foi possível remover." };
   await audit({
@@ -143,4 +159,83 @@ export async function revokeBadge(playerBadgeId: string): Promise<BadgeResult> {
   });
   refresh();
   return { ok: true, message: "Insígnia removida do jogador." };
+}
+
+/** Habilita ou desabilita uma insígnia sem apagar o histórico de conquistas. */
+export async function setBadgeEnabled(badgeId: string, enabled: boolean): Promise<BadgeResult> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { ok: false, message: auth.error! };
+  const { data: badge, error } = await auth.admin
+    .from("badges")
+    .update({ enabled })
+    .eq("id", badgeId)
+    .select("name, auto_rule")
+    .maybeSingle();
+  if (error)
+    return {
+      ok: false,
+      message: missing(error.code) ? "Rode a migração 0025_badges_auto.sql no Supabase." : "Não foi possível salvar.",
+    };
+  if (!badge) return { ok: false, message: "Insígnia não encontrada." };
+  await audit({
+    action: enabled ? "badge.enable" : "badge.disable",
+    outcome: "success",
+    actorId: auth.session.id,
+    detail: { name: badge.name },
+  });
+  // Ao reabilitar uma automática, recalcula quem tem agora.
+  if (enabled && badge.auto_rule) await recomputeBadges();
+  refresh();
+  return {
+    ok: true,
+    message: enabled ? `"${badge.name}" habilitada.` : `"${badge.name}" desabilitada (histórico mantido).`,
+  };
+}
+
+/** Ajusta os parâmetros de uma insígnia automática (ex.: mínimo de mixes do Rei do Mix) e recalcula. */
+export async function updateBadgeParams(badgeId: string, params: Record<string, number>): Promise<BadgeResult> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { ok: false, message: auth.error! };
+  const { data: badge } = await auth.admin.from("badges").select("name, auto_rule").eq("id", badgeId).maybeSingle();
+  const rule = badge?.auto_rule as BadgeRule | undefined;
+  if (!badge || !rule || !(rule in BADGE_RULES))
+    return { ok: false, message: "Só insígnias automáticas têm parâmetros." };
+  const clean: Record<string, number> = {};
+  for (const key of Object.keys(BADGE_RULES[rule].defaults)) {
+    const v = Number(params[key]);
+    if (!Number.isFinite(v) || v <= 0 || v > 1000) return { ok: false, message: `Valor inválido em "${key}".` };
+    clean[key] = key === "min_rating" ? Math.round(v * 100) / 100 : Math.round(v);
+  }
+  const { error } = await auth.admin.from("badges").update({ params: clean }).eq("id", badgeId);
+  if (error) return { ok: false, message: "Não foi possível salvar." };
+  await audit({
+    action: "badge.params",
+    outcome: "success",
+    actorId: auth.session.id,
+    detail: { name: badge.name, params: clean },
+  });
+  const r = await recomputeBadges();
+  refresh();
+  return r.ok
+    ? { ok: true, message: `Parâmetros salvos e insígnias recalculadas.` }
+    : { ok: false, message: `Parâmetros salvos, mas o recálculo falhou: ${r.message}` };
+}
+
+/** Recalcula agora todas as insígnias automáticas. */
+export async function recomputeBadgesNow(): Promise<BadgeResult> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { ok: false, message: auth.error! };
+  const r = await recomputeBadges();
+  if (!r.ok) return { ok: false, message: r.message };
+  await audit({
+    action: "badge.recompute",
+    outcome: "success",
+    actorId: auth.session.id,
+    detail: { inseridas: r.inseridas, atualizadas: r.atualizadas, removidas: r.removidas },
+  });
+  refresh();
+  return {
+    ok: true,
+    message: `Insígnias recalculadas: ${r.inseridas} nova(s), ${r.atualizadas} atualizada(s), ${r.removidas} removida(s) por correção.`,
+  };
 }

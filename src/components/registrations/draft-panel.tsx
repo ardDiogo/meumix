@@ -12,6 +12,8 @@ import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { TeamDot } from "../mixes/badges";
 import { WinProbability } from "./win-probability";
+import { PickPlayer } from "./pick-player";
+import type { PickInfo } from "@/lib/pick-types";
 
 const CHOICES: { id: PptChoice; label: string; emoji: string }[] = [
   { id: "rock", label: "Pedra", emoji: "✊" },
@@ -43,6 +45,7 @@ export function DraftPanel({
   viewerId,
   isAdmin,
   probA = null,
+  info = {},
 }: {
   scheduleId: string;
   date: string;
@@ -54,6 +57,8 @@ export function DraftPanel({
   isAdmin: boolean;
   /** Chance do time A, com os times completos. */
   probA?: number | null;
+  /** Resumo e insígnias de cada jogador (PICK). */
+  info?: Record<string, PickInfo>;
 }) {
   const [pending, run] = useRun();
   const name = (id: string | null) => (id ? (names[id] ?? "Jogador") : "—");
@@ -118,6 +123,7 @@ export function DraftPanel({
           avatar={avatar}
           classified={classified}
           mySide={mySide}
+          info={info}
         />
       )}
     </Card>
@@ -262,6 +268,7 @@ function PickStage({
   avatar,
   classified,
   mySide,
+  info,
 }: {
   scheduleId: string;
   date: string;
@@ -270,6 +277,7 @@ function PickStage({
   avatar: (id: string | null) => string | null;
   classified: string[];
   mySide: "a" | "b" | null;
+  info: Record<string, PickInfo>;
 }) {
   const [pending, run] = useRun();
   const [picking, setPicking] = useState<string | null>(null);
@@ -334,32 +342,25 @@ function PickStage({
 
       {draft.status === "draft" && available.length > 0 && (
         <div>
-          <div className="mb-2 text-[11px] font-semibold tracking-wider text-muted uppercase">Disponíveis</div>
+          <div className="mb-2 flex items-baseline justify-between gap-2">
+            <span className="text-[11px] font-semibold tracking-wider text-muted uppercase">Disponíveis</span>
+            <span className="text-[11px] text-subtle">Toque no jogador para ver detalhes e insígnias</span>
+          </div>
           <ul className="grid gap-1.5 sm:grid-cols-2">
             {available.map((id) => (
               <li key={id}>
-                <button
-                  type="button"
-                  disabled={!myTurn || pending}
-                  onClick={() => {
+                <PickPlayer
+                  name={name(id)}
+                  avatar={avatar(id)}
+                  info={info[id]}
+                  canPick={myTurn}
+                  picking={pending && picking === id}
+                  disabled={pending}
+                  onPick={() => {
                     setPicking(id);
                     run(() => pickPlayer(scheduleId, date, id));
                   }}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-md border px-3 py-2 text-left text-sm transition-colors",
-                    myTurn
-                      ? "border-border bg-surface-2 hover:border-brand hover:bg-brand/10"
-                      : "cursor-default border-border bg-surface-2/50 text-muted",
-                  )}
-                >
-                  <Avatar name={name(id)} src={avatar(id)} size="xs" />
-                  <span className="flex-1 truncate">{name(id)}</span>
-                  {pending && picking === id ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    myTurn && <span className="text-xs font-semibold text-brand">Escolher</span>
-                  )}
-                </button>
+                />
               </li>
             ))}
           </ul>

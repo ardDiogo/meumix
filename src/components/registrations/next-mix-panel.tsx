@@ -6,6 +6,7 @@ import { registrationWindow } from "@/lib/mix-schedule";
 import { cn } from "@/lib/utils";
 import { getPermissions } from "@/services/auth";
 import { getNextMix } from "@/services/mix-events";
+import { getPickInfo } from "@/services/pick-info";
 import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -129,6 +130,14 @@ export async function NextMixPanel() {
     maxPlayers: schedule.maxPlayers,
     link: `${await siteUrl()}/confirmar`,
   });
+  // PICK: insígnias e resumo dos jogadores, carregados de uma vez (falha = PICK sem os extras).
+  const pickInfo =
+    draft && draft.status !== "completed"
+      ? await getPickInfo(classifiedList.map((r) => r.userId)).catch((e) => {
+          console.error("[pick] resumo dos jogadores:", e);
+          return {};
+        })
+      : {};
   const topMaps = votes.mapTally.slice(0, MAPS_IN_ROTATION);
   const topCaptains = votes.captainTally.slice(0, CAPTAINS);
 
@@ -239,6 +248,7 @@ export async function NextMixPanel() {
           viewerId={session?.id ?? null}
           isAdmin={canManageMixes}
           probA={result.mix.draftProbA}
+          info={pickInfo}
         />
       )}
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { canManageAdmins, canManageMixes, isSuperAdminEmail } from "@/lib/auth/permissions";
@@ -192,6 +193,8 @@ export async function updateUserElo(userId: string, elo: number, gcLevel?: numbe
     actorId: session.id,
     detail: { userId, from: oldElo, to: elo },
   });
+  // O ranking mudou: o Rei do Mix pode mudar de dono.
+  await recomputeBadgesSafely();
   refresh();
   return { ok: true, message: `ELO atualizado: ${oldElo} → ${elo} (nível ${level}).` };
 }

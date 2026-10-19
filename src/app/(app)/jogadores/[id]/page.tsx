@@ -34,7 +34,8 @@ import { CsrepCard } from "@/components/players/csrep-card";
 import { getPermissions } from "@/services/auth";
 import { getCsrepView } from "@/services/csrep";
 import { BadgeIcon } from "@/components/badges/badge-icon";
-import { playerBadges } from "@/services/badges";
+import { badgeProgress, byPriority, listBadges, playerBadges } from "@/services/badges";
+import { PlayerBadgesCard } from "@/components/badges/player-badges-card";
 import { mixHref } from "@/lib/mix-slug";
 import { MapIcon } from "@/components/maps/map-icon";
 import { SteamIcon } from "@/components/players/steam-icon";
@@ -77,14 +78,20 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const formPoints = formSeries(playedMixes, player.id);
   const mapRecs = mapRecords(playedMixes, player.id);
   const timeline = mapTimeline(playedMixes, player.id);
-  const [{ session, canManageMixes }, csrep, badges, feed, twitchLogin, live] = await Promise.all([
-    getPermissions(),
-    kind === "supabase" ? getCsrepView(player.id, player.steamId) : null,
-    playerBadges([player.id]),
-    getHighlightsFeed(),
-    kind === "supabase" ? profileTwitch([player.id]).then((m) => m.get(player.id) ?? null) : null,
-    kind === "supabase" ? liveChannels([player.id]) : [],
-  ]);
+  const [{ session, canManageMixes }, csrep, allBadges, feed, twitchLogin, live, catalog, progress] = await Promise.all(
+    [
+      getPermissions(),
+      kind === "supabase" ? getCsrepView(player.id, player.steamId) : null,
+      playerBadges([player.id], { history: true }),
+      getHighlightsFeed(),
+      kind === "supabase" ? profileTwitch([player.id]).then((m) => m.get(player.id) ?? null) : null,
+      kind === "supabase" ? liveChannels([player.id]) : [],
+      listBadges(),
+      badgeProgress([player.id]),
+    ],
+  );
+  // No topo, só as ativas, das mais relevantes para as outras.
+  const badges = byPriority(allBadges.filter((b) => !b.deactivatedAt));
   const liveItems = toStreamItems(live, new Map([[player.id, player]]));
   const clips = toClipViews(
     feed.highlights.filter((h) => h.playerId === player.id),
@@ -114,8 +121,9 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                   <li
                     key={b.id}
                     title={
-                      [b.description, b.unlock && `Desbloqueio: ${b.unlock}`, b.note].filter(Boolean).join(" · ") ||
-                      b.name
+                      [b.reason ?? b.description, b.unlock && `Desbloqueio: ${b.unlock}`, b.note]
+                        .filter(Boolean)
+                        .join(" · ") || b.name
                     }
                     className="flex items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-0.5 text-xs font-semibold"
                     style={{ borderColor: `${b.color}55`, color: b.color }}
@@ -252,6 +260,8 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
       </div>
 
       {liveItems.length > 0 && <TwitchStreams className="mt-4" title="Ao vivo agora" items={liveItems} />}
+
+      <PlayerBadgesCard badges={allBadges} catalog={catalog ?? []} progress={progress} />
 
       <PlayerForm points={formPoints} />
       <RecentMatches timeline={timeline} />

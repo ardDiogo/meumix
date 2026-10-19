@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { cronUnauthorized } from "@/lib/cron-auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -8,13 +8,8 @@ export const dynamic = "force-dynamic";
  * pelo cron da Vercel (vercel.json). A Vercel envia `Authorization: Bearer <CRON_SECRET>`.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return Response.json({ ok: false, error: "CRON_SECRET não configurado" }, { status: 503 });
-  const got = Buffer.from(request.headers.get("authorization") ?? "");
-  const want = Buffer.from(`Bearer ${secret}`);
-  if (got.length !== want.length || !timingSafeEqual(got, want)) {
-    return Response.json({ ok: false }, { status: 401 });
-  }
+  const denied = cronUnauthorized(request);
+  if (denied) return denied;
   const admin = createSupabaseAdminClient();
   if (!admin) return Response.json({ ok: false, error: "banco não configurado" }, { status: 503 });
   const { data, error } = await admin.rpc("purge_audit_log");

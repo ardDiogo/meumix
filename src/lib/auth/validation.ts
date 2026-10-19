@@ -1,7 +1,9 @@
 export const PASSWORD_MIN = 8;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export type FieldErrors = Partial<Record<"email" | "password" | "confirm" | "displayName" | "gcLevel" | "terms", string>>;
+export type FieldErrors = Partial<
+  Record<"email" | "password" | "confirm" | "displayName" | "gcLevel" | "terms", string>
+>;
 
 export function validateEmail(email: string) {
   return EMAIL.test(email) ? undefined : "Informe um e-mail válido.";
