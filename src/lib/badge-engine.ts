@@ -24,7 +24,9 @@ export type BadgeRule =
   | "rank_climber"
   | "consistent"
   | "map_king"
-  | "veteran";
+  | "veteran"
+  | "latest_lanterna"
+  | "lanterna_streak";
 
 export const BADGE_RULES: Record<
   BadgeRule,
@@ -38,6 +40,8 @@ export const BADGE_RULES: Record<
   latest_mvp: { label: "MVP do último mix", kind: "dynamic", defaults: {}, priority: 70 },
   veteran: { label: "Mixes jogados", kind: "permanent", defaults: { mixes: 50 }, priority: 60 },
   loss_streak: { label: "Derrotas seguidas", kind: "dynamic", defaults: { n: 3 }, priority: 30 },
+  latest_lanterna: { label: "Lanterna do último mix", kind: "dynamic", defaults: {}, priority: 25 },
+  lanterna_streak: { label: "Lanterna em mixes seguidos", kind: "dynamic", defaults: { n: 3 }, priority: 20 },
 };
 
 /** Prioridade para mostrar no PICK (manuais ficam no meio). */
@@ -52,6 +56,8 @@ export interface EngineRecord {
   adr: number | null;
   kast: number | null;
   isMvp: boolean;
+  /** Pior desempenho do mix (o mesmo “lanterna” das estatísticas). */
+  isLanterna?: boolean;
   eloAfter: number | null;
 }
 
@@ -150,6 +156,7 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
 
   // Estado acumulado por jogador.
   const winStreak = new Map<string, number>();
+  const lanternaStreak = new Map<string, number>();
   const lossStreak = new Map<string, number>();
   const mixes = new Map<string, number>();
   const seriesWins = new Map<string, number>();
@@ -233,6 +240,27 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
         if (u !== mvp) stop(b, u, when, mvp ? `Novo MVP no mix de ${label}` : `Mix de ${label} sem MVP`);
       }
       if (mvp) start(b, mvp, match.id, when, `MVP do mix de ${label}`);
+    }
+
+    // Lanterna do último mix (como o MVP, só que do outro lado da tabela).
+    const lanterna = records.find((r) => r.isLanterna)?.userId ?? null;
+    for (const b of byRule("latest_lanterna")) {
+      for (const u of holders(b)) {
+        if (u !== lanterna)
+          stop(b, u, when, lanterna ? `Novo lanterna no mix de ${label}` : `Mix de ${label} sem lanterna`);
+      }
+      if (lanterna) start(b, lanterna, match.id, when, `Lanterna do mix de ${label}`);
+    }
+
+    // Lanterna em mixes seguidos (contando só os mixes que o jogador jogou).
+    for (const r of records) {
+      const n = r.isLanterna ? (lanternaStreak.get(r.userId) ?? 0) + 1 : 0;
+      lanternaStreak.set(r.userId, n);
+      for (const b of byRule("lanterna_streak")) {
+        const target = param(b, "n");
+        if (n >= target) start(b, r.userId, match.id, when, `Lanterna em ${target} mixes seguidos (até ${label})`);
+        if (!r.isLanterna) stop(b, r.userId, when, `Saiu da lanterna no mix de ${label}`);
+      }
     }
 
     // Ranking (líder e subida).

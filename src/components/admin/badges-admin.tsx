@@ -317,7 +317,9 @@ function BadgeRow({ badge }: { badge: Badge }) {
           <div className="grid gap-2 sm:grid-cols-3">
             {Object.entries(params).map(([key, value]) => (
               <div key={key}>
-                <Label htmlFor={`p-${badge.id}-${key}`}>{PARAM_LABELS[key] ?? key}</Label>
+                <Label htmlFor={`p-${badge.id}-${key}`}>
+                  {badge.autoRule === "lanterna_streak" && key === "n" ? "Mixes seguidos" : (PARAM_LABELS[key] ?? key)}
+                </Label>
                 <Input
                   id={`p-${badge.id}-${key}`}
                   type="number"

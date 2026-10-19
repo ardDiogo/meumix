@@ -10,6 +10,8 @@ const MVP: EngineBadge = { id: "b-mvp", rule: "latest_mvp" };
 const VETERANO: EngineBadge = { id: "b-vet", rule: "veteran", params: { mixes: 2 } };
 const CONSISTENTE: EngineBadge = { id: "b-con", rule: "consistent", params: { mixes: 2, min_rating: 0.9 } };
 const REI_MAPA: EngineBadge = { id: "b-map", rule: "map_king", params: { min_maps: 2, min_win_rate: 60 } };
+const LANTERNA: EngineBadge = { id: "b-lan", rule: "latest_lanterna" };
+const LANTERNA_VERMELHA: EngineBadge = { id: "b-lv", rule: "lanterna_streak", params: { n: 3 } };
 const FOGUETE: EngineBadge = { id: "b-fgt", rule: "rank_climber", params: { positions: 2, window: 1 } };
 
 let seq = 0;
@@ -216,5 +218,47 @@ describe("Permanentes, MVP, consistência, mapa e subida", () => {
     const m2 = mix([W], { records: records({ ard: 1100, p1: 1000, p2: 950, p3: 900 }) });
     const { rows } = computeBadges({ matches: [m1, m2], badges: [FOGUETE] });
     assert.equal(active(rows, "b-fgt", "ard").length, 1);
+  });
+});
+
+describe("Lanterna", () => {
+  const lanterna = (user: "ard" | "barker") =>
+    mix([W], {
+      records: [rec("ard", "A", { isLanterna: user === "ard" }), rec("barker", "B", { isLanterna: user === "barker" })],
+    });
+
+  it("Lanterna vai para o lanterna do último mix e passa adiante", () => {
+    const { rows } = computeBadges({ matches: [lanterna("ard"), lanterna("barker")], badges: [LANTERNA] });
+    assert.equal(active(rows, "b-lan", "ard").length, 0);
+    assert.equal(active(rows, "b-lan", "barker").length, 1);
+    assert.match(of(rows, "b-lan", "ard")[0]!.endReason!, /Novo lanterna/);
+  });
+
+  it("Lanterna Vermelha: 3 mixes seguidos como lanterna", () => {
+    const two = computeBadges({ matches: [lanterna("ard"), lanterna("ard")], badges: [LANTERNA_VERMELHA] });
+    assert.equal(of(two.rows, "b-lv", "ard").length, 0);
+    const three = computeBadges({
+      matches: [lanterna("ard"), lanterna("ard"), lanterna("ard")],
+      badges: [LANTERNA_VERMELHA],
+    });
+    assert.equal(active(three.rows, "b-lv", "ard").length, 1);
+  });
+
+  it("Lanterna Vermelha sai no primeiro mix fora da lanterna (histórico fica)", () => {
+    const { rows } = computeBadges({
+      matches: [lanterna("ard"), lanterna("ard"), lanterna("ard"), lanterna("barker")],
+      badges: [LANTERNA_VERMELHA],
+    });
+    assert.equal(active(rows, "b-lv", "ard").length, 0);
+    assert.equal(of(rows, "b-lv", "ard").length, 1);
+  });
+
+  it("mix que o jogador não jogou não quebra nem soma a sequência", () => {
+    const solo = mix([W], { records: [rec("barker", "B"), rec("p3", "A")] });
+    const { rows } = computeBadges({
+      matches: [lanterna("ard"), lanterna("ard"), solo, lanterna("ard")],
+      badges: [LANTERNA_VERMELHA],
+    });
+    assert.equal(active(rows, "b-lv", "ard").length, 1);
   });
 });

@@ -54,7 +54,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     allPages((from, to) =>
       admin
         .from("player_match_records")
-        .select("match_id, user_id, team, kills, deaths, assists, adr, kast, is_mvp, elo_after")
+        .select("match_id, user_id, team, kills, deaths, assists, adr, kast, is_mvp, is_lanterna, elo_after")
         .not("user_id", "is", null)
         .eq("calculate_elo", true)
         .order("match_id")
@@ -80,6 +80,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
       adr: r.adr == null ? null : Number(r.adr),
       kast: r.kast == null ? null : Number(r.kast),
       isMvp: !!r.is_mvp,
+      isLanterna: !!r.is_lanterna,
       eloAfter: (r.elo_after as number | null) ?? null,
     });
     byMatch.set(r.match_id as string, list);

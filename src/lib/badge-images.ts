@@ -38,6 +38,7 @@ export const BADGE_IMAGES: Record<string, { label: string; src: string }> = {
   "img:rei": { label: "Coroa", src: "/badges/rei.png" },
   "img:mvp": { label: "Troféu", src: "/badges/mvp.png" },
   "img:toparado": { label: "Tô parado!", src: "/badges/toparado.png" },
+  "img:lanternavermelha": { label: "Lanterna vermelha", src: "/badges/lanternavermelha.png" },
   "img:pefrio": { label: "Coração partido", src: "/badges/pefrio.png" },
   "img:cassino": { label: "Dado", src: "/badges/cassino.png" },
   "img:reimapa": { label: "Troféu", src: "/badges/reimapa.png" },
