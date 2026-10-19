@@ -237,6 +237,11 @@ describe("Lanterna", () => {
   it("Lanterna Vermelha: 3 mixes seguidos como lanterna", () => {
     const two = computeBadges({ matches: [lanterna("ard"), lanterna("ard")], badges: [LANTERNA_VERMELHA] });
     assert.equal(of(two.rows, "b-lv", "ard").length, 0);
+    assert.deepEqual(
+      two.progress.find((p) => p.userId === "ard" && p.badgeId === "b-lv"),
+      { userId: "ard", badgeId: "b-lv", current: 2, target: 3 },
+      "progresso 2/3",
+    );
     const three = computeBadges({
       matches: [lanterna("ard"), lanterna("ard"), lanterna("ard")],
       badges: [LANTERNA_VERMELHA],

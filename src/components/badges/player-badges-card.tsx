@@ -22,7 +22,7 @@ export function PlayerBadgesCard({
   const permanent = active.filter((b) => b.kind === "permanent");
   const history = badges.filter((b) => b.deactivatedAt);
   const owned = new Set(active.map((b) => b.badgeId));
-  // Progresso só do que ainda não está ativo; Pé Frio e lanterna não aparecem como "meta".
+  // Progresso só do que ainda não está ativo (Pé Frio não aparece como "meta").
   const inProgress = progress
     .map((p) => ({ p, badge: catalog.find((b) => b.id === p.badgeId) }))
     .filter(
@@ -30,7 +30,6 @@ export function PlayerBadgesCard({
         !!x.badge &&
         x.badge.enabled &&
         x.badge.autoRule !== "loss_streak" &&
-        x.badge.autoRule !== "lanterna_streak" &&
         !owned.has(x.badge.id) &&
         x.p.current > 0 &&
         x.p.current < x.p.target,

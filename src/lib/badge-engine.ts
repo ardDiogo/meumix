@@ -359,6 +359,10 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
       const n = param(b, "n");
       progress.push({ userId: u, badgeId: b.id, current: Math.min(lossStreak.get(u) ?? 0, n), target: n });
     }
+    for (const b of byRule("lanterna_streak")) {
+      const n = param(b, "n");
+      progress.push({ userId: u, badgeId: b.id, current: Math.min(lanternaStreak.get(u) ?? 0, n), target: n });
+    }
     for (const b of byRule("consistent")) {
       const n = param(b, "mixes");
       const min = param(b, "min_rating");
