@@ -61,3 +61,11 @@ o ELO depois do último mix, o líder atual segue o ELO de agora.
   histórico. Excluir apaga tudo.
 - O histórico das dinâmicas é reconstruído pelos resultados: corrigir um placar antigo pode
   mudar datas e motivos de conquistas passadas.
+
+## Controle manual pelo admin
+
+- **Ativa/Desativada** (na lista de insígnias): liga ou desliga a insígnia para todos, sem apagar o histórico.
+- **Desativar/Reativar** (em Concedidas, para automáticas): desativa a conquista de um jogador e a
+  trava — o recálculo não reativa (`player_badges.locked`). Reativar devolve à regra: se o jogador
+  não cumpre mais, o recálculo encerra de novo.
+- **Conceder** também aceita automáticas: vira uma conquista manual, que o recálculo não mexe.

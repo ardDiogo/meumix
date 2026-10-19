@@ -173,9 +173,20 @@ begin
   if n <> 2 then raise exception 'FALHOU: reconquista deveria ter 2 linhas, tem %', n; end if;
   raise notice 'ok  insígnias: reconquistar cria nova conquista e preserva a anterior';
 
+  -- Admin desativa a conquista do jogador (travada): o recálculo não reativa nem apaga.
+  update public.player_badges set deactivated_at = now(), end_reason = 'Desativada pelo admin', locked = true
+   where user_id = u1 and badge_id = fog and source_ref = 'win_streak::m3:3';
+  perform public.sync_auto_badges(array[fog, vet], jsonb_build_array(
+    jsonb_set(rows1 -> 0, '{source_ref}', '"win_streak::m3:3"'), rows1 -> 1), '[]');
+  if not exists (select 1 from public.player_badges where source_ref = 'win_streak::m3:3' and locked and deactivated_at is not null) then
+    raise exception 'FALHOU: recálculo reativou insígnia desativada pelo admin';
+  end if;
+  raise notice 'ok  insígnias: desativada pelo admin continua desativada após recálculo';
+
   -- Correção de resultado: nada derivado → dinâmicas somem; permanente e manual ficam.
   perform public.sync_auto_badges(array[fog, vet], '[]', '[]');
-  if exists (select 1 from public.player_badges where badge_id = fog) then raise exception 'FALHOU: dinâmica inválida não foi removida'; end if;
+  if exists (select 1 from public.player_badges where badge_id = fog and not locked) then raise exception 'FALHOU: dinâmica inválida não foi removida'; end if;
+  if not exists (select 1 from public.player_badges where badge_id = fog and locked) then raise exception 'FALHOU: travada foi apagada'; end if;
   if not exists (select 1 from public.player_badges where badge_id = vet and user_id = u1) then raise exception 'FALHOU: permanente foi removida'; end if;
   if not exists (select 1 from public.player_badges where badge_id = manual and user_id = u1) then raise exception 'FALHOU: manual foi mexida'; end if;
   if exists (select 1 from public.badge_progress where badge_id = fog) then raise exception 'FALHOU: progresso não foi substituído'; end if;

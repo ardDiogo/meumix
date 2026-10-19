@@ -221,7 +221,13 @@ async function UsersPanel({ canManageAdmins, currentUserId }: { canManageAdmins:
 }
 
 async function BadgesTab() {
-  const [badges, granted, players] = await Promise.all([listBadges(), playerBadges(), getDataSource().listPlayers()]);
+  const [badges, all, players] = await Promise.all([
+    listBadges(),
+    playerBadges(undefined, { history: true }),
+    getDataSource().listPlayers(),
+  ]);
+  // Ativas + as desativadas à mão (para poder reativar).
+  const granted = all.filter((g) => !g.deactivatedAt || g.locked);
   if (!badges) {
     return (
       <Card>

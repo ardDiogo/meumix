@@ -34,6 +34,8 @@ alter table public.player_badges add column if not exists scope text not null de
 alter table public.player_badges add column if not exists reason text;
 alter table public.player_badges add column if not exists deactivated_at timestamptz;
 alter table public.player_badges add column if not exists end_reason text;
+-- Desativada à mão pelo admin: o recálculo automático não mexe nela.
+alter table public.player_badges add column if not exists locked boolean not null default false;
 
 alter table public.player_badges drop constraint if exists player_badges_source_check;
 alter table public.player_badges add constraint player_badges_source_check check (source in ('manual', 'auto'));
@@ -99,7 +101,9 @@ on conflict do nothing;
 update public.player_badges pb
    set deactivated_at = now(), end_reason = 'A insígnia passou a ser automática.'
   from public.badges b
- where b.id = pb.badge_id and b.auto_rule is not null and pb.source = 'manual' and pb.deactivated_at is null;
+ where b.id = pb.badge_id and b.auto_rule is not null and pb.source = 'manual' and pb.deactivated_at is null
+   -- Só as concessões de antes desta versão (rodar de novo não mexe nas feitas depois).
+   and pb.created_at < timestamptz '2026-10-20 03:00:00+00';
 
 -- ------------------------------------------------ sincronização (servidor)
 -- Recebe o resultado completo do cálculo e aplica numa única transação:
@@ -127,7 +131,7 @@ begin
   )
   delete from public.player_badges pb
    using public.badges b
-   where b.id = pb.badge_id and pb.badge_id = any (p_badges) and pb.source = 'auto' and b.kind = 'dynamic'
+   where b.id = pb.badge_id and pb.badge_id = any (p_badges) and pb.source = 'auto' and b.kind = 'dynamic' and not pb.locked
      and not exists (
        select 1 from d where d.user_id = pb.user_id and d.badge_id = pb.badge_id and d.source_ref = pb.source_ref
      );
@@ -144,7 +148,7 @@ begin
          end_reason = d.end_reason,
          reason = d.reason
     from d
-   where pb.user_id = d.user_id and pb.badge_id = d.badge_id and pb.source_ref = d.source_ref
+   where pb.user_id = d.user_id and pb.badge_id = d.badge_id and pb.source_ref = d.source_ref and not pb.locked
      and ((pb.deactivated_at is null) <> (d.deactivated_at is null)
           or pb.reason is distinct from d.reason
           or pb.end_reason is distinct from d.end_reason);

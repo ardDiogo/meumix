@@ -106,9 +106,7 @@ export async function grantBadge(badgeId: string, userIds: string[], note: strin
   if (note.trim().length > 140) return { ok: false, message: "Observação: até 140 caracteres." };
   const { data: badge } = await auth.admin.from("badges").select("*").eq("id", badgeId).maybeSingle();
   if (!badge) return { ok: false, message: "Insígnia não encontrada." };
-  if (badge.auto_rule) {
-    return { ok: false, message: "Essa insígnia é automática: o sistema concede e remove pelos resultados." };
-  }
+  // Automática concedida à mão: fica como conquista manual (o recálculo não mexe nela).
   const { error } = await auth.admin.from("player_badges").upsert(
     ids.map((user_id) => ({
       user_id,
@@ -238,4 +236,59 @@ export async function recomputeBadgesNow(): Promise<BadgeResult> {
     ok: true,
     message: `Insígnias recalculadas: ${r.inseridas} nova(s), ${r.atualizadas} atualizada(s), ${r.removidas} removida(s) por correção.`,
   };
+}
+
+/**
+ * Desativa ou reativa a conquista de um jogador. Automática desativada fica
+ * travada (o recálculo não reativa); ao reativar, volta a seguir a regra.
+ */
+export async function setPlayerBadgeActive(playerBadgeId: string, active: boolean): Promise<BadgeResult> {
+  const auth = await requireAdmin();
+  if ("error" in auth) return { ok: false, message: auth.error! };
+  const { data: row } = await auth.admin
+    .from("player_badges")
+    .select("user_id, badge_id, source")
+    .eq("id", playerBadgeId)
+    .maybeSingle();
+  if (!row) return { ok: false, message: "Conquista não encontrada." };
+  const { error } = await auth.admin
+    .from("player_badges")
+    .update(
+      active
+        ? { deactivated_at: null, end_reason: null, locked: false }
+        : { deactivated_at: new Date().toISOString(), end_reason: "Desativada pelo admin", locked: true },
+    )
+    .eq("id", playerBadgeId);
+  if (error) {
+    return {
+      ok: false,
+      message: missing(error.code) ? "Rode a migração 0025_badges_auto.sql no Supabase." : "Não foi possível salvar.",
+    };
+  }
+  await audit({
+    action: active ? "badge.reactivate" : "badge.deactivate",
+    outcome: "success",
+    actorId: auth.session.id,
+    detail: { userId: row.user_id, badgeId: row.badge_id },
+  });
+  // Reativada: o cálculo confere se o jogador ainda cumpre a regra.
+  let stillActive = true;
+  if (active && row.source === "auto") {
+    await recomputeBadges();
+    const { data: after } = await auth.admin
+      .from("player_badges")
+      .select("deactivated_at")
+      .eq("id", playerBadgeId)
+      .maybeSingle();
+    stillActive = !!after && !after.deactivated_at;
+  }
+  refresh();
+  if (!active) return { ok: true, message: "Insígnia desativada para o jogador (o recálculo não reativa)." };
+  return stillActive
+    ? { ok: true, message: "Insígnia reativada." }
+    : {
+        ok: true,
+        message:
+          "Reativada, mas o jogador não cumpre mais a regra e o recálculo a encerrou. Para manter mesmo assim, conceda manualmente.",
+      };
 }

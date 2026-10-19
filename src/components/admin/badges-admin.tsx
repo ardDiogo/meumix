@@ -10,6 +10,7 @@ import {
   recomputeBadgesNow,
   revokeBadge,
   setBadgeEnabled,
+  setPlayerBadgeActive,
   updateBadgeParams,
 } from "@/app/(app)/admin/badge-actions";
 import { BADGE_RULES } from "@/lib/badge-engine";
@@ -47,7 +48,7 @@ export function BadgesAdmin({
   players: { id: string; name: string }[];
 }) {
   const names = new Map(players.map((p) => [p.id, p.name]));
-  const manual = badges.filter((b) => !b.autoRule && b.enabled);
+  const grantable = badges.filter((b) => b.enabled);
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[24rem_1fr]">
@@ -60,18 +61,24 @@ export function BadgesAdmin({
           />
           {badges.length ? (
             <ul className="divide-y divide-border">
-              {badges.map((b) => (
-                <BadgeRow key={b.id} badge={b} />
-              ))}
+              {/* Automáticas primeiro. */}
+              {[...badges]
+                .sort((a, b) => Number(!!b.autoRule) - Number(!!a.autoRule))
+                .map((b) => (
+                  <BadgeRow key={b.id} badge={b} />
+                ))}
             </ul>
           ) : (
             <EmptyState icon={Plus} title="Nenhuma insígnia criada ainda" className="py-8" />
           )}
         </Card>
       </div>
-      {manual.length > 0 && <GrantBadge badges={manual} players={players} />}
+      {grantable.length > 0 && <GrantBadge badges={grantable} players={players} />}
       <Card>
-        <CardHeader title={`Ativas agora (${granted.length})`} />
+        <CardHeader
+          title={`Concedidas (${granted.length})`}
+          description="Ativas agora e as desativadas pelo admin. Automáticas: Desativar trava para o jogador; Reativar devolve à regra."
+        />
         {granted.length ? (
           <ul className="divide-y divide-border">
             {granted.map((g) => (
@@ -284,10 +291,10 @@ function BadgeRow({ badge }: { badge: Badge }) {
           aria-label={badge.enabled ? `Desabilitar ${badge.name}` : `Habilitar ${badge.name}`}
           title={badge.enabled ? "Desabilitar (mantém o histórico)" : "Habilitar"}
           disabled={pending}
-          className={cn("px-1.5", badge.enabled ? "text-win hover:text-win" : "text-subtle")}
+          className={cn("px-2 text-xs", badge.enabled ? "text-win hover:text-win" : "text-subtle")}
           onClick={() => run(() => setBadgeEnabled(badge.id, !badge.enabled))}
         >
-          <Power />
+          <Power /> {badge.enabled ? "Ativa" : "Desativada"}
         </Button>
         <Button
           variant="ghost"
@@ -364,6 +371,7 @@ function GrantBadge({ badges, players }: { badges: Badge[]; players: { id: strin
               {badges.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
+                  {b.autoRule ? " (automática — concedida à mão)" : ""}
                 </option>
               ))}
             </Select>
@@ -437,20 +445,32 @@ function GrantBadge({ badges, players }: { badges: Badge[]; players: { id: strin
 
 function GrantedRow({ item, player }: { item: PlayerBadge; player: string }) {
   const [pending, run] = useRun();
+  const off = !!item.deactivatedAt;
   return (
-    <li className="flex items-center gap-3 px-4 py-2.5">
+    <li className={cn("flex items-center gap-3 px-4 py-2.5", off && "opacity-60")}>
       <BadgeIcon icon={item.icon} color={item.color} size="xs" />
       <div className="min-w-0 flex-1 text-sm">
-        <span className="font-medium">{player}</span> <span className="text-muted">recebeu</span>{" "}
+        <span className="font-medium">{player}</span> <span className="text-muted">{off ? "tinha" : "recebeu"}</span>{" "}
         <span className="font-medium">{item.name}</span>
         {item.note && <span className="text-muted"> · {item.note}</span>}
         {item.auto && item.reason && <span className="text-muted"> · {item.reason}</span>}
+        {off && <span className="text-loss"> · desativada pelo admin</span>}
       </div>
       <span className="hidden text-xs text-subtle sm:block">{formatDate(item.createdAt)}</span>
+      <Tag variant={item.auto ? "win" : "neutral"} className="hidden shrink-0 sm:inline-flex">
+        {item.auto ? "Automática" : "Manual"}
+      </Tag>
       {item.auto ? (
-        <Tag variant="win" className="shrink-0">
-          Automática
-        </Tag>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          className={cn("px-2 text-xs", off ? "text-win hover:text-win" : "text-loss hover:text-loss")}
+          title={off ? "Reativar (volta a seguir a regra automática)" : "Desativar para este jogador"}
+          onClick={() => run(() => setPlayerBadgeActive(item.id, off))}
+        >
+          {pending ? <Loader2 className="animate-spin" /> : <Power />} {off ? "Reativar" : "Desativar"}
+        </Button>
       ) : (
         <Button
           variant="ghost"
