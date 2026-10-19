@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { cancelMix } from "@/app/(app)/admin/config-actions";
@@ -11,14 +12,21 @@ export function DeleteMixButton({
   date,
   label,
   compact,
+  text,
+  redirectTo,
 }: {
   scheduleId: string;
   date: string;
   label: string;
   /** Versão pequena (lista de mixes para finalizar). */
   compact?: boolean;
+  /** Texto do botão (padrão: "Descartar" no compacto, "Deletar mix" no normal). */
+  text?: string;
+  /** Página para onde ir depois de excluir. */
+  redirectTo?: string;
 }) {
   const [pending, start] = useTransition();
+  const router = useRouter();
   return (
     <Button
       variant={compact ? "ghost" : "danger"}
@@ -31,12 +39,14 @@ export function DeleteMixButton({
         ) &&
         start(async () => {
           const r = await cancelMix(scheduleId, date);
-          if (r.ok) toast.success(r.message);
-          else toast.error(r.message);
+          if (r.ok) {
+            toast.success(r.message);
+            if (redirectTo) router.push(redirectTo);
+          } else toast.error(r.message);
         })
       }
     >
-      {pending ? <Loader2 className="animate-spin" /> : <Trash2 />} {compact ? "Descartar" : "Deletar mix"}
+      {pending ? <Loader2 className="animate-spin" /> : <Trash2 />} {text ?? (compact ? "Descartar" : "Deletar mix")}
     </Button>
   );
 }

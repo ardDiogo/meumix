@@ -1,6 +1,7 @@
 import { ArrowLeft, LockKeyhole } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { DeleteMixButton } from "@/components/admin/delete-mix-button";
 import { FinalizeSection } from "@/components/admin/finalize-section";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,16 @@ export default async function FinalizePage({ searchParams }: PageProps<"/admin/f
         <PageHeader
           title="Finalizar mix"
           description={`Mix de ${d}/${m}/${y}. Confira os times, informe o placar e as estatísticas de cada jogador.`}
+          actions={
+            <DeleteMixButton
+              scheduleId={agenda}
+              date={data}
+              label={`${d}/${m}/${y}`}
+              compact
+              text="Excluir mix"
+              redirectTo="/admin"
+            />
+          }
         />
       )}
       {valid ? (
