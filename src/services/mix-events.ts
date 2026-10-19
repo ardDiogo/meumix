@@ -419,7 +419,11 @@ export async function listPendingFinalization(limit = 6) {
     supabase.from("mix_matches").select("schedule_id, event_date"),
     supabase.from("mix_schedules").select(SCHEDULE_COLUMNS),
   ]);
-  const done = new Set((matches ?? []).map((m) => `${m.schedule_id}|${m.event_date}`));
+  // Finalizados e descartados ("Deletar mix") não aparecem.
+  const done = new Set([
+    ...(matches ?? []).map((m) => `${m.schedule_id}|${m.event_date}`),
+    ...(await cancelledOccurrences()),
+  ]);
   const byId = new Map(((schedules ?? []) as ScheduleRow[]).map((r) => [r.id, toSchedule(r)]));
   const seen = new Map<string, { scheduleId: string; date: string; players: number; eventTime: string }>();
   for (const r of regs ?? []) {

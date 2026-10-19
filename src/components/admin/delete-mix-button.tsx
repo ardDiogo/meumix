@@ -6,12 +6,24 @@ import { toast } from "sonner";
 import { cancelMix } from "@/app/(app)/admin/config-actions";
 import { Button } from "../ui/button";
 
-export function DeleteMixButton({ scheduleId, date, label }: { scheduleId: string; date: string; label: string }) {
+export function DeleteMixButton({
+  scheduleId,
+  date,
+  label,
+  compact,
+}: {
+  scheduleId: string;
+  date: string;
+  label: string;
+  /** Versão pequena (lista de mixes para finalizar). */
+  compact?: boolean;
+}) {
   const [pending, start] = useTransition();
   return (
     <Button
-      variant="danger"
-      className="w-full"
+      variant={compact ? "ghost" : "danger"}
+      size={compact ? "sm" : undefined}
+      className={compact ? "text-loss hover:text-loss" : "w-full"}
       disabled={pending}
       onClick={() =>
         confirm(
@@ -24,7 +36,7 @@ export function DeleteMixButton({ scheduleId, date, label }: { scheduleId: strin
         })
       }
     >
-      {pending ? <Loader2 className="animate-spin" /> : <Trash2 />} Deletar mix
+      {pending ? <Loader2 className="animate-spin" /> : <Trash2 />} {compact ? "Descartar" : "Deletar mix"}
     </Button>
   );
 }

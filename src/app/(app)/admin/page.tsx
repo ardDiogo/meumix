@@ -464,7 +464,7 @@ async function PendingFinalization({ viewerId }: { viewerId: string }) {
     <Card>
       <CardHeader
         title="Mixes para finalizar"
-        description="Lance o placar e as estatísticas para atualizar o ELO e o ranking."
+        description="Datas com inscritos e sem resultado. Lance o placar, ou descarte se o mix não aconteceu."
       />
       <ul className="divide-y divide-border">
         {pending.map((p) => {
@@ -477,11 +477,14 @@ async function PendingFinalization({ viewerId }: { viewerId: string }) {
                 </div>
                 <div className="text-xs text-muted">{p.players} inscritos</div>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/admin/finalizar?agenda=${p.scheduleId}&data=${p.date}`}>
-                  <Flag /> Finalizar
-                </Link>
-              </Button>
+              <div className="flex shrink-0 items-center gap-1">
+                <DeleteMixButton scheduleId={p.scheduleId} date={p.date} label={`${d}/${m}/${y}`} compact />
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/admin/finalizar?agenda=${p.scheduleId}&data=${p.date}`}>
+                    <Flag /> Finalizar
+                  </Link>
+                </Button>
+              </div>
             </li>
           );
         })}
