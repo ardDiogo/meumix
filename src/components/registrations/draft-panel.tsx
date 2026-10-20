@@ -342,6 +342,8 @@ function PickStage({
         })}
       </div>
 
+      <PickLog draft={draft} name={name} />
+
       {draft.status === "draft" && available.length > 0 && (
         <div>
           <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -390,5 +392,45 @@ function TeamBadges({ badges }: { badges: PickInfo["badges"] }) {
       ))}
       {more > 0 && <span className="pl-0.5 text-[10px] text-muted tabular">+{more}</span>}
     </span>
+  );
+}
+
+/**
+ * Ordem do PICK reconstruída dos times (que guardam a ordem de escolha) e da
+ * sequência de turnos 1-2-2-2-1, começando por quem venceu o PPT.
+ */
+function pickLog(draft: DraftView) {
+  const first: "a" | "b" = draft.winner === draft.captainB ? "b" : "a";
+  const queue = { a: draft.teamA.slice(1), b: draft.teamB.slice(1) };
+  const turns: { captain: string; picks: string[] }[] = [];
+  for (let t = 0; t < TURN_PATTERN.length; t++) {
+    const side = t % 2 === 0 ? first : first === "a" ? "b" : "a";
+    const picks = queue[side].splice(0, TURN_PATTERN[t]!);
+    if (!picks.length) break;
+    turns.push({ captain: side === "a" ? draft.captainA : draft.captainB, picks });
+  }
+  return turns;
+}
+
+function PickLog({ draft, name }: { draft: DraftView; name: (id: string | null) => string }) {
+  const turns = draft.winner ? pickLog(draft) : [];
+  if (!turns.length) return null;
+  return (
+    <ol className="space-y-0.5 text-xs text-muted" aria-label="Ordem do PICK">
+      {turns.map((t, i) => (
+        <li key={i} className="flex gap-2">
+          <span className="w-4 text-right text-subtle tabular">{i + 1}.</span>
+          <span>
+            <span className="font-medium text-fg">{name(t.captain)}</span> pickou{" "}
+            {t.picks.map((id, j) => (
+              <span key={id}>
+                {j > 0 && " e "}
+                <span className="text-fg">{name(id)}</span>
+              </span>
+            ))}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
