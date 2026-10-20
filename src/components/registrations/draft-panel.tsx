@@ -11,6 +11,7 @@ import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { TeamDot } from "../mixes/badges";
+import { BadgeIcon } from "../badges/badge-icon";
 import { WinProbability } from "./win-probability";
 import { PickPlayer } from "./pick-player";
 import type { PickInfo } from "@/lib/pick-types";
@@ -330,8 +331,9 @@ function PickStage({
                   <li key={id} className="flex items-center gap-2 text-sm">
                     <span className="w-5 text-right font-display text-xs text-subtle tabular">{i + 1}º</span>
                     <Avatar name={name(id)} src={avatar(id)} size="xs" />
-                    <span className="flex-1 truncate">{name(id)}</span>
-                    {id === captain && <Crown className="size-3.5 text-brand" aria-label="Capitão" />}
+                    <span className="min-w-0 truncate">{name(id)}</span>
+                    {id === captain && <Crown className="size-3.5 shrink-0 text-brand" aria-label="Capitão" />}
+                    <TeamBadges badges={info[id]?.badges ?? []} />
                   </li>
                 ))}
               </ol>
@@ -367,5 +369,26 @@ function PickStage({
         </div>
       )}
     </div>
+  );
+}
+
+/** Insígnias ativas ao lado do nome nos times (as mais relevantes primeiro; o resto vira +N). */
+function TeamBadges({ badges }: { badges: PickInfo["badges"] }) {
+  const shown = badges.slice(0, 4);
+  const more = badges.length - shown.length;
+  return (
+    <span className="ml-1 flex shrink-0 items-center gap-0.5" aria-label="Insígnias">
+      {shown.map((b) => (
+        <BadgeIcon
+          key={b.id}
+          icon={b.icon}
+          color={b.color}
+          size="xs"
+          className="size-5"
+          title={[b.name, b.reason ?? b.description].filter(Boolean).join(" — ")}
+        />
+      ))}
+      {more > 0 && <span className="pl-0.5 text-[10px] text-muted tabular">+{more}</span>}
+    </span>
   );
 }

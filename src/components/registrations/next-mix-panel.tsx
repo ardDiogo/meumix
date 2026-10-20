@@ -130,14 +130,13 @@ export async function NextMixPanel() {
     maxPlayers: schedule.maxPlayers,
     link: `${await siteUrl()}/confirmar`,
   });
-  // PICK: insígnias e resumo dos jogadores, carregados de uma vez (falha = PICK sem os extras).
-  const pickInfo =
-    draft && draft.status !== "completed"
-      ? await getPickInfo(classifiedList.map((r) => r.userId)).catch((e) => {
-          console.error("[pick] resumo dos jogadores:", e);
-          return {};
-        })
-      : {};
+  // PICK e times montados: insígnias e resumo dos jogadores, de uma vez (falha = sem os extras).
+  const pickInfo = draft
+    ? await getPickInfo(classifiedList.map((r) => r.userId)).catch((e) => {
+        console.error("[pick] resumo dos jogadores:", e);
+        return {};
+      })
+    : {};
   const topMaps = votes.mapTally.slice(0, MAPS_IN_ROTATION);
   const topCaptains = votes.captainTally.slice(0, CAPTAINS);
 
