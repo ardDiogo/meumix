@@ -5,6 +5,7 @@ import { getOccurrenceForFinalization } from "@/services/mix-events";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { FinalizeForm } from "./finalize-form";
 
 /** Formulário de finalização de uma ocorrência (usado no painel e em /admin/finalizar). */
@@ -41,6 +42,13 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
   // Todos os perfis: nicks do print que não se inscreveram no site ainda são ligados à conta certa.
   const { data: profiles } = await supabase!.from("profiles").select("id, display_name, elo");
   const eloOf = new Map((profiles ?? []).map((p) => [p.id as string, p.elo as number]));
+  // Apelidos já vinculados em finalizações anteriores (sem a migração 0030: nenhum).
+  const { data: aliasRows } = (await createSupabaseAdminClient()
+    ?.from("player_aliases")
+    .select("alias_norm, user_id")) ?? {
+    data: null,
+  };
+  const aliases = Object.fromEntries((aliasRows ?? []).map((a) => [a.alias_norm as string, a.user_id as string]));
 
   // Times da escolha (se houver); senão, os classificados alternados entre A e B.
   const draft = occurrence.draft;
@@ -54,6 +62,7 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
       date={date}
       maps={occurrence.votes.maps}
       initialMaps={occurrence.tiebreaker.finalMaps.map((x) => x.id)}
+      aliases={aliases}
       otherProfiles={(profiles ?? [])
         .filter((p) => !classified.some((r) => r.userId === p.id))
         .map((p) => ({ userId: p.id as string, name: p.display_name as string, elo: (p.elo as number) ?? 0 }))}

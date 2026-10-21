@@ -1,6 +1,7 @@
 "use server";
 
 import { recomputeBadgesSafely } from "@/services/badge-sync";
+import { aliasKey } from "@/lib/alias";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { pickMvpAndLanterna } from "@/lib/match-rules";
@@ -46,6 +47,8 @@ export async function finalizeMix(input: {
   platform: "manual" | "gc" | "faceit";
   maps: FinalizeMap[];
   players: FinalizePlayer[];
+  /** Nicks do print vinculados à mão a jogadores (salvos para as próximas leituras). */
+  aliases?: { alias: string; userId: string }[];
 }): Promise<FinalizeResult> {
   const session = await getSession();
   if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem finalizar mixes." };
@@ -124,6 +127,17 @@ export async function finalizeMix(input: {
     eventDate: input.date,
     detail: { match_id: data, players: players.length, maps: maps.length, platform: input.platform },
   });
+  // Apelidos vinculados à mão: só de jogadores deste mix (sem a migração 0030, ignora).
+  const inMix = new Set(players.map((p) => p.userId).filter(Boolean));
+  const aliasRows = (input.aliases ?? [])
+    .map((a) => ({ alias: a.alias.trim().slice(0, 64), alias_norm: aliasKey(a.alias), user_id: a.userId }))
+    .filter((a) => a.alias && a.alias_norm && inMix.has(a.user_id))
+    .map((a) => ({ ...a, created_by: session!.id }));
+  if (aliasRows.length) {
+    const { error: aliasError } = await admin.from("player_aliases").upsert(aliasRows, { onConflict: "alias_norm" });
+    if (aliasError) console.error("[finalize] apelidos:", aliasError.code, aliasError.message);
+  }
+
   // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
   await recomputeBadgesSafely();
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])

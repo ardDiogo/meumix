@@ -3,6 +3,7 @@
 import { AlertCircle, Crown, Flag, Loader2, Plus, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { aliasKey } from "@/lib/alias";
 import { toast } from "sonner";
 import { finalizeMix, type FinalizeMap, type FinalizePlayer } from "@/app/(app)/admin/finalizar/actions";
 import { ELO_CAP, levelForElo } from "@/lib/levels";
@@ -23,6 +24,8 @@ interface PlayerDraft extends Omit<
 > {
   key: string;
   elo: number | null;
+  /** Nick do print que o admin vinculou a este jogador (vira apelido salvo). */
+  aliasFrom?: string;
   kills: string;
   deaths: string;
   assists: string;
@@ -63,6 +66,7 @@ export function FinalizeForm({
   initialMaps,
   players,
   otherProfiles = [],
+  aliases = {},
 }: {
   scheduleId: string;
   date: string;
@@ -71,6 +75,8 @@ export function FinalizeForm({
   players: { userId: string; name: string; team: "A" | "B"; elo: number }[];
   /** Cadastrados que não se inscreveram neste mix (para ligar nicks do print). */
   otherProfiles?: { userId: string; name: string; elo: number }[];
+  /** Apelidos salvos: nick do print (normalizado) → jogador. */
+  aliases?: Record<string, string>;
 }) {
   const levels = useLevels();
   const router = useRouter();
@@ -102,6 +108,44 @@ export function FinalizeForm({
 
   const update = (key: string, patch: Partial<PlayerDraft>) =>
     setRows((r) => r.map((x) => (x.key === key ? { ...x, ...patch } : x)));
+
+  /**
+   * Convidado do print → jogador cadastrado: os números vão para a linha do
+   * jogador (ou o convidado vira ele, se não estava inscrito) e o nick fica
+   * salvo como apelido ao finalizar.
+   */
+  function linkGuest(guestKey: string, userId: string) {
+    setRows((current) => {
+      const guest = current.find((r) => r.key === guestKey);
+      if (!guest) return current;
+      const stats = {
+        team: guest.team,
+        kills: guest.kills,
+        deaths: guest.deaths,
+        assists: guest.assists,
+        firstKills: guest.firstKills,
+        adr: guest.adr,
+        kast: guest.kast,
+        rp: guest.rp,
+        s: guest.s,
+        fa: guest.fa,
+        mk: guest.mk,
+        drop: guest.drop,
+        aliasFrom: guest.name,
+      };
+      if (current.some((r) => r.userId === userId)) {
+        return current.filter((r) => r.key !== guestKey).map((r) => (r.userId === userId ? { ...r, ...stats } : r));
+      }
+      const p = otherProfiles.find((x) => x.userId === userId);
+      if (!p) return current;
+      return current.map((r) =>
+        r.key === guestKey
+          ? { ...r, ...stats, key: p.userId, userId: p.userId, name: p.name, elo: p.elo, calculateElo: true }
+          : r,
+      );
+    });
+  }
+  const isEmpty = (r: PlayerDraft) => !r.kills && !r.deaths && !r.assists;
 
   const parsed = useMemo(
     () =>
@@ -154,9 +198,21 @@ export function FinalizeForm({
       drop: intOr0(r.drop),
       calculateElo: r.calculateElo,
     }));
+    const payloadAliases = rows.flatMap((r) =>
+      r.userId && r.aliasFrom && aliasKey(r.aliasFrom) !== aliasKey(r.name)
+        ? [{ alias: r.aliasFrom, userId: r.userId }]
+        : [],
+    );
     if (!confirm("Finalizar o mix? O ELO dos jogadores será atualizado e isso não pode ser desfeito por aqui.")) return;
     start(async () => {
-      const result = await finalizeMix({ scheduleId, date, platform, maps: payloadMaps, players: payloadPlayers });
+      const result = await finalizeMix({
+        scheduleId,
+        date,
+        platform,
+        maps: payloadMaps,
+        players: payloadPlayers,
+        aliases: payloadAliases,
+      });
       if (!result.ok) {
         setError(result.message);
         toast.error(result.message);
@@ -174,8 +230,9 @@ export function FinalizeForm({
     const notes = [...result.warnings];
     const profileRows = rows.filter((r) => r.userId);
     // Vínculo garantido (SteamID / ID Faceit) vale antes da semelhança de nick.
+    // …e os apelidos salvos em finalizações anteriores.
     const linkedId = (p: MergedResult["players"][number]) =>
-      [p.name, ...p.aliases].map((n) => links[n]).find(Boolean) ?? null;
+      [p.name, ...p.aliases].map((n) => links[n] ?? aliases[aliasKey(n)]).find(Boolean) ?? null;
     const idx = matchProfiles(
       result.players,
       profileRows.map((r) => ({ name: r.name })),
@@ -427,6 +484,37 @@ export function FinalizeForm({
                             className="h-8 w-32"
                             placeholder="Convidado"
                           />
+                        )}
+                        {!r.userId && (
+                          <Select
+                            aria-label={`Vincular ${r.name} a um jogador cadastrado`}
+                            value=""
+                            onChange={(e) => e.target.value && linkGuest(r.key, e.target.value)}
+                            className="h-8 w-40 px-2 text-xs"
+                          >
+                            <option value="">Vincular a…</option>
+                            <optgroup label="Neste mix">
+                              {rows
+                                .filter((x) => x.userId)
+                                .sort((a, b) => Number(isEmpty(b)) - Number(isEmpty(a)) || a.name.localeCompare(b.name))
+                                .map((x) => (
+                                  <option key={x.userId!} value={x.userId!}>
+                                    {x.name}
+                                    {isEmpty(x) ? " (sem dados)" : ""}
+                                  </option>
+                                ))}
+                            </optgroup>
+                            <optgroup label="Outros cadastrados">
+                              {otherProfiles
+                                .filter((p) => !rows.some((x) => x.userId === p.userId))
+                                .sort((a, b) => a.name.localeCompare(b.name))
+                                .map((p) => (
+                                  <option key={p.userId} value={p.userId}>
+                                    {p.name}
+                                  </option>
+                                ))}
+                            </optgroup>
+                          </Select>
                         )}
                         {i === mvp && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-brand uppercase">
