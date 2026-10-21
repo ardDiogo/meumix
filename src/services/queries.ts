@@ -1,5 +1,6 @@
 import "server-only";
 import { findMixBySlug, mixSlug } from "@/lib/mix-slug";
+import { eloChangeSince } from "@/lib/elo";
 import { aggregatePlayer, buildScoreboard, playerMixResult } from "@/lib/stats";
 import type { ID, MapId, Player } from "@/types/domain";
 import type { Highlights, PlayerMixResult, PlayerProfile, RankingPeriod, RankingRow } from "@/types/views";
@@ -48,9 +49,10 @@ export async function getRanking({ period = "30d", query = "" }: { period?: Rank
       position: 0,
       player,
       elo: elos.get(player.id) ?? 0,
-      eloChange: history
-        .filter((h) => h.playerId === player.id && inPeriod(h.date))
-        .reduce((sum, h) => sum + (h.eloAfter - h.eloBefore), 0),
+      eloChange: eloChangeSince(
+        history.filter((h) => h.playerId === player.id),
+        since,
+      ),
       stats: aggregatePlayer(player.id, periodMixes),
     }))
     .filter((r) => r.stats.mixes > 0)

@@ -31,7 +31,15 @@ export function toEloSeries(
   }));
 }
 
-/** Soma das variações de ELO a partir de uma data. */
-export function eloChangeSince(history: { date: string; eloBefore: number; eloAfter: number }[], since: Date) {
-  return history.filter((h) => new Date(h.date) >= since).reduce((s, h) => s + h.eloAfter - h.eloBefore, 0);
+/**
+ * Soma das variações de ELO ganhas em mixes a partir de uma data. Ajustes do admin
+ * (ELO inicial, nível GC, correção manual) não têm mix e ficam de fora.
+ */
+export function eloChangeSince(
+  history: { date: string; eloBefore: number; eloAfter: number; mixId: string }[],
+  since: Date | null,
+) {
+  return history
+    .filter((h) => h.mixId && (!since || new Date(h.date) >= since))
+    .reduce((s, h) => s + h.eloAfter - h.eloBefore, 0);
 }
