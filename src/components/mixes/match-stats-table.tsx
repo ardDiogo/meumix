@@ -85,7 +85,8 @@ export function MatchStatsTable({ rows }: { rows: StatRow[] }) {
     return [...rows].sort((x, y) => {
       const a = col.value(x) ?? -Infinity;
       const b = col.value(y) ?? -Infinity;
-      return sort.desc ? b - a : a - b;
+      // Empate: mesma ordem da imagem compartilhada (mais kills, depois mais assistências).
+      return (sort.desc ? b - a : a - b) || y.k - x.k || y.a - x.a;
     });
   }, [rows, sort]);
 
