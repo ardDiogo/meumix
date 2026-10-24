@@ -58,6 +58,10 @@ export const passwordCheckMessage: Record<Exclude<PasswordCheck, "ok">, string> 
  * Auth — o perfil e os dados ligados a ele saem em cascata.
  */
 export async function deleteAccount(admin: SupabaseClient, userId: string): Promise<{ ok: boolean; message?: string }> {
+  // Crônicas citam o nick: as dos mixes que a pessoa jogou são apagadas (sem a 0032, nada a apagar).
+  const { data: played } = await admin.from("player_match_records").select("match_id").eq("user_id", userId);
+  const matchIds = [...new Set((played ?? []).map((r) => r.match_id as string))];
+  if (matchIds.length) await admin.from("mix_chronicles").delete().in("match_id", matchIds);
   // Aparelhos com avisos e palpites do bolão saem junto (sem a migração 0031, nada a apagar).
   await Promise.all([
     admin.from("push_subscriptions").delete().eq("user_id", userId),

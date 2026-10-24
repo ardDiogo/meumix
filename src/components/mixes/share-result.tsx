@@ -19,11 +19,25 @@ function WhatsAppIcon() {
  * menu de compartilhar com a imagem; no computador baixa a imagem e abre o
  * WhatsApp com o texto e o link.
  */
-export function ShareResult({ matchId, fileName, text }: { matchId: string; fileName: string; text: string }) {
+export function ShareResult({
+  matchId,
+  fileName,
+  text,
+  chronicle,
+}: {
+  matchId: string;
+  fileName: string;
+  text: string;
+  /** Crônica do mix no formato do WhatsApp (vai na imagem e na mensagem). */
+  chronicle?: string | null;
+}) {
   const [open, setOpen] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [withChronicle, setWithChronicle] = useState(true);
+  const [files, setFiles] = useState<Record<string, File>>({});
   const [loading, setLoading] = useState(false);
-  const src = `/api/mixes/${matchId}/card`;
+  const useChronicle = !!chronicle && withChronicle;
+  const src = `/api/mixes/${matchId}/card${useChronicle ? "" : "?cronica=0"}`;
+  const file = files[src] ?? null;
 
   // Baixa a imagem ao abrir: o compartilhamento precisa acontecer logo após o clique.
   useEffect(() => {
@@ -32,7 +46,9 @@ export function ShareResult({ matchId, fileName, text }: { matchId: string; file
     const timer = setTimeout(() => setLoading(true));
     fetch(src)
       .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
-      .then((blob) => !cancelled && setFile(new File([blob], fileName, { type: "image/png" })))
+      .then(
+        (blob) => !cancelled && setFiles((f) => ({ ...f, [src]: new File([blob], fileName, { type: "image/png" }) })),
+      )
       .catch(() => !cancelled && toast.error("Não foi possível gerar a imagem do resultado."))
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -42,7 +58,7 @@ export function ShareResult({ matchId, fileName, text }: { matchId: string; file
   }, [open, file, src, fileName]);
 
   const link = typeof window === "undefined" ? "" : window.location.href.split("?")[0]!;
-  const message = `${text}\n\nVeja as estatísticas completas: ${link}`;
+  const message = useChronicle ? `${chronicle}\n\n${link}` : `${text}\n\nVeja as estatísticas completas: ${link}`;
 
   function download() {
     if (!file) return;
@@ -79,12 +95,23 @@ export function ShareResult({ matchId, fileName, text }: { matchId: string; file
       </DialogTrigger>
       <DialogContent
         title="Compartilhar resultado"
-        description="Card com placar, estatísticas e destaques para mandar no grupo."
+        description="Card com placar, estatísticas, destaques e a crônica para mandar no grupo."
         className="max-w-lg"
       >
+        {chronicle && (
+          <label className="mb-3 flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={withChronicle}
+              onChange={(e) => setWithChronicle(e.target.checked)}
+              className="size-4 accent-[#FF6A00]"
+            />
+            Incluir a crônica na imagem e na mensagem
+          </label>
+        )}
         <div className="max-h-[55vh] overflow-y-auto rounded-md border border-border bg-bg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="Card do resultado do mix" className="w-full" />
+          <img key={src} src={src} alt="Card do resultado do mix" className="w-full" />
         </div>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <Button

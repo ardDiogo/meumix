@@ -59,6 +59,10 @@ export default function PrivacyPage() {
             </em>
           </li>
           <li>
+            <strong>Crônica do mix:</strong> texto bem-humorado sobre cada mix finalizado, escrito por inteligência
+            artificial a partir dos nicks e das estatísticas da partida (os mesmos dados públicos do placar).
+          </li>
+          <li>
             <strong>Prints de placares:</strong> imagens enviadas por administradores para ler o placar com inteligência
             artificial. As imagens não são guardadas; só o resultado.
           </li>
@@ -70,9 +74,9 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-2 pl-5">
           <li>
             <strong>Supabase</strong> (banco de dados e login), <strong>Vercel</strong> (hospedagem) e{" "}
-            <strong>Google</strong> (envio de e-mails pelo Gmail e leitura de prints pela IA Gemini) — fornecedores que
-            tratam os dados em nosso nome. Alguns ficam fora do Brasil (principalmente nos EUA); a transferência segue
-            as garantias contratuais desses fornecedores (LGPD, art. 33).
+            <strong>Google</strong> (envio de e-mails pelo Gmail; leitura de prints e escrita da crônica do mix pela IA
+            Gemini) — fornecedores que tratam os dados em nosso nome. Alguns ficam fora do Brasil (principalmente nos
+            EUA); a transferência segue as garantias contratuais desses fornecedores (LGPD, art. 33).
           </li>
           <li>
             <strong>Steam, Twitch, Faceit, Allstar e CSRep:</strong> consultamos dados públicos usando o identificador
@@ -90,9 +94,9 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-2 pl-5">
           <li>Conta, perfil e contas vinculadas: enquanto a conta existir.</li>
           <li>
-            Ao excluir a conta: perfil, inscrições, votos, palpites, aparelhos com avisos, clipes, insígnias,
-            penalidades e histórico de ELO são apagados. Nos placares de mixes já jogados, o nick passa a aparecer como
-            “Jogador removido”, para não alterar os resultados dos demais jogadores.
+            Ao excluir a conta: perfil, inscrições, votos, palpites, aparelhos com avisos, crônicas dos mixes que você
+            jogou, clipes, insígnias, penalidades e histórico de ELO são apagados. Nos placares de mixes já jogados, o
+            nick passa a aparecer como “Jogador removido”, para não alterar os resultados dos demais jogadores.
           </li>
           <li>Aparelhos com avisos: até você desativar (ou o navegador invalidar o endereço).</li>
           <li>IP e navegador dos registros de segurança: até 6 meses.</li>

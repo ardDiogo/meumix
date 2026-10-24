@@ -10,6 +10,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { notifyMixResult } from "@/services/notify";
+import { generateChronicle } from "@/services/chronicle";
 
 export interface FinalizeMap {
   mapId: string;
@@ -142,8 +143,11 @@ export async function finalizeMix(input: {
 
   // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
   await recomputeBadgesSafely();
-  // Avisos no celular: resultado e ELO para quem jogou, pontos do bolão para quem palpitou.
-  after(() => notifyMixResult(data as string));
+  // Depois de responder: avisos no celular e a crônica do mix (IA ou modelo pronto).
+  after(async () => {
+    await notifyMixResult(data as string);
+    await generateChronicle(data as string, session!.id);
+  });
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
     revalidatePath(path, "layout");
   return { ok: true, matchId: data as string };

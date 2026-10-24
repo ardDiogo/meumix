@@ -1,7 +1,7 @@
 import "server-only";
 
 /**
- * Leitura de imagens por IA (somente servidor), com JSON estruturado.
+ * Leitura de imagens (e textos) por IA (somente servidor), com JSON estruturado.
  * Provedores, na ordem: OpenAI (OPENAI_API_KEY; OPENAI_MODEL e
  * OPENAI_FALLBACK_MODEL opcionais) e Gemini (GEMINI_API_KEY; GEMINI_MODEL e
  * GEMINI_FALLBACK_MODEL opcionais). Em sobrecarga (429/500/503) ou modelo
@@ -30,7 +30,14 @@ function parseJson(text: string): unknown {
   }
 }
 
-async function callGemini(model: string, key: string, prompt: string, schema: object, image: VisionImage) {
+async function callGemini(
+  model: string,
+  key: string,
+  prompt: string,
+  schema: object,
+  image: VisionImage | null,
+  temperature = 0,
+) {
   const res = await fetch(
     `${process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com"}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
@@ -38,9 +45,15 @@ async function callGemini(model: string, key: string, prompt: string, schema: ob
       headers: { "content-type": "application/json", "x-goog-api-key": key },
       body: JSON.stringify({
         contents: [
-          { role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: image.mimeType, data: image.data } }] },
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              ...(image ? [{ inline_data: { mime_type: image.mimeType, data: image.data } }] : []),
+            ],
+          },
         ],
-        generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: schema },
+        generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema },
       }),
       signal: AbortSignal.timeout(45_000),
     },
@@ -53,19 +66,33 @@ async function callGemini(model: string, key: string, prompt: string, schema: ob
   return parseJson(text);
 }
 
-async function callOpenAI(model: string, key: string, prompt: string, schema: object, image: VisionImage) {
+async function callOpenAI(
+  model: string,
+  key: string,
+  prompt: string,
+  schema: object,
+  image: VisionImage | null,
+  temperature = 0,
+) {
   const res = await fetch(`${process.env.OPENAI_API_BASE || "https://api.openai.com"}/v1/chat/completions`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model,
-      temperature: 0,
+      temperature,
       messages: [
         {
           role: "user",
           content: [
             { type: "text", text: prompt },
-            { type: "image_url", image_url: { url: `data:${image.mimeType};base64,${image.data}`, detail: "high" } },
+            ...(image
+              ? [
+                  {
+                    type: "image_url",
+                    image_url: { url: `data:${image.mimeType};base64,${image.data}`, detail: "high" },
+                  },
+                ]
+              : []),
           ],
         },
       ],
@@ -84,7 +111,13 @@ async function callOpenAI(model: string, key: string, prompt: string, schema: ob
 
 type Provider = {
   label: string;
-  call: (prompt: string, gemini: object, openai: object, image: VisionImage) => Promise<unknown>;
+  call: (
+    prompt: string,
+    gemini: object,
+    openai: object,
+    image: VisionImage | null,
+    temperature?: number,
+  ) => Promise<unknown>;
 };
 
 function providers(): Provider[] {
@@ -95,7 +128,7 @@ function providers(): Provider[] {
       process.env.OPENAI_MODEL || "gpt-4.1-mini",
       process.env.OPENAI_FALLBACK_MODEL || "gpt-4o-mini",
     ]) {
-      list.push({ label: `openai:${model}`, call: (p, _g, o, img) => callOpenAI(model, openai, p, o, img) });
+      list.push({ label: `openai:${model}`, call: (p, _g, o, img, t) => callOpenAI(model, openai, p, o, img, t) });
     }
   }
   const gemini = process.env.GEMINI_API_KEY;
@@ -110,7 +143,7 @@ function providers(): Provider[] {
       "gemini-2.5-flash",
     ].filter((m, i, all): m is string => !!m && all.indexOf(m) === i);
     for (const model of models) {
-      list.push({ label: `gemini:${model}`, call: (p, g, _o, img) => callGemini(model, gemini, p, g, img) });
+      list.push({ label: `gemini:${model}`, call: (p, g, _o, img, t) => callGemini(model, gemini, p, g, img, t) });
     }
   }
   return list;
@@ -142,6 +175,28 @@ export async function visionJson<T>(opts: {
         errors.push(e instanceof Error ? e.message : String(e));
         if (e instanceof SkipModelError) break;
       }
+    }
+  }
+  return { ok: false, errors };
+}
+
+/** Mesmo fluxo de `visionJson`, só com texto (ex.: crônica do mix). */
+export async function textJson<T>(opts: {
+  prompt: string;
+  geminiSchema: object;
+  openaiSchema: object;
+  temperature?: number;
+  /** Quantos modelos tentar antes de desistir (padrão 2). */
+  maxAttempts?: number;
+  parse: (raw: unknown) => T;
+}): Promise<VisionResult<T>> {
+  const errors: string[] = [];
+  for (const { label, call } of providers().slice(0, opts.maxAttempts ?? 2)) {
+    try {
+      const raw = await call(opts.prompt, opts.geminiSchema, opts.openaiSchema, null, opts.temperature ?? 0.9);
+      return { ok: true, value: opts.parse(raw), model: label };
+    } catch (e) {
+      errors.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   return { ok: false, errors };

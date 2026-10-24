@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "test:rls": "bash scripts/test-rls.sh",
     "test:badges": "tsx --test src/lib/badge-engine.test.ts",
-    "test:bolao": "tsx --test src/lib/bolao.test.ts"
+    "test:bolao": "tsx --test src/lib/bolao.test.ts",
+    "test:cronica": "tsx --test src/lib/chronicle.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.3.1",

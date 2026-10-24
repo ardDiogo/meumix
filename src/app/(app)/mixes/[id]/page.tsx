@@ -36,6 +36,9 @@ import { toClipViews } from "@/services/clips";
 import { allstarProfileUrl } from "@/lib/allstar";
 import { MapIcon } from "@/components/maps/map-icon";
 import { BolaoResult } from "@/components/bolao/bolao-result";
+import { ChronicleCard } from "@/components/mixes/chronicle-card";
+import { chronicleText } from "@/lib/chronicle";
+import { getChronicle } from "@/services/chronicle";
 
 // Importar clipes do Allstar e da Twitch consulta vários jogadores.
 export const maxDuration = 60;
@@ -52,7 +55,10 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   // Endereço amigável: /mixes/<id> vira /mixes/outubro13.
   if (decodeURIComponent(param) !== detail.slug) redirect(`/mixes/${detail.slug}`);
   const { kind, mix, players, scoreboard, mapScoreboards, highlights } = detail;
-  const report = kind === "supabase" && mix.status === "finished" ? await getMatchReport(mix.id) : null;
+  const [report, chronicle] =
+    kind === "supabase" && mix.status === "finished"
+      ? await Promise.all([getMatchReport(mix.id), getChronicle(mix.id)])
+      : [null, null];
   const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;
   const guests = report?.rows.filter((r) => !r.userId) ?? [];
   const { session, canManageMixes } = await getPermissions();
@@ -113,6 +119,15 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
             {report?.rows.length ? (
               <ShareResult
                 matchId={mix.id}
+                chronicle={
+                  chronicle && !chronicle.hidden
+                    ? chronicleText(chronicle.content, {
+                        date: mix.scheduledAt.slice(0, 10),
+                        teams: { A: mix.teams[0].name, B: mix.teams[1].name },
+                        maps: mix.maps.map((m) => ({ name: mapName(m.mapId), scoreA: m.scoreA, scoreB: m.scoreB })),
+                      })
+                    : null
+                }
                 fileName={`meumix-${mix.scheduledAt.slice(0, 10)}.png`}
                 text={`🏆 ${mix.name}: ${mix.teams[0].name} ${score?.[0] ?? 0} x ${score?.[1] ?? 0} ${mix.teams[1].name}${
                   winner ? ` — vitória do ${mix.teams[winner === "A" ? 0 : 1].name}` : " — empate"
@@ -242,6 +257,15 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 />
               )}
               <MatchHighlights rows={report.rows} />
+              <ChronicleCard
+                matchId={mix.id}
+                canManage={canManageMixes}
+                meta={{
+                  date: mix.scheduledAt.slice(0, 10),
+                  teams: { A: mix.teams[0].name, B: mix.teams[1].name },
+                  maps: mix.maps.map((m) => ({ name: mapName(m.mapId), scoreA: m.scoreA, scoreB: m.scoreB })),
+                }}
+              />
               <BolaoResult matchId={mix.id} />
             </>
           ) : finished ? (

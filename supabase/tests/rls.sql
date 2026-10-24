@@ -47,6 +47,7 @@ select pg_temp.expect_denied('S-01 visitante lê confirm_links', 'select * from 
 select pg_temp.expect_denied('S-01 visitante lê user_penalties', 'select * from public.user_penalties', 'anon');
 select pg_temp.expect_denied('S-01 jogador lê mix_draft_ppt_choices', 'select * from public.mix_draft_ppt_choices', 'authenticated', '00000000-0000-4000-8000-000000000001');
 -- S-01b: nome completo fora da API (P-01)
+select pg_temp.expect_denied('S-05 jogador escreve crônica pela API', $q$update public.mix_chronicles set hidden = true$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-01 visitante lê palpites do bolão', 'select * from public.mix_predictions', 'anon');
 select pg_temp.expect_denied('S-01 jogador lê palpites do bolão (escondidos até fechar)', 'select * from public.mix_predictions', 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-01 jogador lê inscrições de push', 'select * from public.push_subscriptions', 'authenticated', '00000000-0000-4000-8000-000000000001');
