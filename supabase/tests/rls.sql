@@ -47,6 +47,12 @@ select pg_temp.expect_denied('S-01 visitante lê confirm_links', 'select * from 
 select pg_temp.expect_denied('S-01 visitante lê user_penalties', 'select * from public.user_penalties', 'anon');
 select pg_temp.expect_denied('S-01 jogador lê mix_draft_ppt_choices', 'select * from public.mix_draft_ppt_choices', 'authenticated', '00000000-0000-4000-8000-000000000001');
 -- S-01b: nome completo fora da API (P-01)
+select pg_temp.expect_denied('S-01 visitante lê palpites do bolão', 'select * from public.mix_predictions', 'anon');
+select pg_temp.expect_denied('S-01 jogador lê palpites do bolão (escondidos até fechar)', 'select * from public.mix_predictions', 'authenticated', '00000000-0000-4000-8000-000000000001');
+select pg_temp.expect_denied('S-01 jogador lê inscrições de push', 'select * from public.push_subscriptions', 'authenticated', '00000000-0000-4000-8000-000000000001');
+select pg_temp.expect_denied('S-01 visitante lê push_log', 'select * from public.push_log', 'anon');
+select pg_temp.expect_denied('S-05 jogador palpita direto pela API', $q$insert into public.mix_predictions (schedule_id, event_date, user_id, winner_captain, maps_won, maps_lost) select id, current_date, '00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002', 2, 1 from public.mix_schedules limit 1$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
+select pg_temp.expect_denied('S-05 jogador cadastra aparelho de outro', $q$insert into public.push_subscriptions (endpoint, user_id, p256dh, auth) values ('https://push.example/abc', '00000000-0000-4000-8000-000000000002', 'x', 'y')$q$, 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-01b visitante lê profiles.full_name', 'select full_name from public.profiles', 'anon');
 select pg_temp.expect_denied('S-01b jogador lê o próprio full_name pela API', 'select full_name from public.profiles', 'authenticated', '00000000-0000-4000-8000-000000000001');
 select pg_temp.expect_denied('S-01b visitante faz select * em profiles', 'select * from public.profiles', 'anon');

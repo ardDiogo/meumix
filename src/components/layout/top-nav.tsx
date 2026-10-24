@@ -20,7 +20,7 @@ export function TopNav({ className }: { className?: string }) {
             aria-current={active ? "page" : undefined}
             title={item.description}
             className={cn(
-              "relative flex items-center gap-2 px-3 text-sm font-medium transition-colors xl:px-4",
+              "relative flex items-center gap-1.5 px-2 text-sm font-medium transition-colors xl:gap-2 xl:px-3",
               active ? "text-brand" : "text-muted hover:text-fg",
             )}
           >

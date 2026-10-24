@@ -1,5 +1,6 @@
 import {
   Award,
+  Bell,
   CalendarClock,
   Flag,
   KeyRound,
@@ -56,6 +57,9 @@ import { getAppSetting } from "@/services/settings";
 import { getPermissions } from "@/services/auth";
 import { getNextMix, listPendingFinalization, listSchedules } from "@/services/mix-events";
 import { MapIcon as MapEmblem } from "@/components/maps/map-icon";
+import { VapidKeyGenerator } from "@/components/admin/push-admin";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { pushConfigured } from "@/services/push";
 
 export const metadata: Metadata = { title: "Painel administrativo" };
 // A leitura dos prints por IA (finalização no painel) pode levar alguns segundos por imagem.
@@ -346,6 +350,15 @@ async function SettingsTab({ canManageAdmins }: { canManageAdmins: boolean }) {
         />
         <LevelsEditor levels={levels} canEdit={canManageAdmins} />
       </Card>
+      {canManageAdmins && (
+        <Card>
+          <CardHeader
+            title={title(Bell, "Avisos no celular")}
+            description="Notificações do MeuMix (lista abrindo, PICK, bolão, resultado e lives). Cada jogador ativa em Configurações."
+          />
+          <PushAdminStatus />
+        </Card>
+      )}
       <Card>
         <CardHeader
           title={title(Plug, "API do CSRep")}
@@ -354,6 +367,46 @@ async function SettingsTab({ canManageAdmins }: { canManageAdmins: boolean }) {
         <CsrepApiPanel configured={csrepApiConfigured()} />
       </Card>
     </div>
+  );
+}
+
+async function PushAdminStatus() {
+  if (!pushConfigured()) {
+    return (
+      <CardContent className="space-y-3 text-sm">
+        <p className="text-muted">
+          Falta configurar: gere as chaves abaixo e crie <code>VAPID_PUBLIC_KEY</code> e <code>VAPID_PRIVATE_KEY</code>{" "}
+          na Vercel (Settings → Environment Variables, ambiente Production). Depois, rode a migração{" "}
+          <code>0031_bolao_push.sql</code> no Supabase.
+        </p>
+        <VapidKeyGenerator />
+      </CardContent>
+    );
+  }
+  const admin = createSupabaseAdminClient();
+  const [{ count: devices, error }, { data: users }] = admin
+    ? await Promise.all([
+        admin.from("push_subscriptions").select("endpoint", { count: "exact", head: true }),
+        admin.from("push_subscriptions").select("user_id"),
+      ])
+    : [{ count: null, error: true }, { data: null }];
+  return (
+    <CardContent className="space-y-2 text-sm">
+      {error ? (
+        <p className="text-loss">Chaves configuradas, mas falta rodar a migração 0031_bolao_push.sql no Supabase.</p>
+      ) : (
+        <p>
+          <span className="font-semibold text-win">Ativo.</span>{" "}
+          <span className="text-muted">
+            {new Set((users ?? []).map((u) => u.user_id)).size} jogador(es) em {devices ?? 0} aparelho(s).
+          </span>
+        </p>
+      )}
+      <p className="text-xs text-subtle">
+        Avisos por horário (inscrições abrindo, vagas, bolão fechando e lives) dependem do agendador chamando{" "}
+        <code>/api/cron/avisos</code> a cada 5 minutos.
+      </p>
+    </CardContent>
   );
 }
 

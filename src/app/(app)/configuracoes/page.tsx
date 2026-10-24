@@ -1,4 +1,4 @@
-import { Database, Link2, Plug, UserRound, Users } from "lucide-react";
+import { Bell, Database, Link2, Plug, UserRound, Users } from "lucide-react";
 import type { Metadata } from "next";
 import { NotImplementedButton } from "@/components/not-implemented";
 import { PageHeader } from "@/components/page-header";
@@ -15,6 +15,8 @@ import { getDataSource } from "@/services";
 import { getSession } from "@/services/auth";
 import { profileAvatars } from "@/services/avatars";
 import { profileTwitch } from "@/services/twitch";
+import { PushSettings } from "@/components/push/push-settings";
+import { pushConfigured, vapidPublicKey } from "@/services/push";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -59,6 +61,22 @@ export default async function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {session && (
+          <Card id="avisos" className="scroll-mt-20">
+            <CardHeader
+              title={
+                <span className="flex items-center gap-2">
+                  <Bell className="size-4 text-muted" /> Avisos no celular
+                </span>
+              }
+              description="Cada aparelho ativa e escolhe os seus avisos."
+            />
+            <CardContent>
+              <PushSettings publicKey={pushConfigured() ? vapidPublicKey() : null} />
+            </CardContent>
+          </Card>
+        )}
 
         {session && (
           <Card>

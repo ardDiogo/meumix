@@ -58,6 +58,11 @@ export const passwordCheckMessage: Record<Exclude<PasswordCheck, "ok">, string> 
  * Auth — o perfil e os dados ligados a ele saem em cascata.
  */
 export async function deleteAccount(admin: SupabaseClient, userId: string): Promise<{ ok: boolean; message?: string }> {
+  // Aparelhos com avisos e palpites do bolão saem junto (sem a migração 0031, nada a apagar).
+  await Promise.all([
+    admin.from("push_subscriptions").delete().eq("user_id", userId),
+    admin.from("mix_predictions").delete().eq("user_id", userId),
+  ]);
   const { error: rpcError } = await admin.rpc("anonymize_account", { p_user: userId });
   if (rpcError) {
     const missing = rpcError.code === "PGRST202" || rpcError.code === "42883";
@@ -85,6 +90,8 @@ const OWN_ROWS: { table: string; column: string; label: string }[] = [
   { table: "player_badges", column: "user_id", label: "insignias" },
   { table: "user_penalties", column: "user_id", label: "penalidades" },
   { table: "clips", column: "user_id", label: "clipes" },
+  { table: "mix_predictions", column: "user_id", label: "palpites_do_bolao" },
+  { table: "push_subscriptions", column: "user_id", label: "aparelhos_com_avisos" },
   { table: "player_ai_analyses", column: "user_id", label: "analises_csrep" },
   { table: "audit_log", column: "actor_id", label: "registro_de_acoes" },
 ];

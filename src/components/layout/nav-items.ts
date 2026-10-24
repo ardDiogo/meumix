@@ -5,6 +5,7 @@ import {
   Settings,
   ShieldCheck,
   Swords,
+  Target,
   Trophy,
   Users,
   type LucideIcon,
@@ -23,6 +24,7 @@ export const NAV_MAIN: NavItem[] = [
   { href: "/mixes", label: "Mixes", icon: Swords, description: "Criar e consultar mixes" },
   { href: "/jogadores", label: "Jogadores", icon: Users, description: "Perfis e desempenho" },
   { href: "/rankings", label: "Rankings", icon: Trophy, description: "Classificação por ELO" },
+  { href: "/bolao", label: "Bolão", icon: Target, description: "Palpites e ranking dos palpiteiros" },
   { href: "/estatisticas", label: "Estatísticas", icon: BarChart3, description: "Números da comunidade" },
   { href: "/clipes", label: "Clipes", icon: Clapperboard, description: "Clipes e highlights" },
 ];

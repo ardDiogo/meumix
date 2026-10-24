@@ -4,6 +4,6 @@ export const LEGAL = {
   controller: "o administrador do MeuMix (pessoa física)",
   contactEmail: "meumix.cs@gmail.com",
   /** Versão dos documentos; gravada no cadastro quando o usuário aceita os Termos. */
-  version: "2026-10-17",
-  updatedAt: "17 de outubro de 2026",
+  version: "2026-10-24",
+  updatedAt: "24 de outubro de 2026",
 } as const;

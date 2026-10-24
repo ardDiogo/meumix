@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { notifyCaptains, notifyPicked, notifyTeamsDefined } from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
 
 export type DraftResult = { ok: true; message: string } | { ok: false; message: string };
@@ -44,6 +46,7 @@ export async function startDraft(scheduleId: string, date: string): Promise<Draf
     .update({ status: "rejected", decided_at: new Date().toISOString() })
     .match({ schedule_id: scheduleId, event_date: date })
     .eq("status", "pending");
+  after(() => notifyCaptains(scheduleId, date));
   await audit({
     action: "admin.force_start_draft",
     outcome: "success",
@@ -91,7 +94,12 @@ export async function pickPlayer(scheduleId: string, date: string, playerId: str
   });
   if (error) return fail(dbMessage(error.message));
   // Escolha concluída → checa desempate de mapas (idempotente).
-  if ((data as { status?: string } | null)?.status === "completed") await detectTiebreaker(scheduleId, date);
+  const completed = (data as { status?: string } | null)?.status === "completed";
+  if (completed) await detectTiebreaker(scheduleId, date);
+  after(async () => {
+    await notifyPicked(scheduleId, date, playerId, session.id);
+    if (completed) await notifyTeamsDefined(scheduleId, date);
+  });
   refresh();
   return { ok: true, message: "Jogador escolhido!" };
 }

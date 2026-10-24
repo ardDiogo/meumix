@@ -5,6 +5,7 @@
  * - Arquivos estáticos (JS/CSS com hash, logos de mapas, insígnias, ícones):
  *   cache, para o app abrir rápido.
  * - API, login e ações do servidor: não passam pelo cache.
+ * - Avisos no celular (Web Push): mostra o aviso e abre a página ao tocar.
  */
 const VERSION = "meumix-v1";
 const STATIC = `${VERSION}-static`;
@@ -66,4 +67,41 @@ self.addEventListener("fetch", (event) => {
       }),
     );
   }
+});
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "MeuMix", {
+      body: data.body || "",
+      icon: "/pwa/icon-192.png",
+      tag: data.tag,
+      renotify: !!data.tag,
+      data: { url: data.url || "/dashboard" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/dashboard", self.location.origin);
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      // Mesma origem: reaproveita uma aba aberta do MeuMix.
+      if (target.origin === self.location.origin) {
+        const tab = list.find((c) => new URL(c.url).origin === self.location.origin);
+        if (tab)
+          return tab
+            .navigate(target.href)
+            .then((c) => (c || tab).focus())
+            .catch(() => self.clients.openWindow(target.href));
+      }
+      return self.clients.openWindow(target.href);
+    }),
+  );
 });

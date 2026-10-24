@@ -42,8 +42,14 @@ export default function PrivacyPage() {
             qualquer momento. <em>Base legal: execução do contrato, a seu pedido.</em>
           </li>
           <li>
-            <strong>Participação nos mixes:</strong> inscrições, votos de mapa e capitão, penalidades por faltas e
-            atrasos. <em>Base legal: execução do contrato; penalidades por legítimo interesse.</em>
+            <strong>Participação nos mixes:</strong> inscrições, votos de mapa e capitão, palpites do bolão (que ficam
+            visíveis para todos depois que o bolão fecha), penalidades por faltas e atrasos.{" "}
+            <em>Base legal: execução do contrato; penalidades por legítimo interesse.</em>
+          </li>
+          <li>
+            <strong>Avisos no celular (opcional):</strong> o endereço de entrega e as chaves de criptografia que o
+            navegador do seu aparelho gera ao ativar os avisos, o navegador usado e os tipos de aviso escolhidos. Você
+            desativa em Configurações. <em>Base legal: consentimento (art. 7º, I).</em>
           </li>
           <li>
             <strong>Registros de segurança:</strong> endereço IP, navegador, tipo de aparelho e horários das inscrições,
@@ -72,6 +78,10 @@ export default function PrivacyPage() {
             <strong>Steam, Twitch, Faceit, Allstar e CSRep:</strong> consultamos dados públicos usando o identificador
             que você vinculou (SteamID, canal ou sala). Não enviamos seu e-mail nem outros dados a eles.
           </li>
+          <li>
+            <strong>Serviço de avisos do seu navegador</strong> (Google, Apple ou Mozilla), se você ativar os avisos:
+            recebe cada aviso criptografado só para entregá-lo ao seu aparelho.
+          </li>
           <li>Autoridades, quando houver obrigação legal ou ordem judicial.</li>
         </ul>
       </Section>
@@ -80,10 +90,11 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-2 pl-5">
           <li>Conta, perfil e contas vinculadas: enquanto a conta existir.</li>
           <li>
-            Ao excluir a conta: perfil, inscrições, votos, clipes, insígnias, penalidades e histórico de ELO são
-            apagados. Nos placares de mixes já jogados, o nick passa a aparecer como “Jogador removido”, para não
-            alterar os resultados dos demais jogadores.
+            Ao excluir a conta: perfil, inscrições, votos, palpites, aparelhos com avisos, clipes, insígnias,
+            penalidades e histórico de ELO são apagados. Nos placares de mixes já jogados, o nick passa a aparecer como
+            “Jogador removido”, para não alterar os resultados dos demais jogadores.
           </li>
+          <li>Aparelhos com avisos: até você desativar (ou o navegador invalidar o endereço).</li>
           <li>IP e navegador dos registros de segurança: até 6 meses.</li>
           <li>Registro de ações administrativas: até 24 meses, sem dados que identifiquem quem excluiu a conta.</li>
           <li>Cópias de segurança: apagadas conforme o ciclo de backups (até 6 meses).</li>

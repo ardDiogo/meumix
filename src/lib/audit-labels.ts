@@ -6,6 +6,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "vote.captains": "Votou nos capitães",
   "vote.map_tiebreaker": "Votou no desempate de mapas",
   "vote.team_suggestion": "Votou na sugestão de times",
+  "vote.bolao": "Palpitou no bolão",
   "admin.remove_registration": "Removeu inscrição",
   "admin.reset_mix": "Reiniciou o mix",
   "admin.cancel_mix": "Deletou o mix",
@@ -52,6 +53,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "profile.steam_link": "Vinculou Steam",
   "profile.twitch_link": "Cadastrou canal da Twitch",
   "profile.rotate_confirm_link": "Gerou novo link pessoal",
+  "push.subscribe": "Ativou avisos no celular",
   "player.csrep_ai": "Análise do CSRep por IA",
   "clip.add": "Enviou clipe",
   "clip.delete": "Excluiu clipe",
@@ -65,6 +67,7 @@ export const AUDIT_CATEGORIES = {
   admin: "Administração",
   badge: "Insígnias",
   profile: "Perfil",
+  push: "Avisos",
   player: "IA / CSRep",
   clip: "Clipes",
 } as const;

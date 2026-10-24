@@ -3,11 +3,13 @@
 import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { aliasKey } from "@/lib/alias";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { pickMvpAndLanterna } from "@/lib/match-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { notifyMixResult } from "@/services/notify";
 
 export interface FinalizeMap {
   mapId: string;
@@ -140,6 +142,8 @@ export async function finalizeMix(input: {
 
   // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
   await recomputeBadgesSafely();
+  // Avisos no celular: resultado e ELO para quem jogou, pontos do bolão para quem palpitou.
+  after(() => notifyMixResult(data as string));
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
     revalidatePath(path, "layout");
   return { ok: true, matchId: data as string };

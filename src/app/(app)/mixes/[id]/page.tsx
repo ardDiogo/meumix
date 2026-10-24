@@ -35,6 +35,7 @@ import { twitchChannelUrl } from "@/lib/twitch";
 import { toClipViews } from "@/services/clips";
 import { allstarProfileUrl } from "@/lib/allstar";
 import { MapIcon } from "@/components/maps/map-icon";
+import { BolaoResult } from "@/components/bolao/bolao-result";
 
 // Importar clipes do Allstar e da Twitch consulta vários jogadores.
 export const maxDuration = 60;
@@ -241,6 +242,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 />
               )}
               <MatchHighlights rows={report.rows} />
+              <BolaoResult matchId={mix.id} />
             </>
           ) : finished ? (
             <>

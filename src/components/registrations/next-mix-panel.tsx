@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { getPermissions } from "@/services/auth";
 import { getNextMix } from "@/services/mix-events";
 import { getPickInfo } from "@/services/pick-info";
+import { loadBolao, typicalMapsCount } from "@/services/bolao";
+import { BolaoPanel } from "../bolao/bolao-panel";
 import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -137,6 +139,24 @@ export async function NextMixPanel() {
         return {};
       })
     : {};
+  // Bolão: abre com os times definidos e fecha no horário do mix (falha = sem bolão).
+  const bolao =
+    draft?.status === "completed"
+      ? await loadBolao({
+          scheduleId: schedule.id,
+          date: occurrence.date,
+          closesAt: occurrence.eventAt,
+          captains: [draft.captainA, draft.captainB],
+          teams: [draft.teamA, draft.teamB],
+          mapsCount: await typicalMapsCount(),
+          finalizedMatchId: result.mix.finalizedMatchId,
+          viewerId: session?.id ?? null,
+          now,
+        }).catch((e) => {
+          console.error("[bolao]", e);
+          return null;
+        })
+      : null;
   const topMaps = votes.mapTally.slice(0, MAPS_IN_ROTATION);
   const topCaptains = votes.captainTally.slice(0, CAPTAINS);
 
@@ -269,6 +289,18 @@ export async function NextMixPanel() {
           classifiedCount={classified}
           isClassified={mine?.status === "classified"}
           isAdmin={canManageMixes}
+        />
+      )}
+
+      {bolao && (
+        <BolaoPanel
+          scheduleId={schedule.id}
+          date={occurrence.date}
+          bolao={bolao}
+          people={Object.fromEntries(
+            registrations.map((r) => [r.userId, { name: r.displayName, avatarUrl: r.avatarUrl }]),
+          )}
+          loggedIn={!!session}
         />
       )}
 

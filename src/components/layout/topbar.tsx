@@ -24,10 +24,10 @@ export function Topbar({
         <Logo height={30} className="shrink-0" />
         <TopNav className="hidden lg:flex" />
         <div className="ml-auto flex items-center gap-2">
-          <PlayerSearch className="hidden w-56 xl:block" />
+          <PlayerSearch className="hidden w-56 2xl:block" />
           <Link
             href="/jogadores"
-            className="flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg xl:hidden"
+            className="flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg 2xl:hidden"
             aria-label="Buscar jogadores"
           >
             <Search className="size-4" />

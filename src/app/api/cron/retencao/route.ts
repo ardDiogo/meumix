@@ -17,5 +17,10 @@ export async function GET(request: Request) {
     console.error("[retencao]", error.code, error.message);
     return Response.json({ ok: false, error: error.code }, { status: 500 });
   }
+  // Registro dos avisos já enviados (só serve para não repetir): 30 dias bastam.
+  await admin
+    .from("push_log")
+    .delete()
+    .lt("created_at", new Date(Date.now() - 30 * 86_400_000).toISOString());
   return Response.json({ ok: true, ...(data as Record<string, number>) });
 }

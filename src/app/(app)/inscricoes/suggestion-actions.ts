@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { ACCEPT_RATIO } from "@/lib/team-balance";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { notifyTeamsDefined } from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
 
 export type SuggestionResult = { ok: boolean; message: string };
@@ -55,6 +57,7 @@ async function accept(
     .update({ status: "accepted", decided_at: new Date().toISOString() })
     .match(match);
   await detectTiebreaker(match.schedule_id, match.event_date);
+  after(() => notifyTeamsDefined(match.schedule_id, match.event_date));
   return true;
 }
 

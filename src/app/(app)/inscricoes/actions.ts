@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { currentOccurrence, registrationWindow } from "@/lib/mix-schedule";
 import { captainsDecided, CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
@@ -10,6 +11,7 @@ import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
+import { notifyCaptains } from "@/services/notify";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
 /**
@@ -355,7 +357,8 @@ export async function submitCaptainVotes(
       .eq("status", "pending")
       .maybeSingle();
     if ((cast >= v.ctx.schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER || decided) && !pending) {
-      await v.ctx.admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
+      const { error } = await v.ctx.admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
+      if (!error) after(() => notifyCaptains(scheduleId, date));
     }
   }
   refresh();
