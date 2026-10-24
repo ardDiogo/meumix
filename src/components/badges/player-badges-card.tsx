@@ -1,4 +1,6 @@
 import { ChevronDown } from "lucide-react";
+import { BADGE_RULES } from "@/lib/badge-engine";
+import { BOLAO_MAX } from "@/lib/bolao";
 import { formatDate } from "@/lib/format";
 import type { Badge, BadgeProgressView, PlayerBadge } from "@/services/badges";
 import { Card, CardHeader } from "../ui/card";
@@ -34,10 +36,27 @@ export function PlayerBadgesCard({
       (x): x is { p: BadgeProgressView; badge: Badge } =>
         !!x.badge && x.badge.enabled && !owned.has(x.badge.id) && x.p.current < x.p.target,
     );
-  // "Ser o X do próximo mix" (0/1): só ícones, para não ocupar uma linha cada.
-  const nextMix = pending.filter(({ p }) => p.target === 1);
+  // Automáticas ainda sem progresso para o jogador (ex.: as do bolão para quem nunca palpitou):
+  // aparecem zeradas, para todo mundo saber que existem.
+  const withProgress = new Set(progress.map((p) => p.badgeId));
+  for (const badge of catalog) {
+    if (!badge.enabled || !badge.autoRule || owned.has(badge.id) || withProgress.has(badge.id)) continue;
+    // Meta: a do parâmetro principal da regra (ex.: 3 palpites, 50 mixes); "do último mix" = 1.
+    const defaults = BADGE_RULES[badge.autoRule].defaults;
+    const main = Object.keys(defaults)[0];
+    const target =
+      badge.autoRule === "bolao_perfect" ? BOLAO_MAX : main ? (badge.params[main] ?? defaults[main] ?? 1) : 1;
+    pending.push({
+      badge,
+      p: { userId: "", badgeId: badge.id, current: 0, target, detail: badge.unlock ?? "Ainda não conquistada" },
+    });
+  }
+  // Bolão em seção própria (sempre visível); "ser o X do próximo mix" (0/1) só em ícones.
+  const isBolao = (b: Badge) => b.autoRule?.startsWith("bolao_") ?? false;
+  const bolao = pending.filter(({ badge }) => isBolao(badge));
+  const nextMix = pending.filter(({ p, badge }) => p.target === 1 && !isBolao(badge));
   const inProgress = pending
-    .filter(({ p }) => p.target > 1)
+    .filter(({ p, badge }) => p.target > 1 && !isBolao(badge))
     .sort((a, b) => b.p.current / b.p.target - a.p.current / a.p.target);
   if (!badges.length && !pending.length) return null;
 
@@ -83,6 +102,17 @@ export function PlayerBadgesCard({
                 </ul>
               </details>
             )}
+          </section>
+        )}
+
+        {bolao.length > 0 && (
+          <section>
+            <Heading>Bolão</Heading>
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {bolao.map((x) => (
+                <Progress key={x.badge.id} {...x} />
+              ))}
+            </ul>
           </section>
         )}
 
