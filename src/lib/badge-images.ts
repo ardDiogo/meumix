@@ -50,4 +50,9 @@ export const BADGE_IMAGES: Record<string, { label: string; src: string }> = {
   "img:reimapa": { label: "Troféu", src: "/badges/reimapa.png" },
   "img:veterano": { label: "Despertador", src: "/badges/veterano.png" },
   "img:lenda": { label: "Diamante", src: "/badges/lenda.png" },
+  "img:pitaco": { label: "Megafone", src: "/badges/pitaco.png" },
+  "img:alambrado": { label: "Pipoca", src: "/badges/alambrado.png" },
+  "img:maedina": { label: "Bola de cristal", src: "/badges/maedina.png" },
+  "img:zicado": { label: "Gato preto", src: "/badges/zicado.png" },
+  "img:chutometro": { label: "Tonto", src: "/badges/chutometro.png" },
 };

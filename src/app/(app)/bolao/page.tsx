@@ -8,18 +8,23 @@ import { Table, TD, TH, THead, TR } from "@/components/ui/table";
 import { BOLAO_MAX, BOLAO_POINTS } from "@/lib/bolao";
 import { cn } from "@/lib/utils";
 import { getBolaoRanking } from "@/services/bolao";
+import { playerBadges } from "@/services/badges";
+import { BadgeIcon } from "@/components/badges/badge-icon";
 
 export const metadata: Metadata = { title: "Bolão" };
 
 export default async function BolaoPage() {
   const ranking = await getBolaoRanking();
   const rows = ranking?.rows ?? [];
+  // Insígnias do bolão (Rei do Pitaco, Alambrado, Mãe Diná, Zicado, Chutômetro) ao lado do nome.
+  const badges = rows.length ? await playerBadges(rows.map((r) => r.userId)).catch(() => []) : [];
+  const bolaoBadges = (userId: string) => badges.filter((b) => b.userId === userId && b.rule?.startsWith("bolao_"));
 
   return (
     <>
       <PageHeader
         title="Bolão"
-        description="Palpite em todo mix, jogando ou não: vale só a glória (e a zoeira). O bolão abre quando os times são definidos e fecha no horário do mix."
+        description="Palpite em todo mix, jogando ou não: vale só a glória (e a zoeira). O bolão abre quando os times são definidos e fecha no horário do mix. Insígnias do bolão: Rei do Pitaco, Alambrado do Mix, Mãe Diná, Zicado e Chutômetro Quebrado."
       />
 
       <Card className="mb-4">
@@ -82,6 +87,15 @@ export default async function BolaoPage() {
                     <div className="flex items-center gap-2.5">
                       <Avatar name={r.name} src={r.avatarUrl} size="sm" />
                       <span className="font-medium">{r.name}</span>
+                      {bolaoBadges(r.userId).map((b) => (
+                        <BadgeIcon
+                          key={b.id}
+                          icon={b.icon}
+                          color={b.color}
+                          size="xs"
+                          title={`${b.name}${b.reason ? ` — ${b.reason}` : ""}`}
+                        />
+                      ))}
                     </div>
                   </TD>
                   <TD className="text-right font-display text-base font-bold">{r.points}</TD>

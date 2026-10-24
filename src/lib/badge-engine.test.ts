@@ -323,3 +323,96 @@ describe("Destaques do último mix", () => {
     assert.match(progress.find((p) => p.userId === "ard" && p.badgeId === "b-bait")!.detail, /menos first kills/);
   });
 });
+
+describe("Bolão", () => {
+  const PITACO: EngineBadge = { id: "b-pit", rule: "bolao_leader", params: { min_bets: 2 } };
+  const ALAMBRADO: EngineBadge = { id: "b-ala", rule: "bolao_spectator", params: { n: 2 } };
+  const MAE_DINA: EngineBadge = { id: "b-dina", rule: "bolao_perfect" };
+  const ZICADO: EngineBadge = { id: "b-zic", rule: "bolao_miss_streak", params: { n: 2 } };
+  const CHUTOMETRO: EngineBadge = { id: "b-chu", rule: "bolao_zero" };
+  const ALL = [PITACO, ALAMBRADO, MAE_DINA, ZICADO, CHUTOMETRO];
+  /** Palpite conferido: v = acertou o vencedor, p = placar, m = MVP, l = lanterna. */
+  const bet = (userId: string, hits: string, decided = true) => {
+    const s = {
+      winner: hits.includes("v"),
+      score: hits.includes("p"),
+      mvp: hits.includes("m"),
+      lanterna: hits.includes("l"),
+    };
+    return {
+      userId,
+      decided,
+      score: { ...s, points: (s.winner ? 3 : 0) + (s.score ? 2 : 0) + (s.mvp ? 3 : 0) + (s.lanterna ? 2 : 0) },
+    };
+  };
+  const withBets = (bets: ReturnType<typeof bet>[]) => ({ ...mix([W]), bets, participants: ["ard", "barker"] });
+
+  it("Rei do Pitaco: 1º do bolão com o mínimo de palpites, e passa adiante", () => {
+    const matches = [
+      withBets([bet("ze", "vp"), bet("tio", "v")]),
+      withBets([bet("ze", ""), bet("tio", "vm")]),
+      withBets([bet("ze", ""), bet("tio", "v")]),
+    ];
+    const { rows } = computeBadges({ matches: matches.slice(0, 1), badges: ALL });
+    assert.equal(of(rows, "b-pit", "ze").length, 0, "só 1 palpite: ainda não disputa");
+    const full = computeBadges({ matches, badges: ALL }).rows;
+    assert.equal(of(full, "b-pit", "ze").length, 0);
+    assert.equal(active(full, "b-pit", "tio").length, 1);
+  });
+
+  it("Alambrado: palpitar em mixes seguidos sem jogar; jogar encerra", () => {
+    const m1 = withBets([bet("ze", "v"), bet("ard", "v")]);
+    const m2 = withBets([bet("ze", "")]);
+    const m3 = { ...withBets([bet("ze", "v")]), participants: ["ard", "barker", "ze"] };
+    const { rows } = computeBadges({ matches: [m1, m2, m3], badges: ALL });
+    const z = of(rows, "b-ala", "ze");
+    assert.equal(z.length, 1);
+    assert.match(z[0]!.endReason ?? "", /Jogou o mix/);
+    assert.equal(of(rows, "b-ala", "ard").length, 0, "quem jogou não é alambrado");
+  });
+
+  it("Mãe Diná é permanente: gabaritou uma vez, fica para sempre", () => {
+    const { rows } = computeBadges({
+      matches: [withBets([bet("ze", "vpml")]), withBets([bet("ze", "")])],
+      badges: ALL,
+    });
+    const d = of(rows, "b-dina", "ze");
+    assert.equal(d.length, 1);
+    assert.equal(d[0]!.deactivatedAt, null);
+  });
+
+  it("Zicado: erra o vencedor seguido; empate não conta; acertar encerra", () => {
+    const { rows } = computeBadges({
+      matches: [
+        withBets([bet("ze", "m")]),
+        withBets([bet("ze", "", false)]),
+        withBets([bet("ze", "l")]),
+        withBets([bet("ze", "v")]),
+      ],
+      badges: ALL,
+    });
+    const z = of(rows, "b-zic", "ze");
+    assert.equal(z.length, 1);
+    assert.match(z[0]!.endReason ?? "", /Acertou o vencedor/);
+  });
+
+  it("Chutômetro Quebrado: quem zerou o último bolão; pontuar tira", () => {
+    const { rows, progress } = computeBadges({
+      matches: [withBets([bet("ze", ""), bet("tio", "")]), withBets([bet("ze", "v"), bet("tio", "")])],
+      badges: ALL,
+    });
+    assert.equal(active(rows, "b-chu", "ze").length, 0);
+    assert.equal(active(rows, "b-chu", "tio").length, 1);
+    for (const b of ALL)
+      assert.ok(
+        progress.some((p) => p.userId === "ze" && p.badgeId === b.id),
+        `sem progresso de ${b.rule}`,
+      );
+    assert.match(progress.find((p) => p.userId === "ze" && p.badgeId === "b-dina")!.detail, /Melhor bolão: 3 de 10/);
+  });
+
+  it("mix sem bolão não mexe nas insígnias do bolão", () => {
+    const { rows } = computeBadges({ matches: [withBets([bet("ze", "")]), mix([W])], badges: ALL });
+    assert.equal(active(rows, "b-chu", "ze").length, 1);
+  });
+});

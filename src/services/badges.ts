@@ -50,6 +50,8 @@ export interface PlayerBadge {
   priority: number;
   /** Desativada à mão pelo admin (o recálculo não reativa). */
   locked: boolean;
+  /** Regra automática (null = manual). */
+  rule: BadgeRule | null;
 }
 
 export interface BadgeProgressView {
@@ -144,6 +146,7 @@ export async function playerBadges(userIds?: string[], opts: { history?: boolean
         scope: (r.scope as string | undefined) ?? "",
         priority: rule ? BADGE_RULES[rule].priority : MANUAL_BADGE_PRIORITY,
         locked: r.locked === true,
+        rule,
         enabled: enabledOf(b),
       };
     })

@@ -1,3 +1,4 @@
+import { BOLAO_MAX, bolaoRanking, type PredictionScore } from "./bolao";
 import { approxRating } from "./rating";
 
 /**
@@ -14,6 +15,8 @@ import { approxRating } from "./rating";
  *   Mapa sem placar ou empatado não conta e não quebra a sequência.
  * - Ranking = o mesmo da página Rankings: ELO, desempate pela taxa de vitória
  *   nos mixes, depois mais mixes e por fim o id (determinístico).
+ * - Bolão: só contam mixes com palpites; pontos conferidos pelo resultado
+ *   oficial (src/lib/bolao.ts). Quem só palpita também ganha insígnias.
  */
 
 export type BadgeRule =
@@ -33,7 +36,12 @@ export type BadgeRule =
   | "latest_top_fk"
   | "latest_top_assists"
   | "latest_top_deaths"
-  | "latest_low_fk";
+  | "latest_low_fk"
+  | "bolao_leader"
+  | "bolao_spectator"
+  | "bolao_perfect"
+  | "bolao_miss_streak"
+  | "bolao_zero";
 
 /** Destaques do último mix (os mesmos cards de "Destaques da partida"). */
 export const TOP_RULES = {
@@ -103,6 +111,11 @@ export const BADGE_RULES: Record<
     defaults: {},
     priority: 21,
   },
+  bolao_leader: { label: "Liderança do bolão", kind: "dynamic", defaults: { min_bets: 3 }, priority: 45 },
+  bolao_perfect: { label: "Gabaritar o bolão", kind: "permanent", defaults: {}, priority: 44 },
+  bolao_spectator: { label: "Palpitar sem jogar", kind: "dynamic", defaults: { n: 3 }, priority: 35 },
+  bolao_miss_streak: { label: "Errar o vencedor seguido", kind: "dynamic", defaults: { n: 3 }, priority: 19 },
+  bolao_zero: { label: "Zerar o último bolão", kind: "dynamic", defaults: {}, priority: 18 },
 };
 
 /** Prioridade para mostrar no PICK (manuais ficam no meio). */
@@ -134,6 +147,17 @@ export interface EngineMatch {
    * convidados, pela mesma função da página do mix). `null` = ninguém com conta.
    */
   tops?: Partial<Record<TopKey, string | null>>;
+  /** Palpites do bolão deste mix, já conferidos. */
+  bets?: EngineBet[];
+  /** Todos os jogadores com conta neste mix (inclusive sem ELO aplicado). */
+  participants?: string[];
+}
+
+export interface EngineBet {
+  userId: string;
+  score: PredictionScore;
+  /** O mix teve vencedor (empate não conta para acerto nem erro do vencedor). */
+  decided: boolean;
 }
 
 export interface EngineBadge {
@@ -232,6 +256,12 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
   const ratings = new Map<string, (number | null)[]>();
   const mapStats = new Map<string, Map<string, { played: number; won: number }>>();
   const positions: Map<string, number>[] = [];
+  // Bolão.
+  const bolaoScores: { userId: string; score: PredictionScore }[] = [];
+  const bettors = new Set<string>();
+  const spectatorStreak = new Map<string, number>();
+  const missStreak = new Map<string, number>();
+  const bestBet = new Map<string, number>();
 
   const standings = (eloOf: (u: string) => number | undefined) =>
     [...mixes.keys()]
@@ -411,6 +441,65 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
       }
     }
 
+    // Bolão (só mixes que tiveram palpites).
+    const bets = match.bets ?? [];
+    if (bets.length) {
+      const played = new Set(match.participants ?? records.map((r) => r.userId));
+      for (const bet of bets) {
+        bettors.add(bet.userId);
+        bolaoScores.push({ userId: bet.userId, score: bet.score });
+        bestBet.set(bet.userId, Math.max(bestBet.get(bet.userId) ?? 0, bet.score.points));
+      }
+      const betOf = new Map(bets.map((b) => [b.userId, b]));
+
+      // Rei do Pitaco: 1º no ranking do bolão.
+      const ranking = bolaoRanking(bolaoScores);
+      for (const b of byRule("bolao_leader")) {
+        const leader = ranking.find((r) => r.bets >= param(b, "min_bets") && r.points > 0) ?? null;
+        for (const u of holders(b)) {
+          if (u !== leader?.userId) stop(b, u, when, `Perdeu a liderança do bolão no mix de ${label}`);
+        }
+        if (leader)
+          start(b, leader.userId, `leader:${match.id}`, when, `1º do bolão com ${leader.points} pontos (até ${label})`);
+      }
+
+      // Alambrado: palpita em mixes seguidos sem jogar.
+      for (const u of bettors) {
+        const bet = betOf.get(u);
+        const n = bet && !played.has(u) ? (spectatorStreak.get(u) ?? 0) + 1 : 0;
+        spectatorStreak.set(u, n);
+        for (const b of byRule("bolao_spectator")) {
+          const target = param(b, "n");
+          if (n >= target) start(b, u, match.id, when, `Palpitou em ${target} mixes seguidos sem jogar (até ${label})`);
+          if (!n) stop(b, u, when, bet ? `Jogou o mix de ${label}` : `Não palpitou no mix de ${label}`);
+        }
+      }
+
+      for (const bet of bets) {
+        // Mãe Diná (permanente): gabaritou um bolão.
+        if (bet.score.points >= BOLAO_MAX)
+          for (const b of byRule("bolao_perfect"))
+            start(b, bet.userId, "gabarito", when, `Gabaritou o bolão do mix de ${label} (${BOLAO_MAX} pontos)`);
+        // Zicado: errou o vencedor em bolões seguidos (empate não conta).
+        if (!bet.decided) continue;
+        const n = bet.score.winner ? 0 : (missStreak.get(bet.userId) ?? 0) + 1;
+        missStreak.set(bet.userId, n);
+        for (const b of byRule("bolao_miss_streak")) {
+          const target = param(b, "n");
+          if (n >= target)
+            start(b, bet.userId, match.id, when, `Errou o vencedor em ${target} bolões seguidos (até ${label})`);
+          if (!n) stop(b, bet.userId, when, `Acertou o vencedor no mix de ${label}`);
+        }
+      }
+
+      // Chutômetro Quebrado: zerou o bolão mais recente.
+      const zeros = new Set(bets.filter((bet) => bet.score.points === 0).map((bet) => bet.userId));
+      for (const b of byRule("bolao_zero")) {
+        for (const u of holders(b)) if (!zeros.has(u)) stop(b, u, when, `Pontuou no bolão do mix de ${label}`);
+        for (const u of zeros) start(b, u, match.id, when, `0 pontos no bolão do mix de ${label}`);
+      }
+    }
+
     // Veterano (permanente: nunca é encerrada).
     for (const b of byRule("veteran")) {
       const n = param(b, "mixes");
@@ -558,6 +647,49 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
         );
       }
     }
+  }
+  // Progresso do bolão (inclui quem só palpita).
+  const bolaoOrder = bolaoRanking(bolaoScores);
+  for (const u of bettors) {
+    const mine = bolaoOrder.find((r) => r.userId === u);
+    for (const b of byRule("bolao_leader")) {
+      const min = param(b, "min_bets");
+      const bets = mine?.bets ?? 0;
+      const leader = bolaoOrder.find((r) => r.bets >= min && r.points > 0);
+      if (bets < min) {
+        push(
+          u,
+          b,
+          bets,
+          min,
+          `Faltam ${plural(min - bets, "palpite", "palpites")} para entrar na disputa (mínimo ${min})`,
+        );
+      } else if (leader && mine) {
+        const pos = bolaoOrder.filter((r) => r.bets >= min).findIndex((r) => r.userId === u) + 1;
+        push(
+          u,
+          b,
+          mine.points,
+          Math.max(leader.points, 1),
+          `${pos}º no bolão · faltam ${Math.max(0, leader.points - mine.points)} pontos para o 1º`,
+        );
+      }
+    }
+    for (const b of byRule("bolao_spectator")) {
+      const n = param(b, "n");
+      const cur = spectatorStreak.get(u) ?? 0;
+      push(u, b, cur, n, `${Math.min(cur, n)} de ${n} mixes seguidos palpitando sem jogar`);
+    }
+    for (const b of byRule("bolao_perfect")) {
+      const best = bestBet.get(u) ?? 0;
+      push(u, b, best, BOLAO_MAX, `Melhor bolão: ${best} de ${BOLAO_MAX} pontos`);
+    }
+    for (const b of byRule("bolao_miss_streak")) {
+      const n = param(b, "n");
+      const cur = missStreak.get(u) ?? 0;
+      push(u, b, cur, n, `${Math.min(cur, n)} de ${n} bolões seguidos errando o vencedor`);
+    }
+    for (const b of byRule("bolao_zero")) push(u, b, 0, 1, "Zerar o próximo bolão");
   }
   return { rows, progress };
 }

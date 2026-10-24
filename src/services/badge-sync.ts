@@ -1,5 +1,13 @@
 import "server-only";
-import { computeBadges, type BadgeRule, type EngineBadge, type EngineMatch, type TopKey } from "@/lib/badge-engine";
+import {
+  computeBadges,
+  type BadgeRule,
+  type EngineBadge,
+  type EngineBet,
+  type EngineMatch,
+  type TopKey,
+} from "@/lib/badge-engine";
+import { outcomeOf, scorePrediction } from "@/lib/bolao";
 import { matchHighlights, type StatRow } from "@/lib/match-highlights";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -49,8 +57,8 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     }));
   if (!badges.length) return { ok: true, inseridas: 0, atualizadas: 0, removidas: 0, badges: 0 };
 
-  const [matches, records, profiles, maps, allRows] = await Promise.all([
-    admin.from("mix_matches").select("id, event_date, finalized_at, maps"),
+  const [matches, records, profiles, maps, allRows, predictions, drafts] = await Promise.all([
+    admin.from("mix_matches").select("id, schedule_id, event_date, finalized_at, maps"),
     // O Supabase devolve no máximo 1000 linhas por consulta: lê em páginas.
     allPages((from, to) =>
       admin
@@ -76,6 +84,12 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
         .order("id")
         .range(from, to),
     ),
+    // Bolão (sem a migração 0031, só fica sem as insígnias do bolão).
+    admin
+      .from("mix_predictions")
+      .select("schedule_id, event_date, user_id, winner_captain, maps_won, maps_lost, mvp_id, lanterna_id")
+      .limit(20000),
+    admin.from("mix_draft_state").select("schedule_id, event_date, captain_a, captain_b"),
   ]);
   if (matches.error || records.error || profiles.error) {
     return { ok: false, message: "Não foi possível ler os resultados." };
@@ -138,6 +152,50 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     return tops;
   };
 
+  // Palpites conferidos de cada mix (mesma conta da página do bolão).
+  const predsOf = new Map<string, NonNullable<typeof predictions.data>>();
+  for (const p of predictions.error ? [] : (predictions.data ?? [])) {
+    const k = `${p.schedule_id}|${p.event_date}`;
+    predsOf.set(k, [...(predsOf.get(k) ?? []), p]);
+  }
+  const draftOf = new Map((drafts.data ?? []).map((d) => [`${d.schedule_id}|${d.event_date}`, d]));
+  const betsOf = (m: Record<string, unknown>): EngineBet[] => {
+    const k = `${m.schedule_id}|${m.event_date}`;
+    const preds = predsOf.get(k);
+    if (!preds?.length) return [];
+    const rows = rowsByMatch.get(m.id as string) ?? [];
+    const team = new Map(rows.filter((r) => r.userId).map((r) => [r.userId!, r.team]));
+    const draft = draftOf.get(k);
+    const captains = (
+      draft ? [draft.captain_a, draft.captain_b] : [...new Set(preds.map((p) => p.winner_captain))]
+    ) as string[];
+    const outcome = outcomeOf({
+      maps: ((m.maps as { score_a: number | null; score_b: number | null }[]) ?? []).map((x) => ({
+        scoreA: x.score_a ?? null,
+        scoreB: x.score_b ?? null,
+      })),
+      teamOf: (id) => team.get(id) ?? null,
+      captains: [captains[0] ?? "", captains[1] ?? ""],
+      mvpId: rows.find((r) => r.isMvp)?.userId ?? null,
+      lanternaId: rows.find((r) => r.isLanterna)?.userId ?? null,
+    });
+    return preds.map((p) => ({
+      userId: p.user_id as string,
+      decided: outcome.winnerCaptain != null,
+      score: scorePrediction(
+        {
+          userId: p.user_id as string,
+          winnerCaptain: p.winner_captain as string,
+          mapsWon: p.maps_won as number,
+          mapsLost: p.maps_lost as number,
+          mvpId: (p.mvp_id as string | null) ?? null,
+          lanternaId: (p.lanterna_id as string | null) ?? null,
+        },
+        outcome,
+      ),
+    }));
+  };
+
   const engineMatches: EngineMatch[] = (matches.data ?? []).map((m) => ({
     id: m.id as string,
     date: m.event_date as string,
@@ -149,6 +207,10 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     })),
     records: byMatch.get(m.id as string) ?? [],
     tops: topsOf(m.id as string),
+    bets: betsOf(m),
+    participants: [
+      ...new Set((rowsByMatch.get(m.id as string) ?? []).map((r) => r.userId).filter((u): u is string => !!u)),
+    ],
   }));
 
   const { rows, progress } = computeBadges({
