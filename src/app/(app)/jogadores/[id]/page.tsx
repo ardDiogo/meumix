@@ -345,6 +345,15 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
       <RecentMatches timeline={timeline} />
       <MapRecords records={mapRecs} />
 
+      <ComparePlayers
+        player={player}
+        stats={stats}
+        other={other && { player: other.player, stats: other.stats }}
+        options={allPlayers
+          .filter((p) => p.player.id !== player.id)
+          .map((p) => ({ id: p.player.id, label: `${p.player.nickname} (ELO ${p.elo})` }))}
+      />
+
       {liveItems.length > 0 && <TwitchStreams className="mt-4" title="Ao vivo agora" items={liveItems} />}
 
       <PlayerBadgesCard badges={allBadges} catalog={catalog ?? []} progress={progress} />
@@ -391,15 +400,6 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
           canEdit={!!session && (session.id === player.id || canManageMixes)}
         />
       )}
-
-      <ComparePlayers
-        player={player}
-        stats={stats}
-        other={other && { player: other.player, stats: other.stats }}
-        options={allPlayers
-          .filter((p) => p.player.id !== player.id)
-          .map((p) => ({ id: p.player.id, label: `${p.player.nickname} (ELO ${p.elo})` }))}
-      />
 
       <Card className="mt-4">
         <CardHeader title="Histórico de mixes" description={`${recentMixes.length} partidas`} />
