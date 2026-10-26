@@ -29,7 +29,7 @@ const BOARDS: { title: string; value: (s: PlayerAggregate) => number | null; for
 ];
 
 export default async function StatsPage() {
-  const { kind, community, totals, maps, leaders, minMixes, mapWinners, names } = await getCommunityStats();
+  const { kind, community, totals, maps, leaders, minMixes, mapWinners, names, avatars } = await getCommunityStats();
 
   return (
     <>
@@ -94,7 +94,7 @@ export default async function StatsPage() {
             description="Escolha o mapa. Fatia = vitórias do jogador nele (cada mapa vencido conta para os 5 do time)."
           />
           <CardContent>
-            <MapWinners maps={mapWinners} names={names} />
+            <MapWinners maps={mapWinners} names={names} avatars={avatars} />
           </CardContent>
         </Card>
       )}

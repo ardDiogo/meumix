@@ -5,6 +5,7 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { MapIcon } from "@/components/maps/map-icon";
 import { mapName } from "@/lib/maps";
 import { cn } from "@/lib/utils";
+import { Avatar } from "../ui/avatar";
 import type { MapId } from "@/types/domain";
 
 /**
@@ -32,7 +33,15 @@ interface Slice {
 const pct = (wins: number, played: number) => (played ? Math.round((wins / played) * 100) : 0);
 
 /** Maiores vencedores por mapa: escolhe o mapa e vê a rosca e a lista de jogadores. */
-export function MapWinners({ maps, names }: { maps: MapWinnersData[]; names: Record<string, string> }) {
+export function MapWinners({
+  maps,
+  names,
+  avatars,
+}: {
+  maps: MapWinnersData[];
+  names: Record<string, string>;
+  avatars: Record<string, string | null>;
+}) {
   const gamesOf = (m: MapWinnersData) => Math.max(...m.players.map((p) => p.played), 0);
   // Mais jogados primeiro; mapas novos entram sozinhos.
   const ordered = [...maps].sort((a, b) => gamesOf(b) - gamesOf(a) || mapName(a.mapId).localeCompare(mapName(b.mapId)));
@@ -168,6 +177,7 @@ export function MapWinners({ maps, names }: { maps: MapWinnersData[]; names: Rec
                           style={{ background: color ?? "transparent" }}
                           aria-hidden
                         />
+                        <Avatar name={name(p.playerId)} src={avatars[p.playerId]} size="xs" />
                         <span className="truncate font-medium">{name(p.playerId)}</span>
                       </span>
                     </td>

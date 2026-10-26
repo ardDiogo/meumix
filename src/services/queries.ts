@@ -216,6 +216,7 @@ export async function getCommunityStats() {
     leaders,
     minMixes,
     names: Object.fromEntries(players.map((p) => [p.id, p.nickname])) as Record<string, string>,
+    avatars: Object.fromEntries(players.map((p) => [p.id, p.avatarUrl])) as Record<string, string | null>,
     mapWinners: [...mapWins.entries()].map(([mapId, per]) => ({
       mapId,
       players: [...per.entries()]
