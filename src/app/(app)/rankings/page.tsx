@@ -1,20 +1,13 @@
 import { Search, Trophy } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { DemoBadge } from "@/components/demo-notice";
 import { PageHeader } from "@/components/page-header";
-import { Delta } from "@/components/stats/delta";
-import { LevelBadge } from "@/components/players/level-badge";
-import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { FilterTabs } from "@/components/ui/filter-tabs";
-import { Table, TD, TH, THead, TR } from "@/components/ui/table";
-import { formatDecimal, formatPercent } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { RankingTable } from "@/components/rankings/ranking-table";
 import { getDataSource } from "@/services";
 import { getRanking, parsePeriod, RANKING_PERIODS } from "@/services/queries";
-import { playerHref } from "@/lib/player-slug";
 
 export const metadata: Metadata = { title: "Rankings" };
 
@@ -38,7 +31,7 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
       <PageHeader
         eyebrow={community.name}
         title="Rankings"
-        description="Classificação por ELO. Estatísticas e variação consideram apenas o período selecionado."
+        description="Classificação por ELO. Estatísticas e variação consideram apenas o período selecionado. Clique no título de uma coluna para ordenar."
         actions={<DemoBadge kind={kind} />}
       />
 
@@ -70,70 +63,7 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
 
       <Card>
         {rows.length ? (
-          <Table>
-            <THead>
-              <TR>
-                <TH className="w-14 text-center">#</TH>
-                <TH className="min-w-44">Jogador</TH>
-                <TH className="text-right">ELO</TH>
-                <TH className="text-right" title="Variação de ELO no período">
-                  Var.
-                </TH>
-                <TH className="text-right">Mixes</TH>
-                <TH className="text-right" title="Vitórias">
-                  V
-                </TH>
-                <TH className="text-right" title="Derrotas">
-                  D
-                </TH>
-                <TH className="text-right">Win rate</TH>
-                <TH className="text-right">K/D</TH>
-                <TH className="text-right">ADR</TH>
-              </TR>
-            </THead>
-            <tbody>
-              {rows.map((r) => (
-                <TR key={r.player.id} className="hover:bg-surface-2/50">
-                  <TD className="text-center">
-                    <span
-                      className={cn(
-                        "inline-flex size-7 items-center justify-center rounded-sm font-display text-sm font-bold tabular",
-                        r.position === 1 && "bg-brand text-brand-fg",
-                        r.position === 2 && "bg-brand/25 text-brand",
-                        r.position === 3 && "bg-brand/12 text-brand",
-                        r.position > 3 && "text-muted",
-                      )}
-                    >
-                      {r.position}
-                    </span>
-                  </TD>
-                  <TD>
-                    <Link href={playerHref(r.player)} className="group flex items-center gap-2.5">
-                      <Avatar name={r.player.nickname} src={r.player.avatarUrl} size="sm" />
-                      <span className="font-medium group-hover:text-brand">{r.player.nickname}</span>
-                    </Link>
-                  </TD>
-                  <TD className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <LevelBadge elo={r.elo} />
-                      <span className="font-display text-base font-bold">{r.elo}</span>
-                    </div>
-                  </TD>
-                  <TD className="text-right">
-                    <Delta value={r.eloChange} />
-                  </TD>
-                  <TD className="text-right text-muted">{r.stats.mixes}</TD>
-                  <TD className="text-right text-win">{r.stats.wins}</TD>
-                  <TD className="text-right text-loss">{r.stats.losses}</TD>
-                  <TD className="text-right">
-                    <WinRate value={r.stats.winRate} />
-                  </TD>
-                  <TD className="text-right">{formatDecimal(r.stats.kd)}</TD>
-                  <TD className="text-right">{formatDecimal(r.stats.adr, 1)}</TD>
-                </TR>
-              ))}
-            </tbody>
-          </Table>
+          <RankingTable rows={rows} />
         ) : (
           <EmptyState
             icon={Trophy}
@@ -151,16 +81,5 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
         comunidades.
       </p>
     </>
-  );
-}
-
-function WinRate({ value }: { value: number }) {
-  return (
-    <div className="ml-auto flex w-24 items-center justify-end gap-2">
-      <div className="hidden h-1.5 flex-1 overflow-hidden rounded-full bg-surface-3 sm:block" aria-hidden>
-        <div className="h-full rounded-full bg-brand" style={{ width: `${Math.min(100, value)}%` }} />
-      </div>
-      <span className="w-10 tabular">{formatPercent(value)}</span>
-    </div>
   );
 }
