@@ -1,38 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { MapIcon } from "@/components/maps/map-icon";
 import { mapName } from "@/lib/maps";
 import { cn } from "@/lib/utils";
-import { Avatar } from "../ui/avatar";
 import type { MapId } from "@/types/domain";
-
-/**
- * Categóricas validadas para o fundo escuro (#121419) com o validador do guia de
- * gráficos: contraste ≥ 3:1 e separáveis para daltônicos. O mapa escolhido
- * destaca o próprio top 5 (cores pela posição, com a lista ao lado); o resto
- * entra em "Outros", em cinza.
- */
-const HUES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"];
-const OTHER = "#52525b";
+import { Avatar } from "../ui/avatar";
 
 export interface MapWinnersData {
   mapId: MapId;
   players: { playerId: string; wins: number; played: number }[];
 }
 
-interface Slice {
-  key: string;
-  name: string;
-  wins: number;
-  played: number;
-  color: string;
-}
-
 const pct = (wins: number, played: number) => (played ? Math.round((wins / played) * 100) : 0);
 
-/** Maiores vencedores por mapa: escolhe o mapa e vê a rosca e a lista de jogadores. */
+/**
+ * Maiores vencedores por mapa: escolhe o mapa e vê uma barra por jogador,
+ * dividida em vitórias (verde) e derrotas (vermelho); o tamanho total é o
+ * número de jogos naquele mapa. Ordem: mais vitórias, depois melhor
+ * aproveitamento.
+ */
 export function MapWinners({
   maps,
   names,
@@ -49,22 +36,16 @@ export function MapWinners({
   const m = ordered.find((x) => x.mapId === selected) ?? ordered[0];
   if (!m) return null;
 
-  const games = gamesOf(m);
   const name = (id: string) => names[id] ?? "Jogador";
-  const winners = m.players.filter((p) => p.wins > 0);
-  const slices: Slice[] = winners
-    .slice(0, HUES.length)
-    .map((p, i) => ({ key: p.playerId, name: name(p.playerId), wins: p.wins, played: p.played, color: HUES[i]! }));
-  const rest = winners.slice(HUES.length);
-  if (rest.length) {
-    slices.push({
-      key: "outros",
-      name: "Outros",
-      wins: rest.reduce((s, p) => s + p.wins, 0),
-      played: rest.reduce((s, p) => s + p.played, 0),
-      color: OTHER,
-    });
-  }
+  const games = gamesOf(m);
+  const players = [...m.players].sort(
+    (a, b) =>
+      b.wins - a.wins ||
+      pct(b.wins, b.played) - pct(a.wins, a.played) ||
+      b.played - a.played ||
+      name(a.playerId).localeCompare(name(b.playerId)),
+  );
+  const scale = Math.max(...players.map((p) => p.played), 1);
 
   return (
     <div>
@@ -91,106 +72,67 @@ export function MapWinners({
         ))}
       </div>
 
-      <div className="grid items-center gap-6 md:grid-cols-[minmax(0,20rem)_1fr]">
-        <div
-          className="relative mx-auto aspect-square w-full max-w-80"
-          role="img"
-          aria-label={`Vitórias em ${mapName(m.mapId)}: ${slices.map((s) => `${s.name} ${s.wins}`).join(", ")}`}
-        >
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={slices}
-                dataKey="wins"
-                nameKey="name"
-                innerRadius="62%"
-                outerRadius="96%"
-                paddingAngle={2}
-                cornerRadius={4}
-                stroke="var(--color-surface)"
-                strokeWidth={2}
-                startAngle={90}
-                endAngle={-270}
-                isAnimationActive={false}
-              >
-                {slices.map((s) => (
-                  <Cell key={s.key} fill={s.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                content={({ active, payload }) => {
-                  const s = active ? (payload?.[0]?.payload as Slice | undefined) : undefined;
-                  if (!s) return null;
-                  return (
-                    <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-xs shadow-lg">
-                      <div className="flex items-center gap-1.5 font-medium text-fg">
-                        <span className="size-2 rounded-sm" style={{ background: s.color }} aria-hidden />
-                        {s.name}
-                      </div>
-                      <div className="text-muted">
-                        {s.wins} {s.wins === 1 ? "vitória" : "vitórias"}
-                        {s.key !== "outros" &&
-                          ` em ${s.played} ${s.played === 1 ? "jogo" : "jogos"} (${pct(s.wins, s.played)}%)`}
-                      </div>
-                    </div>
-                  );
-                }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          {/* Logo do mapa, grande, no meio da rosca. */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1">
-            <MapIcon id={m.mapId} size={112} />
-            <span className="text-xs text-muted">
-              {games} {games === 1 ? "jogo" : "jogos"}
-            </span>
+      {/* Mapa escolhido: logo grande e legenda. */}
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <MapIcon id={m.mapId} size={72} />
+        <div className="min-w-0 flex-1">
+          <div className="font-display text-xl font-bold">{mapName(m.mapId)}</div>
+          <div className="text-sm text-muted">
+            {games} {games === 1 ? "jogo" : "jogos"} · {players.length} jogadores
           </div>
         </div>
-
-        {/* Todos os jogadores do mapa. */}
-        <div className="overflow-hidden rounded-md border border-border">
-          <table className="w-full text-sm tabular">
-            <thead>
-              <tr className="bg-surface-2 text-[11px] font-semibold tracking-wider text-muted uppercase">
-                <th className="w-10 px-3 py-2 text-center">#</th>
-                <th className="px-3 py-2 text-left">Jogador</th>
-                <th className="px-3 py-2 text-right" title="Vitórias">
-                  V
-                </th>
-                <th className="px-3 py-2 text-right">Jogos</th>
-                <th className="px-3 py-2 text-right" title="Aproveitamento">
-                  %
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {m.players.map((p, i) => {
-                const color = p.wins > 0 ? (HUES[i] ?? OTHER) : null;
-                const rate = pct(p.wins, p.played);
-                return (
-                  <tr key={p.playerId} className="border-t border-border">
-                    <td className="px-3 py-1.5 text-center text-xs text-muted">{i + 1}</td>
-                    <td className="px-3 py-1.5">
-                      <span className="flex items-center gap-2">
-                        <span
-                          className="size-2.5 shrink-0 rounded-sm"
-                          style={{ background: color ?? "transparent" }}
-                          aria-hidden
-                        />
-                        <Avatar name={name(p.playerId)} src={avatars[p.playerId]} size="xs" />
-                        <span className="truncate font-medium">{name(p.playerId)}</span>
-                      </span>
-                    </td>
-                    <td className="px-3 py-1.5 text-right font-semibold">{p.wins}</td>
-                    <td className="px-3 py-1.5 text-right text-muted">{p.played}</td>
-                    <td className={cn("px-3 py-1.5 text-right", rate >= 50 ? "text-win" : "text-loss")}>{rate}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="flex items-center gap-4 text-xs text-muted">
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm bg-win" aria-hidden /> Vitórias
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm bg-loss" aria-hidden /> Derrotas
+          </span>
         </div>
       </div>
+
+      <ol className="space-y-1.5">
+        {players.map((p, i) => {
+          const losses = p.played - p.wins;
+          const rate = pct(p.wins, p.played);
+          return (
+            <li
+              key={p.playerId}
+              className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-md px-1 py-1 hover:bg-surface-2/60 sm:grid-cols-[1.5rem_minmax(0,12rem)_1fr_8rem] sm:gap-x-3"
+              title={`${name(p.playerId)}: ${p.wins} ${p.wins === 1 ? "vitória" : "vitórias"} e ${losses} ${losses === 1 ? "derrota" : "derrotas"} em ${p.played} ${p.played === 1 ? "jogo" : "jogos"} (${rate}%)`}
+            >
+              <span className="text-center text-xs text-muted tabular">{i + 1}</span>
+              <span className="flex min-w-0 items-center gap-2">
+                <Avatar name={name(p.playerId)} src={avatars[p.playerId]} size="xs" />
+                <span className="truncate text-sm font-medium">{name(p.playerId)}</span>
+              </span>
+              {/* Barra: vitórias + derrotas, na escala do jogador com mais jogos neste mapa. */}
+              {/* No celular, a barra vai para a linha de baixo, com a largura toda. */}
+              <span
+                className="order-last col-span-2 col-start-2 flex h-3.5 gap-0.5 sm:order-none sm:col-span-1 sm:col-start-auto"
+                aria-hidden
+              >
+                {p.wins > 0 && (
+                  <span
+                    className="rounded-l-sm bg-win last:rounded-r-sm"
+                    style={{ width: `${(p.wins / scale) * 100}%` }}
+                  />
+                )}
+                {losses > 0 && (
+                  <span
+                    className="rounded-r-sm bg-loss first:rounded-l-sm"
+                    style={{ width: `${(losses / scale) * 100}%` }}
+                  />
+                )}
+              </span>
+              <span className="text-right text-xs whitespace-nowrap text-muted tabular">
+                <span className="font-semibold text-fg">{p.wins}V</span> · {losses}D ·{" "}
+                <span className={rate >= 50 ? "text-win" : "text-loss"}>{rate}%</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
