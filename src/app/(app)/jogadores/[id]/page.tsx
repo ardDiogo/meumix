@@ -1,4 +1,15 @@
-import { ArrowLeft, Crosshair, ExternalLink, Flame, Link2, ShieldCheck, Trophy } from "lucide-react";
+import {
+  ArrowLeft,
+  Crosshair,
+  ExternalLink,
+  Flame,
+  Gamepad2,
+  Link2,
+  Percent,
+  ShieldCheck,
+  Swords,
+  Trophy,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -26,7 +37,9 @@ import { PlayerForm } from "@/components/players/player-form";
 import { formSeries, mapRecords, mapTimeline } from "@/lib/player-form";
 import { toClipViews } from "@/services/clips";
 import { mapName } from "@/lib/maps";
-import { seriesScore } from "@/lib/stats";
+import { aggregatePlayer, seriesScore } from "@/lib/stats";
+import { mixesInPeriod, parsePlayerPeriod, playerPeriods } from "@/lib/player-period";
+import { PeriodSelect } from "@/components/players/period-select";
 import { getDataSource } from "@/services";
 import { getHighlightsFeed, getPlayerHighlights, resolvePlayerProfile, searchPlayers } from "@/services/queries";
 import { playerHref, playerSlug } from "@/lib/player-slug";
@@ -50,7 +63,7 @@ export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">)
 }
 
 export default async function PlayerProfilePage({ params, searchParams }: PageProps<"/jogadores/[id]">) {
-  const [{ id }, { comparar }] = await Promise.all([params, searchParams]);
+  const [{ id }, { comparar, periodo }] = await Promise.all([params, searchParams]);
   const otherId = typeof comparar === "string" && comparar !== id ? comparar : null;
   const [profile, other, allPlayers] = await Promise.all([
     resolvePlayerProfile(id),
@@ -75,6 +88,10 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const steamUrl = steamProfileUrl(player.steamId);
   const allstarUrl = allstarProfileUrl(player.steamId);
   const playedMixes = recentMixes.map((r) => r.mix);
+  // Resumo do período (filtro: geral, 30/90 dias ou ano).
+  const period = parsePlayerPeriod(periodo, playedMixes);
+  const periodStats =
+    period.value === "geral" ? stats : aggregatePlayer(player.id, mixesInPeriod(playedMixes, period.value, ds.now()));
   const formPoints = formSeries(playedMixes, player.id);
   const mapRecs = mapRecords(playedMixes, player.id);
   const timeline = mapTimeline(playedMixes, player.id);
@@ -203,15 +220,48 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         </div>
       </Card>
 
-      <section aria-label="Estatísticas gerais" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
-        <StatCard label="Mixes" value={stats.mixes} hint={`${stats.wins}V · ${stats.losses}D`} />
-        <StatCard label="Win rate" value={formatPercent(stats.winRate)} />
-        <StatCard label="K/D" value={formatDecimal(stats.kd)} hint={`${stats.kills} K · ${stats.deaths} D`} />
-        <StatCard label="ADR" value={formatDecimal(stats.adr, 1)} />
-        <StatCard label="KAST" value={formatPercent(stats.kast)} />
-        <StatCard label="MVPs" value={stats.mvps} />
-        <StatCard label="Lanternas" value={stats.lanterns} hint="Pior saldo K−D do mix" />
-      </section>
+      <Card aria-label="Resumo do período">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+          <div>
+            <h2 className="font-display text-sm font-semibold tracking-wide uppercase">Resumo do período</h2>
+            <p className="mt-0.5 text-xs text-muted">
+              {period.value === "geral"
+                ? "Todos os mixes"
+                : /^\d{4}$/.test(period.value)
+                  ? `Estatísticas de ${period.label}`
+                  : period.label}
+            </p>
+          </div>
+          <PeriodSelect options={playerPeriods(playedMixes)} value={period.value} />
+        </div>
+        {periodStats.mixes ? (
+          <>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 px-4 py-3 text-sm sm:grid-cols-4">
+              <Summary icon={Gamepad2} label="Mixes" value={`${periodStats.mixes} mixes`} />
+              <Summary
+                icon={Trophy}
+                label="Vitórias e derrotas"
+                value={`${periodStats.wins}V / ${periodStats.losses}D`}
+                className="text-win"
+              />
+              <Summary icon={Percent} label="Win rate" value={`WR: ${formatPercent(periodStats.winRate)}`} />
+              <Summary icon={Swords} label="KDR" value={`KDR: ${formatDecimal(periodStats.kd)}`} />
+            </dl>
+            <div className="grid grid-cols-2 gap-3 border-t border-border p-4 sm:grid-cols-4 xl:grid-cols-8">
+              <StatCard label="Kills" value={periodStats.kills} />
+              <StatCard label="Mortes" value={periodStats.deaths} />
+              <StatCard label="First kills" value={periodStats.firstKills} />
+              <StatCard label="Assistências" value={periodStats.assists} />
+              <StatCard label="ADR médio" value={formatDecimal(periodStats.adr, 1)} />
+              <StatCard label="KAST" value={formatPercent(periodStats.kast)} />
+              <StatCard label="MVPs" value={periodStats.mvps} />
+              <StatCard label="Lanternas" value={periodStats.lanterns} />
+            </div>
+          </>
+        ) : (
+          <p className="px-4 py-6 text-center text-sm text-muted">Nenhum mix neste período.</p>
+        )}
+      </Card>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
@@ -405,4 +455,24 @@ function Highlight({
 function BrandLogo({ src }: { src: string }) {
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt="" aria-hidden className="size-4 shrink-0 object-contain" />;
+}
+
+function Summary({
+  icon: Icon,
+  label,
+  value,
+  className,
+}: {
+  icon: typeof Trophy;
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className={`size-4 shrink-0 ${className ?? "text-muted"}`} aria-hidden />
+      <dt className="sr-only">{label}</dt>
+      <dd className="font-medium">{value}</dd>
+    </div>
+  );
 }
