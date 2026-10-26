@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import type { Player } from "@/types/domain";
 import type { PlayerAggregate } from "@/types/views";
 import { Card } from "../ui/card";
+import { Avatar } from "../ui/avatar";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 import { CompareSelect } from "./compare-select";
 
@@ -63,8 +64,30 @@ export function ComparePlayers({
           <THead>
             <TR>
               <TH className="min-w-36">Estatística</TH>
-              <TH className="text-center text-sm text-fg normal-case">{player.nickname}</TH>
-              <TH className="text-center text-sm text-fg normal-case">{other.player.nickname}</TH>
+              <TH className="text-center text-sm text-fg normal-case">
+                <span className="inline-flex flex-col items-center gap-2 py-2 sm:flex-row sm:gap-3">
+                  {/* Mesmo tamanho da foto do perfil (no celular, menor). */}
+                  <Avatar
+                    name={player.nickname}
+                    src={player.avatarUrl}
+                    size="xl"
+                    className="size-12 text-base sm:size-20 sm:text-2xl"
+                  />
+                  {player.nickname}
+                </span>
+              </TH>
+              <TH className="text-center text-sm text-fg normal-case">
+                <span className="inline-flex flex-col items-center gap-2 py-2 sm:flex-row sm:gap-3">
+                  {/* Mesmo tamanho da foto do perfil (no celular, menor). */}
+                  <Avatar
+                    name={other.player.nickname}
+                    src={other.player.avatarUrl}
+                    size="xl"
+                    className="size-12 text-base sm:size-20 sm:text-2xl"
+                  />
+                  {other.player.nickname}
+                </span>
+              </TH>
             </TR>
           </THead>
           <tbody>
