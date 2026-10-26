@@ -241,10 +241,29 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
               <Summary
                 icon={Trophy}
                 label="Vitórias e derrotas"
-                value={`${periodStats.wins}V / ${periodStats.losses}D`}
+                value={
+                  <>
+                    <span className="text-win">{periodStats.wins}V</span>
+                    <span className="text-subtle"> / </span>
+                    <span className="text-loss">{periodStats.losses}D</span>
+                  </>
+                }
                 className="text-win"
               />
-              <Summary icon={Percent} label="Win rate" value={`WR: ${formatPercent(periodStats.winRate)}`} />
+              {/* Win rate: 50% ou mais em verde, abaixo de 50% em vermelho. */}
+              <Summary
+                icon={Percent}
+                label="Win rate"
+                value={
+                  <>
+                    WR:{" "}
+                    <span className={periodStats.winRate >= 50 ? "text-win" : "text-loss"}>
+                      {formatPercent(periodStats.winRate)}
+                    </span>
+                  </>
+                }
+                className={periodStats.winRate >= 50 ? "text-win" : "text-loss"}
+              />
               <Summary icon={Swords} label="KDR" value={`KDR: ${formatDecimal(periodStats.kd)}`} />
             </dl>
             <div className="grid grid-cols-2 gap-3 border-t border-border p-4 sm:grid-cols-4 xl:grid-cols-8">
@@ -465,7 +484,7 @@ function Summary({
 }: {
   icon: typeof Trophy;
   label: string;
-  value: string;
+  value: React.ReactNode;
   className?: string;
 }) {
   return (
