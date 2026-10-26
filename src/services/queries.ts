@@ -220,7 +220,6 @@ export async function getCommunityStats() {
       mapId,
       players: [...per.entries()]
         .map(([playerId, v]) => ({ playerId, ...v }))
-        .filter((p) => p.wins > 0)
         .sort((a, b) => b.wins - a.wins || a.played - b.played),
     })),
   };

@@ -91,7 +91,7 @@ export default async function StatsPage() {
         <Card className="mt-4">
           <CardHeader
             title="Maiores vencedores por mapa"
-            description="Fatia = vitórias do jogador naquele mapa (cada mapa vencido conta para os 5 do time). Passe o mouse para ver o aproveitamento."
+            description="Escolha o mapa. Fatia = vitórias do jogador nele (cada mapa vencido conta para os 5 do time)."
           />
           <CardContent>
             <MapWinners maps={mapWinners} names={names} />
