@@ -341,13 +341,15 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         </Card>
       </div>
 
+      {/* Partidas e mapas logo abaixo de ELO e destaques; insígnias depois. */}
+      <RecentMatches timeline={timeline} />
+      <MapRecords records={mapRecs} />
+
       {liveItems.length > 0 && <TwitchStreams className="mt-4" title="Ao vivo agora" items={liveItems} />}
 
       <PlayerBadgesCard badges={allBadges} catalog={catalog ?? []} progress={progress} />
 
       <PlayerForm points={formPoints} />
-      <RecentMatches timeline={timeline} />
-      <MapRecords records={mapRecs} />
 
       {(clips.length > 0 || allstarUrl) && (
         <Card className="mt-4">
