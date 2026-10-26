@@ -264,7 +264,20 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 }
                 className={periodStats.winRate >= 50 ? "text-win" : "text-loss"}
               />
-              <Summary icon={Swords} label="KDR" value={`KDR: ${formatDecimal(periodStats.kd)}`} />
+              {/* KDR: 1,00 ou mais em verde, abaixo em vermelho. */}
+              <Summary
+                icon={Swords}
+                label="KDR"
+                value={
+                  <>
+                    KDR:{" "}
+                    <span className={periodStats.kd >= 1 ? "text-win" : "text-loss"}>
+                      {formatDecimal(periodStats.kd)}
+                    </span>
+                  </>
+                }
+                className={periodStats.kd >= 1 ? "text-win" : "text-loss"}
+              />
             </dl>
             <div className="grid grid-cols-2 gap-3 border-t border-border p-4 sm:grid-cols-4 xl:grid-cols-8">
               <StatCard label="Kills" value={periodStats.kills} />
