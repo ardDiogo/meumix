@@ -3,6 +3,7 @@ import { DemoBadge } from "@/components/demo-notice";
 import { PageHeader } from "@/components/page-header";
 import { PlayerLink } from "@/components/players/player-link";
 import { MapsChart } from "@/components/stats/maps-chart";
+import { MapWinners } from "@/components/stats/map-winners";
 import { StatCard } from "@/components/stats/stat-card";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TD, TH, THead, TR } from "@/components/ui/table";
@@ -28,7 +29,7 @@ const BOARDS: { title: string; value: (s: PlayerAggregate) => number | null; for
 ];
 
 export default async function StatsPage() {
-  const { kind, community, totals, maps, leaders, minMixes } = await getCommunityStats();
+  const { kind, community, totals, maps, leaders, minMixes, mapWinners, names } = await getCommunityStats();
 
   return (
     <>
@@ -85,6 +86,18 @@ export default async function StatsPage() {
           </Table>
         </Card>
       </div>
+
+      {mapWinners.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader
+            title="Maiores vencedores por mapa"
+            description="Fatia = vitórias do jogador naquele mapa (cada mapa vencido conta para os 5 do time). Passe o mouse para ver o aproveitamento."
+          />
+          <CardContent>
+            <MapWinners maps={mapWinners} names={names} />
+          </CardContent>
+        </Card>
+      )}
 
       <h2 className="mt-6 mb-3 font-display text-sm font-semibold tracking-wide text-muted uppercase">
         Líderes{" "}

@@ -180,6 +180,23 @@ export async function getCommunityStats() {
       maps.set(m.mapId, entry);
     }
   }
+  // Vitórias de cada jogador em cada mapa (cada mapa vencido conta 1 para os 5 do time).
+  const mapWins = new Map<MapId, Map<string, { wins: number; played: number }>>();
+  for (const mix of mixes) {
+    for (const m of mix.maps) {
+      if (!m.winner) continue;
+      const per = mapWins.get(m.mapId) ?? new Map<string, { wins: number; played: number }>();
+      for (const team of mix.teams) {
+        for (const id of team.playerIds) {
+          const e = per.get(id) ?? { wins: 0, played: 0 };
+          e.played += 1;
+          if (team.side === m.winner) e.wins += 1;
+          per.set(id, e);
+        }
+      }
+      mapWins.set(m.mapId, per);
+    }
+  }
   // Mínimo de mixes para entrar nos líderes: 3, ou menos enquanto a comunidade jogou poucos.
   const minMixes = Math.min(3, Math.max(1, mixes.length));
   const leaders = players
@@ -198,6 +215,14 @@ export async function getCommunityStats() {
     maps: [...maps.entries()].map(([mapId, v]) => ({ mapId, ...v })).sort((a, b) => b.played - a.played),
     leaders,
     minMixes,
+    names: Object.fromEntries(players.map((p) => [p.id, p.nickname])) as Record<string, string>,
+    mapWinners: [...mapWins.entries()].map(([mapId, per]) => ({
+      mapId,
+      players: [...per.entries()]
+        .map(([playerId, v]) => ({ playerId, ...v }))
+        .filter((p) => p.wins > 0)
+        .sort((a, b) => b.wins - a.wins || a.played - b.played),
+    })),
   };
 }
 
