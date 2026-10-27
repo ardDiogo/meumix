@@ -215,6 +215,8 @@ export async function cancelMix(scheduleId: string, date: string): Promise<Confi
 
   const match = { schedule_id: scheduleId, event_date: date };
   await admin.from("mix_draft_state").delete().match(match);
+  // Times desfeitos: os palpites do bolão deixam de valer (sem a migração 0031, nada a apagar).
+  await admin.from("mix_predictions").delete().match(match);
   await Promise.all([
     admin.from("mix_registrations").delete().match(match),
     admin.from("map_votes").delete().match(match),

@@ -157,13 +157,22 @@ export async function notifyPickTurn(
   );
 }
 
+/** Identificador curto da formação dos times (para a chave do aviso). */
+function teamsKey(a: string[], b: string[]) {
+  const text = [[...a].sort().join(","), [...b].sort().join(",")].sort().join("|");
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return (h >>> 0).toString(36);
+}
+
 /** Times definidos (PICK concluído ou sugestão aceita): abre o bolão para todos. */
 export async function notifyTeamsDefined(scheduleId: string, date: string) {
   const draft = await draftOf(scheduleId, date);
   if (draft?.status !== "completed") return;
   const names = await nameMap([draft.captain_a, draft.captain_b]);
   await sendPush(
-    { topic: "bolao", once: `bolao-abre:${scheduleId}:${date}` },
+    // Um aviso por formação de times: se o PICK for refeito, o bolão reabre e avisa de novo.
+    { topic: "bolao", once: `bolao-abre:${scheduleId}:${date}:${teamsKey(draft.team_a, draft.team_b)}` },
     {
       title: "Times definidos! Bolão aberto 🎲",
       body: `Time ${names.get(draft.captain_a) ?? "A"} × Time ${names.get(draft.captain_b) ?? "B"}. Quem vence? Palpite até o mix começar.`,

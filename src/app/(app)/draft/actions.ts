@@ -117,6 +117,8 @@ export async function resetDraft(scheduleId: string, date: string, scope: "draft
   const match = { schedule_id: scheduleId, event_date: date };
   const draft = await admin.from("mix_draft_state").delete().match(match);
   if (draft.error) return fail("Não foi possível reiniciar a seleção.");
+  // Times desfeitos: os palpites do bolão deixam de valer (o bolão reabre com os times novos).
+  await admin.from("mix_predictions").delete().match(match);
   // Reiniciar a escolha também descarta o desempate de mapas (depende dos times).
   await admin.from("map_tiebreaker_rounds").delete().match(match);
   // A sugestão de times (se houver) é refeita e votada de novo.

@@ -6,6 +6,9 @@
   mudado até fechar.
 - **Abre** quando os times estão definidos (PICK concluído ou sugestão de times aceita) e **fecha**
   no horário marcado do mix. Depois de finalizado, o mix não aceita palpites.
+- **Times refeitos:** se o mix ou a escolha dos times for reiniciada (desistência, jogador removido,
+  "Reiniciar seleção", "Reiniciar mix" ou mix deletado), os palpites daquele mix são apagados. O
+  bolão reabre quando os times novos forem definidos, com um novo aviso "Bolão aberto".
 - **Palpite:** time vencedor (identificado pelo capitão), placar de mapas (com 3 mapas: 3×0 ou
   2×1), MVP e lanterna (opcionais; não podem ser o mesmo jogador).
 - **Pontos** (`src/lib/bolao.ts`, testado em `bolao.test.ts`):

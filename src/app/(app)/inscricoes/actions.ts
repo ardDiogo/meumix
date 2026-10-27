@@ -196,6 +196,8 @@ async function deleteRegistration(
   if (error) return { found: true as const, error };
   // Remover um jogador zera a escolha dos times (mantém os votos de capitão).
   await admin.from("mix_draft_state").delete().match({ schedule_id: reg.schedule_id, event_date: reg.event_date });
+  // Times desfeitos: os palpites do bolão deixam de valer.
+  await admin.from("mix_predictions").delete().match({ schedule_id: reg.schedule_id, event_date: reg.event_date });
   await admin.from("mix_cancellations").insert({
     schedule_id: reg.schedule_id,
     event_date: reg.event_date,
@@ -255,6 +257,8 @@ export async function resetRegistrations(scheduleId: string, date: string): Prom
   const match = { schedule_id: scheduleId, event_date: date };
   const draft = await admin.from("mix_draft_state").delete().match(match);
   if (draft.error) return fail("Não foi possível reiniciar o mix.", "error");
+  // Times desfeitos: os palpites do bolão deixam de valer.
+  await admin.from("mix_predictions").delete().match(match);
   const results = await Promise.all([
     admin.from("mix_registrations").delete().match(match),
     admin.from("map_votes").delete().match(match),
