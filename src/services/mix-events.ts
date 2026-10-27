@@ -73,6 +73,17 @@ export interface Registration {
   penalty: { reason: string; delaySeconds: number } | null;
 }
 
+/** Saída da lista (cancelou ou foi removido por um admin). */
+export interface Departure {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  registeredAt: string | null;
+  leftAt: string;
+  /** Quem tirou o jogador; null quando ele mesmo saiu. */
+  removedBy: string | null;
+}
+
 export interface TiebreakerRoundView {
   id: string;
   roundNumber: 1 | 2;
@@ -129,6 +140,8 @@ export interface NextMix {
   occurrence: Occurrence;
   organizer: string | null;
   registrations: Registration[];
+  /** Quem saiu da lista desta ocorrência, na ordem das saídas. */
+  departures: Departure[];
   votes: VoteSummary;
   draft: DraftView | null;
   tiebreaker: TiebreakerView;
@@ -171,25 +184,36 @@ export async function listRegistrations(
   date: string,
   maxPlayers: number,
   viewerId: string | null = null,
-): Promise<{ registrations: Registration[]; votes: VoteSummary }> {
+): Promise<{ registrations: Registration[]; departures: Departure[]; votes: VoteSummary }> {
   const supabase = await createSupabaseServerClient();
   const empty = { maps: [], mapTally: [], captainTally: [], captainVotesCast: 0, mine: { maps: [], captains: [] } };
-  if (!supabase) return { registrations: [], votes: empty };
+  if (!supabase) return { registrations: [], departures: [], votes: empty };
   const match = { schedule_id: scheduleId, event_date: date };
 
-  const [regs, mapVotes, captainVotes, maps] = await Promise.all([
+  const [regs, mapVotes, captainVotes, maps, cancels] = await Promise.all([
     supabase.from("mix_registrations").select("id, user_id, created_at, device").match(match).order("created_at"),
     supabase.from("map_votes").select("user_id, map_id").match(match),
     supabase.from("captain_votes").select("voter_id, candidate_id").match(match),
     listAllMaps().then((all) => ({ data: all.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name })) })),
+    supabase
+      .from("mix_cancellations")
+      .select("user_id, registered_at, cancelled_at, cancelled_by")
+      .match(match)
+      .order("cancelled_at"),
   ]);
   if (regs.error) throw new Error(`Falha ao carregar inscrições: ${regs.error.message}`);
 
   const rows = regs.data;
+  const leftRows = cancels.data ?? []; // falha = sem o registro de saídas
   const classified = new Set(rows.slice(0, maxPlayers).map((r) => r.user_id as string));
+  const people = [...new Set([...rows, ...leftRows].map((r) => r.user_id as string))];
   const [names, avatars] = await Promise.all([
-    displayNames(rows.map((r) => r.user_id as string)),
-    profileAvatars(rows.map((r) => r.user_id as string)),
+    displayNames(
+      [...new Set([...people, ...leftRows.map((c) => c.cancelled_by as string | null)])].filter(
+        (id): id is string => !!id,
+      ),
+    ),
+    profileAvatars(people),
   ]);
   const mapRows = (mapVotes.data ?? []).filter((v) => classified.has(v.user_id as string));
   const capRows = (captainVotes.data ?? []).filter(
@@ -215,8 +239,22 @@ export async function listRegistrations(
     };
   });
 
+  const departures = leftRows.map((c): Departure => {
+    const uid = c.user_id as string;
+    const by = c.cancelled_by as string | null;
+    return {
+      userId: uid,
+      displayName: names.get(uid) ?? "Jogador",
+      avatarUrl: avatars.get(uid)?.avatarUrl ?? null,
+      registeredAt: (c.registered_at as string | null) ?? null,
+      leftAt: c.cancelled_at as string,
+      removedBy: by && by !== uid ? (names.get(by) ?? "Admin") : null,
+    };
+  });
+
   return {
     registrations,
+    departures,
     votes: {
       maps: (maps.data ?? []).map((m) => ({ id: m.id as string, name: m.name as string })),
       mapTally: tally(mapRows.map((v) => v.map_id as string)).map(([id, votes]) => ({
@@ -264,7 +302,7 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
   const next = upcoming[0];
   if (!next) return { status: "none" };
 
-  const [{ registrations, votes }, organizers, draft, features] = await Promise.all([
+  const [{ registrations, departures, votes }, organizers, draft, features] = await Promise.all([
     listRegistrations(next.schedule.id, next.occurrence.date, next.schedule.maxPlayers, viewerId),
     displayNames(next.schedule.createdBy ? [next.schedule.createdBy] : []),
     loadDraft(next.schedule.id, next.occurrence.date),
@@ -298,6 +336,7 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
       ...next,
       organizer: next.schedule.createdBy ? (organizers.get(next.schedule.createdBy) ?? null) : null,
       registrations,
+      departures,
       votes,
       draft,
       tiebreaker,

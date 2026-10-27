@@ -1,4 +1,15 @@
-import { AlertTriangle, CalendarClock, Check, Crown, Flag, Monitor, Smartphone, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarClock,
+  Check,
+  Crown,
+  Flag,
+  LogOut,
+  Monitor,
+  Smartphone,
+  UserX,
+  Users,
+} from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { CAPTAINS, CAPTAIN_VOTES_PER_PLAYER, MAPS_IN_ROTATION } from "@/lib/mix-rules";
@@ -115,7 +126,7 @@ export async function NextMixPanel() {
     );
   }
 
-  const { schedule, occurrence, organizer, registrations, votes, draft } = result.mix;
+  const { schedule, occurrence, organizer, registrations, departures, votes, draft } = result.mix;
   const nameOf = (id: string) => registrations.find((r) => r.userId === id)?.displayName ?? "Jogador";
   const now = new Date();
   const regWindow = registrationWindow(occurrence, now);
@@ -309,7 +320,7 @@ export async function NextMixPanel() {
           title={`Jogadores inscritos (${classified}/${schedule.maxPlayers} classificados)`}
           description="Lista ordenada por horário de inscrição. Após as vagas, os inscritos entram como reservas."
         />
-        {registrations.length ? (
+        {registrations.length || departures.length ? (
           <Table>
             <THead>
               <TR>
@@ -394,6 +405,52 @@ export async function NextMixPanel() {
                       <RemoveButton registrationId={r.id} name={r.displayName} />
                     </TD>
                   )}
+                </TR>
+              ))}
+              {departures.length > 0 && (
+                <TR className="hover:bg-transparent">
+                  <TD
+                    colSpan={canManageMixes ? 8 : 7}
+                    className="bg-surface-2/40 py-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase"
+                  >
+                    Saíram da lista ({departures.length})
+                  </TD>
+                </TR>
+              )}
+              {departures.map((d, i) => (
+                <TR key={`${d.userId}-${d.leftAt}-${i}`} className="opacity-60 hover:opacity-100">
+                  <TD className="text-center text-muted">
+                    {d.removedBy ? (
+                      <UserX className="mx-auto size-4 text-loss" aria-label="Removido" />
+                    ) : (
+                      <LogOut className="mx-auto size-4" aria-label="Saiu" />
+                    )}
+                  </TD>
+                  <TD>
+                    <div className="flex items-center gap-2">
+                      <Avatar name={d.displayName} src={d.avatarUrl} size="xs" />
+                      <span className="font-medium line-through decoration-muted/60">{d.displayName}</span>
+                    </div>
+                  </TD>
+                  <TD>
+                    {d.removedBy ? (
+                      <Badge variant="loss" className="whitespace-nowrap">
+                        Removido por <span className="normal-case">{d.removedBy}</span>
+                      </Badge>
+                    ) : (
+                      <Badge variant="neutral">Saiu</Badge>
+                    )}
+                  </TD>
+                  <TD className="text-center text-subtle">—</TD>
+                  <TD className="text-subtle">—</TD>
+                  <TD className="text-xs whitespace-nowrap text-muted">
+                    {d.registeredAt && <div>Inscreveu: {fullTime(d.registeredAt)}</div>}
+                    <div className={d.removedBy ? "text-loss" : "text-fg"}>
+                      {d.removedBy ? "Removido" : "Saiu"}: {fullTime(d.leftAt)}
+                    </div>
+                  </TD>
+                  <TD className="text-subtle">—</TD>
+                  {canManageMixes && <TD />}
                 </TR>
               ))}
             </tbody>

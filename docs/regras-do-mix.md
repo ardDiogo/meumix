@@ -183,19 +183,19 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 
 ## 12) O que fica armazenado
 
-| Informação                           | Conteúdo                                             |
-| ------------------------------------ | ---------------------------------------------------- |
-| Perfis                               | nick, ELO, nível, ID Faceit, estatísticas acumuladas |
-| Cargos                               | master / admin / usuário                             |
-| Mixes                                | data, horário de liberação, status                   |
-| Inscrições                           | jogador, ordem, classificado/reserva, dispositivo    |
-| Cancelamentos                        | registro de quem saiu                                |
-| Votos de mapas / mapas disponíveis   | 4 mapas por jogador; lista configurável              |
-| Desempate de mapas                   | rounds e votos                                       |
-| Votos de capitão                     | até 2 por jogador                                    |
-| Estado da escolha                    | PPT, vencedor, vez, times                            |
-| Sugestão de times                    | times sugeridos e votos                              |
-| Histórico e partidas                 | resultado final e estatísticas por jogador           |
-| Punições                             | atraso, motivo, expiração                            |
-| Níveis / Insígnias / Funcionalidades | configurações do admin                               |
-| Logs                                 | auditoria de todas as ações sensíveis                |
+| Informação                           | Conteúdo                                                                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Perfis                               | nick, ELO, nível, ID Faceit, estatísticas acumuladas                                                                                                    |
+| Cargos                               | master / admin / usuário                                                                                                                                |
+| Mixes                                | data, horário de liberação, status                                                                                                                      |
+| Inscrições                           | jogador, ordem, classificado/reserva, dispositivo                                                                                                       |
+| Cancelamentos                        | quem saiu: por conta própria ou removido por admin, com horário de inscrição e de saída (aparece no fim da lista de inscritos; zera ao reiniciar o mix) |
+| Votos de mapas / mapas disponíveis   | 4 mapas por jogador; lista configurável                                                                                                                 |
+| Desempate de mapas                   | rounds e votos                                                                                                                                          |
+| Votos de capitão                     | até 2 por jogador                                                                                                                                       |
+| Estado da escolha                    | PPT, vencedor, vez, times                                                                                                                               |
+| Sugestão de times                    | times sugeridos e votos                                                                                                                                 |
+| Histórico e partidas                 | resultado final e estatísticas por jogador                                                                                                              |
+| Punições                             | atraso, motivo, expiração                                                                                                                               |
+| Níveis / Insígnias / Funcionalidades | configurações do admin                                                                                                                                  |
+| Logs                                 | auditoria de todas as ações sensíveis                                                                                                                   |

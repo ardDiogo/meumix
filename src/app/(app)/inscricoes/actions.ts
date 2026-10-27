@@ -263,6 +263,8 @@ export async function resetRegistrations(scheduleId: string, date: string): Prom
     admin.from("mix_registrations").delete().match(match),
     admin.from("map_votes").delete().match(match),
     admin.from("captain_votes").delete().match(match),
+    // Lista nova: o registro de saídas recomeça junto (o reinício fica no audit_log).
+    admin.from("mix_cancellations").delete().match(match),
   ]);
   if (results.some((r) => r.error)) return fail("Não foi possível reiniciar o mix.", "error");
   await audit({ action: "admin.reset_mix", outcome: "success", actorId: session!.id, scheduleId, eventDate: date });
