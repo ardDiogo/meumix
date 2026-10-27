@@ -279,10 +279,22 @@ function OpenForm({
 
       {loggedIn ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
-          <p className="text-xs text-muted">
-            {mine ? "Você já palpitou. Pode mudar" : "Palpites ficam escondidos"} até {hourMin(bolao.closesAt)}
-            {mine ? "." : "; depois todos aparecem."}
-          </p>
+          {mine ? (
+            // Resumo do palpite salvo (só o seu: os dos outros ficam escondidos até fechar).
+            <p className="text-xs text-muted">
+              Você já palpitou:{" "}
+              <span className="font-semibold text-fg">
+                Time {name(mine.winnerCaptain)} · {mine.mapsWon}×{mine.mapsLost}
+                {mine.mvpId && ` · MVP ${name(mine.mvpId)}`}
+                {mine.lanternaId && ` · Lanterna ${name(mine.lanternaId)}`}
+              </span>
+              . Pode mudar até {hourMin(bolao.closesAt)}.
+            </p>
+          ) : (
+            <p className="text-xs text-muted">
+              Palpites ficam escondidos até {hourMin(bolao.closesAt)}; depois todos aparecem.
+            </p>
+          )}
           <Button variant="primary" size="sm" disabled={pending || !winner} onClick={save}>
             {pending ? <Loader2 className="animate-spin" /> : <Check />} {mine ? "Atualizar palpite" : "Salvar palpite"}
           </Button>
