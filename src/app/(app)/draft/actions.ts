@@ -6,7 +6,7 @@ import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
-import { notifyCaptains, notifyPicked, notifyTeamsDefined } from "@/services/notify";
+import { notifyCaptains, notifyPicked, notifyPickTurn, notifyTeamsDefined } from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
 
 export type DraftResult = { ok: true; message: string } | { ok: false; message: string };
@@ -98,6 +98,7 @@ export async function pickPlayer(scheduleId: string, date: string, playerId: str
   if (completed) await detectTiebreaker(scheduleId, date);
   after(async () => {
     await notifyPicked(scheduleId, date, playerId, session.id);
+    if (data) await notifyPickTurn(scheduleId, date, data as Parameters<typeof notifyPickTurn>[2], session.id);
     if (completed) await notifyTeamsDefined(scheduleId, date);
   });
   refresh();

@@ -99,9 +99,9 @@ export async function notifyCaptains(scheduleId: string, date: string) {
   );
 }
 
-/** Capitão escolheu alguém: avisa o escolhido e mostra o pick para o resto do mix. */
+/** Capitão escolheu alguém: avisa o escolhido. */
 export async function notifyPicked(scheduleId: string, date: string, playerId: string, captainId: string) {
-  const names = await nameMap([captainId, playerId]);
+  const names = await nameMap([captainId]);
   await sendPush(
     { topic: "pick", userIds: [playerId], once: `pick:${scheduleId}:${date}:${playerId}` },
     {
@@ -110,14 +110,49 @@ export async function notifyPicked(scheduleId: string, date: string, playerId: s
       tag: `pick:${date}`,
     },
   );
-  // Todos do mix acompanham o PICK ("Barker pickou AlexS-"); cada aviso substitui o anterior.
-  const others = (await classifiedOf(scheduleId, date)).filter((u) => u !== playerId);
+}
+
+/** Ordem do PICK: o 1º capitão escolhe 1, depois 2, 2, 2 e o último 1 (0005_draft.sql). */
+const TURN_PATTERN = [1, 2, 2, 2, 1];
+
+/**
+ * Rodada do PICK concluída: todos do mix recebem um aviso numerado com os
+ * escolhidos da rodada ("2. detonic pickou paiked1 e Nasa"). Um aviso por
+ * rodada, sem substituir os anteriores.
+ */
+export async function notifyPickTurn(
+  scheduleId: string,
+  date: string,
+  state: {
+    captain_a: string;
+    captain_b: string;
+    team_a: string[];
+    team_b: string[];
+    turn_number: number;
+    picks_in_turn: number;
+  },
+  captainId: string,
+) {
+  // A rodada só fecha quando o contador volta a zero (o banco já passou para a próxima).
+  if (state.picks_in_turn !== 0 || state.turn_number < 1) return;
+  const turn = state.turn_number;
+  const size = TURN_PATTERN[turn - 1] ?? 1;
+  const team = captainId === state.captain_a ? state.team_a : state.team_b;
+  const picked = team.slice(-size);
+  if (!picked.length) return;
+  const names = await nameMap([captainId, ...picked]);
+  const who = picked.map((id) => names.get(id) ?? "Jogador");
+  const list = who.length > 1 ? `${who.slice(0, -1).join(", ")} e ${who.at(-1)}` : who[0]!;
   await sendPush(
-    { topic: "pick", userIds: others, once: `picklog:${scheduleId}:${date}:${playerId}` },
     {
-      title: `${names.get(captainId) ?? "Capitão"} pickou ${names.get(playerId) ?? "um jogador"}`,
-      body: `PICK do mix de ${dayMonth(date)}: ${names.get(playerId) ?? "Jogador"} vai para o Time ${names.get(captainId) ?? ""}.`.trim(),
-      tag: `picklog:${date}`,
+      topic: "pick",
+      userIds: await classifiedOf(scheduleId, date),
+      once: `picklog:${scheduleId}:${date}:${turn}:${picked.join(",")}`,
+    },
+    {
+      title: `${turn}. ${names.get(captainId) ?? "Capitão"} pickou ${list}`,
+      body: `PICK do mix de ${dayMonth(date)} · rodada ${turn} de ${TURN_PATTERN.length}.`,
+      tag: `picklog:${date}:${turn}`,
     },
   );
 }
