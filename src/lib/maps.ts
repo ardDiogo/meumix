@@ -10,6 +10,7 @@ export const MAPS: Record<MapId, GameMap> = {
   de_train: { id: "de_train", name: "Train", active: true },
   de_overpass: { id: "de_overpass", name: "Overpass", active: false },
   de_vertigo: { id: "de_vertigo", name: "Vertigo", active: false },
+  de_cache: { id: "de_cache", name: "Cache", active: false },
 };
 
 export const ACTIVE_MAP_POOL = Object.values(MAPS).filter((m) => m.active);
@@ -19,7 +20,7 @@ export const mapName = (id: MapId) => MAPS[id]?.name ?? id.replace(/^de_/, "").r
 
 /**
  * Emblema oficial da coleção do mapa (ícones do CS2). Os que estão em
- * /public/maps são servidos pelo próprio site; o Ancient vem do CDN da Steam.
+ * /public/maps são servidos pelo próprio site; Ancient e Cache vêm do CDN da Steam.
  */
 const LOCAL_ICONS = new Set([
   "de_dust2",
