@@ -1,7 +1,11 @@
 /** Tipos de aviso no celular; cada aparelho escolhe quais quer receber. */
 export const PUSH_TOPICS = [
   { key: "inscricoes", label: "Inscrições", description: "Lista abrindo em instantes e vagas sobrando" },
-  { key: "pick", label: "Capitão e PICK", description: "Quando você vira capitão ou é escolhido" },
+  {
+    key: "pick",
+    label: "Votação, capitães e PICK",
+    description: "Lista fechada para votar, capitães definidos e cada pick do mix",
+  },
   { key: "bolao", label: "Bolão", description: "Times definidos e bolão fechando" },
   { key: "resultado", label: "Resultado", description: "Seu ELO no mix e seus pontos no bolão" },
   { key: "live", label: "Ao vivo na Twitch", description: "Quando um jogador do MeuMix abre a live" },

@@ -40,7 +40,35 @@ async function draftOf(scheduleId: string, date: string) {
   } | null;
 }
 
-/** Disputa de capitães começou: avisa os dois capitães. */
+/** Classificados do mix (os primeiros inscritos, até o limite de vagas). */
+async function classifiedOf(scheduleId: string, date: string) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return [];
+  const [{ data: schedule }, { data: regs }] = await Promise.all([
+    admin.from("mix_schedules").select("max_players").eq("id", scheduleId).maybeSingle(),
+    admin
+      .from("mix_registrations")
+      .select("user_id")
+      .match({ schedule_id: scheduleId, event_date: date })
+      .order("created_at"),
+  ]);
+  return (regs ?? []).slice(0, (schedule?.max_players as number) ?? 10).map((r) => r.user_id as string);
+}
+
+/** Lista fechou (10 classificados): chama todos para votar em capitães e mapas. */
+export async function notifyListFull(scheduleId: string, date: string) {
+  const classified = await classifiedOf(scheduleId, date);
+  await sendPush(
+    { topic: "pick", userIds: classified, once: `lista-cheia:${scheduleId}:${date}` },
+    {
+      title: "Lista fechada! Hora de votar 🗳️",
+      body: `${classified.length} classificados para o mix de ${dayMonth(date)}. Vote nos capitães e nos mapas.`,
+      tag: `votacao:${date}`,
+    },
+  );
+}
+
+/** Disputa de capitães começou: avisa os dois capitães e conta para o resto do mix. */
 export async function notifyCaptains(scheduleId: string, date: string) {
   const draft = await draftOf(scheduleId, date);
   if (!draft || draft.status === "completed") return;
@@ -60,17 +88,36 @@ export async function notifyCaptains(scheduleId: string, date: string) {
       ),
     ),
   );
+  const others = (await classifiedOf(scheduleId, date)).filter((u) => u !== draft.captain_a && u !== draft.captain_b);
+  await sendPush(
+    { topic: "pick", userIds: others, once: `capitaes:${scheduleId}:${date}` },
+    {
+      title: "Capitães definidos 👑",
+      body: `${names.get(draft.captain_a) ?? "Capitão A"} × ${names.get(draft.captain_b) ?? "Capitão B"}. Agora é o pedra, papel ou tesoura e o PICK.`,
+      tag: `pick:${date}`,
+    },
+  );
 }
 
-/** Capitão escolheu alguém: avisa o escolhido. */
+/** Capitão escolheu alguém: avisa o escolhido e mostra o pick para o resto do mix. */
 export async function notifyPicked(scheduleId: string, date: string, playerId: string, captainId: string) {
-  const names = await nameMap([captainId]);
+  const names = await nameMap([captainId, playerId]);
   await sendPush(
     { topic: "pick", userIds: [playerId], once: `pick:${scheduleId}:${date}:${playerId}` },
     {
       title: "Você foi escolhido! 🎯",
       body: `${names.get(captainId) ?? "O capitão"} te pegou para o Time ${names.get(captainId) ?? ""}.`.trim(),
       tag: `pick:${date}`,
+    },
+  );
+  // Todos do mix acompanham o PICK ("Barker pickou AlexS-"); cada aviso substitui o anterior.
+  const others = (await classifiedOf(scheduleId, date)).filter((u) => u !== playerId);
+  await sendPush(
+    { topic: "pick", userIds: others, once: `picklog:${scheduleId}:${date}:${playerId}` },
+    {
+      title: `${names.get(captainId) ?? "Capitão"} pickou ${names.get(playerId) ?? "um jogador"}`,
+      body: `PICK do mix de ${dayMonth(date)}: ${names.get(playerId) ?? "Jogador"} vai para o Time ${names.get(captainId) ?? ""}.`.trim(),
+      tag: `picklog:${date}`,
     },
   );
 }

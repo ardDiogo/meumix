@@ -71,6 +71,12 @@ export function VoteDialog({
   ];
 
   const [open, setOpen] = useState(locked);
+  // A lista fechou (10 classificados) com a página já aberta: abre a votação na hora.
+  const [wasLocked, setWasLocked] = useState(locked);
+  if (locked !== wasLocked) {
+    setWasLocked(locked);
+    if (locked) setOpen(true);
+  }
   const [step, setStep] = useState<Step>(firstStep);
   const [captains, setCaptains] = useState<string[]>(myCaptains);
   const [chosenMaps, setChosenMaps] = useState<string[]>(myMaps);

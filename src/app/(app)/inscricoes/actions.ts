@@ -11,7 +11,7 @@ import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
-import { notifyCaptains } from "@/services/notify";
+import { notifyCaptains, notifyListFull } from "@/services/notify";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
 /**
@@ -168,6 +168,13 @@ export async function joinMix(
   }
 
   await audit({ ...base, outcome: "success", detail: meta });
+  // Fechou a lista (10 classificados): chama todos para votar.
+  const { count } = await ctx.admin
+    .from("mix_registrations")
+    .select("id", { count: "exact", head: true })
+    .eq("schedule_id", scheduleId)
+    .eq("event_date", date);
+  if (count === ctx.schedule.maxPlayers) after(() => notifyListFull(scheduleId, date));
   refresh();
   return { ok: true, message: "Inscrição confirmada!" };
 }
