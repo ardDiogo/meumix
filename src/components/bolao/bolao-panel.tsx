@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Flame, Loader2, Lock, Target, Trophy, X } from "lucide-react";
+import { Check, Flame, Loader2, Lock, Pencil, Target, Trophy, X } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -201,8 +201,23 @@ function OpenForm({
   const [mvp, setMvp] = useState<string | null>(mine?.mvpId ?? null);
   const [lanterna, setLanterna] = useState<string | null>(mine?.lanternaId ?? null);
   const [pending, start] = useTransition();
+  // Depois de palpitar, as opções ficam recolhidas; "Atualizar palpite" abre de novo.
+  const [editing, setEditing] = useState(!mine);
+  const showForm = editing || !mine || !loggedIn;
   const name = (id: string) => people[id]?.name ?? "Jogador";
   const teamName = (i: 0 | 1) => `Time ${name(bolao.captains[i])}`;
+  const cancel = () => {
+    setWinner(mine?.winnerCaptain ?? null);
+    setScore(
+      Math.max(
+        0,
+        options.findIndex((o) => o.won === mine?.mapsWon && o.lost === mine?.mapsLost),
+      ),
+    );
+    setMvp(mine?.mvpId ?? null);
+    setLanterna(mine?.lanternaId ?? null);
+    setEditing(false);
+  };
 
   const save = () => {
     if (!winner) return toast.error("Escolha quem vence.");
@@ -215,8 +230,10 @@ function OpenForm({
         mvpId: mvp,
         lanternaId: lanterna,
       });
-      if (r.ok) toast.success(r.message);
-      else toast.error(r.message);
+      if (r.ok) {
+        toast.success(r.message);
+        setEditing(false);
+      } else toast.error(r.message);
     });
   };
 
@@ -225,81 +242,85 @@ function OpenForm({
       <Split bolao={bolao} teamName={teamName} />
       <Voters voters={bolao.voters} />
 
-      <div>
-        <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
-          Quem vence? <span className="font-normal tracking-normal normal-case">(+{BOLAO_POINTS.winner})</span>
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {([0, 1] as const).map((i) => (
-            <button
-              key={i}
-              type="button"
-              disabled={!loggedIn}
-              onClick={() => setWinner(bolao.captains[i])}
-              aria-pressed={winner === bolao.captains[i]}
-              className={cn(
-                "flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50",
-                winner === bolao.captains[i]
-                  ? i === 0
-                    ? "border-team-a bg-team-a/15 text-team-a"
-                    : "border-team-b bg-team-b/15 text-team-b"
-                  : "border-border hover:border-border-strong",
-              )}
-            >
-              <TeamDot side={i === 0 ? "A" : "B"} /> {teamName(i)}
-            </button>
-          ))}
-        </div>
-      </div>
+      {showForm && (
+        <>
+          <div>
+            <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
+              Quem vence? <span className="font-normal tracking-normal normal-case">(+{BOLAO_POINTS.winner})</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {([0, 1] as const).map((i) => (
+                <button
+                  key={i}
+                  type="button"
+                  disabled={!loggedIn}
+                  onClick={() => setWinner(bolao.captains[i])}
+                  aria-pressed={winner === bolao.captains[i]}
+                  className={cn(
+                    "flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50",
+                    winner === bolao.captains[i]
+                      ? i === 0
+                        ? "border-team-a bg-team-a/15 text-team-a"
+                        : "border-team-b bg-team-b/15 text-team-b"
+                      : "border-border hover:border-border-strong",
+                  )}
+                >
+                  <TeamDot side={i === 0 ? "A" : "B"} /> {teamName(i)}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <div>
-        <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
-          Placar de mapas{" "}
-          <span className="font-normal tracking-normal normal-case">
-            (+{BOLAO_POINTS.score} se acertar com o vencedor)
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {options.map((o, i) => (
-            <button
-              key={`${o.won}-${o.lost}`}
-              type="button"
-              disabled={!loggedIn}
-              onClick={() => setScore(i)}
-              aria-pressed={score === i}
-              className={cn(
-                "rounded-md border px-3 py-1.5 font-display text-sm font-bold tabular transition-colors disabled:opacity-50",
-                score === i ? "border-brand bg-brand/12 text-brand" : "border-border hover:border-border-strong",
-              )}
-            >
-              {o.won} × {o.lost}
-            </button>
-          ))}
-        </div>
-      </div>
+          <div>
+            <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
+              Placar de mapas{" "}
+              <span className="font-normal tracking-normal normal-case">
+                (+{BOLAO_POINTS.score} se acertar com o vencedor)
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {options.map((o, i) => (
+                <button
+                  key={`${o.won}-${o.lost}`}
+                  type="button"
+                  disabled={!loggedIn}
+                  onClick={() => setScore(i)}
+                  aria-pressed={score === i}
+                  className={cn(
+                    "rounded-md border px-3 py-1.5 font-display text-sm font-bold tabular transition-colors disabled:opacity-50",
+                    score === i ? "border-brand bg-brand/12 text-brand" : "border-border hover:border-border-strong",
+                  )}
+                >
+                  {o.won} × {o.lost}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <PlayerPicker
-        value={mvp}
-        onChange={setMvp}
-        other={lanterna}
-        label="MVP"
-        icon={Trophy}
-        points={BOLAO_POINTS.mvp}
-        teams={bolao.teams}
-        people={people}
-        disabled={!loggedIn}
-      />
-      <PlayerPicker
-        value={lanterna}
-        onChange={setLanterna}
-        other={mvp}
-        label="Lanterna"
-        icon={Flame}
-        points={BOLAO_POINTS.lanterna}
-        teams={bolao.teams}
-        people={people}
-        disabled={!loggedIn}
-      />
+          <PlayerPicker
+            value={mvp}
+            onChange={setMvp}
+            other={lanterna}
+            label="MVP"
+            icon={Trophy}
+            points={BOLAO_POINTS.mvp}
+            teams={bolao.teams}
+            people={people}
+            disabled={!loggedIn}
+          />
+          <PlayerPicker
+            value={lanterna}
+            onChange={setLanterna}
+            other={mvp}
+            label="Lanterna"
+            icon={Flame}
+            points={BOLAO_POINTS.lanterna}
+            teams={bolao.teams}
+            people={people}
+            disabled={!loggedIn}
+          />
+        </>
+      )}
 
       {loggedIn ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
@@ -319,9 +340,22 @@ function OpenForm({
               Palpites ficam escondidos até {hourMin(bolao.closesAt)}; depois todos aparecem.
             </p>
           )}
-          <Button variant="primary" size="sm" disabled={pending || !winner} onClick={save}>
-            {pending ? <Loader2 className="animate-spin" /> : <Check />} {mine ? "Atualizar palpite" : "Salvar palpite"}
-          </Button>
+          {mine && !editing ? (
+            <Button variant="primary" size="sm" onClick={() => setEditing(true)}>
+              <Pencil /> Atualizar palpite
+            </Button>
+          ) : (
+            <div className="flex gap-2">
+              {mine && (
+                <Button variant="ghost" size="sm" disabled={pending} onClick={cancel}>
+                  Cancelar
+                </Button>
+              )}
+              <Button variant="primary" size="sm" disabled={pending || !winner} onClick={save}>
+                {pending ? <Loader2 className="animate-spin" /> : <Check />} Salvar palpite
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <p className="border-t border-border pt-3 text-sm text-muted">
