@@ -155,6 +155,29 @@ function PlayerPicker({
   );
 }
 
+/** Quem já palpitou: só foto e nick (o palpite fica escondido até fechar). */
+function Voters({ voters }: { voters: BolaoView["voters"] }) {
+  if (!voters.length) return null;
+  return (
+    <div>
+      <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
+        Já palpitaram ({voters.length})
+      </div>
+      <ul className="flex flex-wrap gap-1.5">
+        {voters.map((v) => (
+          <li
+            key={v.userId}
+            className="flex items-center gap-1.5 rounded-full border border-border bg-surface-2/50 py-0.5 pr-2.5 pl-0.5 text-xs"
+          >
+            <Avatar name={v.name} src={v.avatarUrl} size="xs" className="rounded-full" />
+            {v.name}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function OpenForm({
   scheduleId,
   date,
@@ -200,6 +223,7 @@ function OpenForm({
   return (
     <div className="space-y-4 p-4 sm:p-5">
       <Split bolao={bolao} teamName={teamName} />
+      <Voters voters={bolao.voters} />
 
       <div>
         <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">

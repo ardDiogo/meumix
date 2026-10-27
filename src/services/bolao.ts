@@ -66,6 +66,8 @@ export interface BolaoView {
   mine: Prediction | null;
   /** Todos os palpites (só depois de fechar). */
   entries: BolaoEntry[] | null;
+  /** Quem já palpitou (só nome e foto, sem o palpite), na ordem dos palpites. */
+  voters: { userId: string; name: string; avatarUrl: string | null }[];
   outcome: MixOutcome | null;
 }
 
@@ -130,9 +132,16 @@ export async function loadBolao(opts: {
 
   let entries: BolaoEntry[] | null = null;
   let outcome: MixOutcome | null = null;
+  const ids = rows.map((r) => r.user_id);
+  const [nameMap, avatars] = ids.length
+    ? await Promise.all([names(admin, ids), profileAvatars(ids)])
+    : [new Map<string, string>(), new Map<string, { avatarUrl: string | null }>()];
+  const voters = rows.map((r) => ({
+    userId: r.user_id,
+    name: nameMap.get(r.user_id) ?? "Jogador",
+    avatarUrl: avatars.get(r.user_id)?.avatarUrl ?? null,
+  }));
   if (status !== "open") {
-    const ids = rows.map((r) => r.user_id);
-    const [nameMap, avatars] = await Promise.all([names(admin, ids), profileAvatars(ids)]);
     outcome = opts.finalizedMatchId ? await matchOutcome(admin, opts.finalizedMatchId, opts.captains) : null;
     entries = rows
       .map((r) => ({
@@ -158,6 +167,7 @@ export async function loadBolao(opts: {
     ],
     mine: mine ? toPrediction(mine) : null,
     entries,
+    voters,
     outcome,
   };
 }
