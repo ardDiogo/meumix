@@ -247,6 +247,54 @@ export async function removeRegistration(registrationId: string): Promise<Action
   return { ok: true, message: "Inscrito removido." };
 }
 
+/**
+ * Super admin: inscreve um jogador cadastrado no mix atual (entra no fim da
+ * lista, como uma inscrição normal). Passa por cima da janela de inscrição e
+ * de punições, mas não depois do mix finalizado.
+ */
+export async function addPlayerToMix(scheduleId: string, date: string, userId: string): Promise<ActionResult> {
+  const session = await getSession();
+  if (!session?.isSuperAdmin) return fail("Apenas o super admin pode incluir jogadores.", "denied");
+  const ctx = await loadOccurrence(scheduleId, date);
+  if ("error" in ctx) return fail(ctx.error!, "unavailable");
+
+  const [{ data: profile }, { data: finalized }] = await Promise.all([
+    ctx.admin.from("profiles").select("id, display_name").eq("id", userId).maybeSingle(),
+    ctx.admin
+      .from("mix_matches")
+      .select("id")
+      .match({ schedule_id: scheduleId, event_date: date })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (!profile) return fail("Jogador não encontrado.", "invalid");
+  if (finalized) return fail("Este mix já foi finalizado.", "closed");
+  const name = profile.display_name as string;
+
+  const { error } = await ctx.admin
+    .from("mix_registrations")
+    .insert({ schedule_id: scheduleId, event_date: date, user_id: userId, device: null });
+  if (error?.code === "23505") return { ok: true, message: `${name} já está na lista.` };
+  if (error) return fail("Não foi possível incluir o jogador.", "error");
+
+  await audit({
+    action: "admin.add_registration",
+    outcome: "success",
+    actorId: session.id,
+    scheduleId,
+    eventDate: date,
+    detail: { user_id: userId },
+  });
+  const { count } = await ctx.admin
+    .from("mix_registrations")
+    .select("id", { count: "exact", head: true })
+    .match({ schedule_id: scheduleId, event_date: date });
+  if (count === ctx.schedule.maxPlayers) after(() => notifyListFull(scheduleId, date));
+  refresh();
+  const reserve = (count ?? 0) > ctx.schedule.maxPlayers;
+  return { ok: true, message: `${name} incluído na lista${reserve ? " como reserva" : ""}.` };
+}
+
 /** Admin: apaga todas as inscrições e votos da ocorrência atual. */
 export async function resetRegistrations(scheduleId: string, date: string): Promise<ActionResult> {
   const session = await getSession();

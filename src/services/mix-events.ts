@@ -550,3 +550,18 @@ export async function listUpcomingOccurrences(now = new Date()): Promise<Upcomin
     }))
     .sort((a, b) => a.eventAt.getTime() - b.eventAt.getTime());
 }
+
+/** Jogadores cadastrados fora da lista (para o super admin incluir). */
+export async function playersOutsideList(registered: string[]) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [];
+  const { data } = await supabase.from("profiles").select("id, display_name").order("display_name");
+  const out = new Set(registered);
+  const rows = (data ?? []).filter((p) => !out.has(p.id as string));
+  const avatars = await profileAvatars(rows.map((p) => p.id as string));
+  return rows.map((p) => ({
+    id: p.id as string,
+    name: p.display_name as string,
+    avatarUrl: avatars.get(p.id as string)?.avatarUrl ?? null,
+  }));
+}

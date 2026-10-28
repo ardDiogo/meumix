@@ -16,7 +16,7 @@ import { CAPTAINS, CAPTAIN_VOTES_PER_PLAYER, MAPS_IN_ROTATION } from "@/lib/mix-
 import { registrationWindow } from "@/lib/mix-schedule";
 import { cn } from "@/lib/utils";
 import { getPermissions } from "@/services/auth";
-import { getNextMix } from "@/services/mix-events";
+import { getNextMix, playersOutsideList } from "@/services/mix-events";
 import { getPickInfo } from "@/services/pick-info";
 import { loadBolao, typicalMapsCount } from "@/services/bolao";
 import { BolaoPanel } from "../bolao/bolao-panel";
@@ -30,7 +30,7 @@ import { JoinButton } from "./join-button";
 import { LiveRefresh } from "./live-refresh";
 import { DraftPanel } from "./draft-panel";
 import { SuggestionPanel } from "./suggestion-panel";
-import { RemoveButton, ResetButton, StartDraftButton } from "./registration-controls";
+import { AddPlayerButton, RemoveButton, ResetButton, StartDraftButton } from "./registration-controls";
 import { VoteDialog } from "./vote-dialog";
 import { ShareMixButton } from "./share-mix";
 import { TiebreakerPanel } from "./tiebreaker-panel";
@@ -168,6 +168,11 @@ export async function NextMixPanel() {
           return null;
         })
       : null;
+  // Super admin: jogadores que ainda podem ser incluídos (falha = sem o botão).
+  const addable =
+    session?.isSuperAdmin && !result.mix.finalizedMatchId
+      ? await playersOutsideList(registrations.map((r) => r.userId)).catch(() => null)
+      : null;
   const topMaps = votes.mapTally.slice(0, MAPS_IN_ROTATION);
   const topCaptains = votes.captainTally.slice(0, CAPTAINS);
 
@@ -239,6 +244,7 @@ export async function NextMixPanel() {
                   </Link>
                 </Button>
               )}
+              {addable && <AddPlayerButton scheduleId={schedule.id} date={occurrence.date} players={addable} />}
               {canManageMixes && registrations.length > 0 && (
                 <ResetButton scheduleId={schedule.id} date={occurrence.date} />
               )}
