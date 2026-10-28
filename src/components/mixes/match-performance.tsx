@@ -28,8 +28,8 @@ const statOf = (r: StatRow, m: Stat): number | null =>
  */
 const FLOOR: Record<Stat, number> = { kdr: 0.5, adr: 40, fk: 2, kast: 40 };
 
-/** Faixa (±10%) em que o jogador conta como "na média" (amarelo). */
-const NEAR = 0.1;
+/** Faixa (±3%) em que o jogador conta como "na média" (amarelo). */
+const NEAR = 0.03;
 const YELLOW = "#eab308";
 const NO_AVG = "#52525b";
 
@@ -50,7 +50,7 @@ const mixHex = (a: string, b: string, t: number) =>
  * média; verde acima e vermelho abaixo, cada vez mais vivos quanto mais longe.
  */
 function toneColor(rel: number) {
-  if (Math.abs(rel) < NEAR) return YELLOW;
+  if (Math.abs(rel) <= NEAR) return YELLOW;
   const t = Math.min(1, (Math.abs(rel) - NEAR) / 0.5);
   return rel > 0 ? mixHex("#5b8a68", "#22c55e", t) : mixHex("#9a5a5a", "#ff3b3b", t);
 }
