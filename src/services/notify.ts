@@ -73,13 +73,15 @@ export async function notifyCaptains(scheduleId: string, date: string) {
   const draft = await draftOf(scheduleId, date);
   if (!draft || draft.status === "completed") return;
   const names = await nameMap([draft.captain_a, draft.captain_b]);
+  // Capitães trocados (super admin): avisa de novo com a dupla nova.
+  const pair = [draft.captain_a, draft.captain_b].sort().join(":");
   await Promise.all(
     [
       [draft.captain_a, draft.captain_b],
       [draft.captain_b, draft.captain_a],
     ].map(([me, rival]) =>
       sendPush(
-        { topic: "pick", userIds: [me!], once: `capitao:${scheduleId}:${date}:${me}` },
+        { topic: "pick", userIds: [me!], once: `capitao:${scheduleId}:${date}:${me}:${pair}` },
         {
           title: "Você é capitão! 👑",
           body: `Pedra, papel ou tesoura contra ${names.get(rival!) ?? "o outro capitão"} para ver quem escolhe primeiro.`,
@@ -90,7 +92,7 @@ export async function notifyCaptains(scheduleId: string, date: string) {
   );
   const others = (await classifiedOf(scheduleId, date)).filter((u) => u !== draft.captain_a && u !== draft.captain_b);
   await sendPush(
-    { topic: "pick", userIds: others, once: `capitaes:${scheduleId}:${date}` },
+    { topic: "pick", userIds: others, once: `capitaes:${scheduleId}:${date}:${pair}` },
     {
       title: "Capitães definidos 👑",
       body: `${names.get(draft.captain_a) ?? "Capitão A"} × ${names.get(draft.captain_b) ?? "Capitão B"}. Agora é o pedra, papel ou tesoura e o PICK.`,

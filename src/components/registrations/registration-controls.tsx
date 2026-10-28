@@ -1,15 +1,16 @@
 "use client";
 
-import { Loader2, Play, RotateCcw, Search, Trash2, UserPlus } from "lucide-react";
+import { Crown, Loader2, Play, RotateCcw, Search, Trash2, UserPlus } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { startDraft } from "@/app/(app)/draft/actions";
+import { setCaptains, startDraft } from "@/app/(app)/draft/actions";
 import {
   addPlayerToMix,
   removeRegistration,
   resetRegistrations,
   type ActionResult,
 } from "@/app/(app)/inscricoes/actions";
+import { cn } from "@/lib/utils";
 import { Avatar } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "../ui/dialog";
@@ -142,6 +143,93 @@ export function AddPlayerButton({
           ))}
           {!shown.length && <li className="px-2 py-4 text-center text-sm text-muted">Nenhum jogador encontrado.</li>}
         </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Super admin: escolhe os 2 capitães na mão (recomeça a seleção do PPT). */
+export function SetCaptainsButton({
+  scheduleId,
+  date,
+  players,
+  current,
+  hasDraft,
+}: {
+  scheduleId: string;
+  date: string;
+  players: { id: string; name: string; avatarUrl: string | null }[];
+  current: string[];
+  hasDraft: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>(current);
+  const [pending, start] = useTransition();
+  const nameOf = (id: string) => players.find((p) => p.id === id)?.name ?? "Jogador";
+  const toggle = (id: string) =>
+    setPicked((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : prev.length < 2 ? [...prev, id] : [prev[1]!, id],
+    );
+  const save = () => {
+    const [a, b] = picked;
+    if (!a || !b) return;
+    const warn = hasDraft ? "\n\nA seleção atual (PPT, picks e bolão) será desfeita." : "";
+    if (!confirm(`Definir ${nameOf(a)} × ${nameOf(b)} como capitães?${warn}`)) return;
+    start(async () => {
+      const r = await setCaptains(scheduleId, date, a, b);
+      if (r.ok) {
+        toast.success(r.message);
+        setOpen(false);
+      } else toast.error(r.message);
+    });
+  };
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v) setPicked(current);
+      }}
+    >
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <Crown /> Definir capitães
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        title="Definir capitães"
+        description="Escolha 2 classificados. A seleção recomeça do pedra-papel-tesoura com eles."
+      >
+        <ul className="grid max-h-80 grid-cols-2 gap-1.5 overflow-y-auto">
+          {players.map((p) => {
+            const slot = picked.indexOf(p.id);
+            return (
+              <li key={p.id}>
+                <button
+                  type="button"
+                  aria-pressed={slot >= 0}
+                  onClick={() => toggle(p.id)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition-colors",
+                    slot >= 0 ? "border-brand bg-brand/12 font-semibold" : "border-border hover:bg-surface-2",
+                  )}
+                >
+                  <Avatar name={p.name} src={p.avatarUrl} size="xs" />
+                  <span className="flex-1 truncate">{p.name}</span>
+                  {slot >= 0 && <Crown className="size-4 text-brand" aria-label={`Capitão ${slot ? "B" : "A"}`} />}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="truncate text-sm text-muted">
+            {picked.length === 2 ? `${nameOf(picked[0]!)} × ${nameOf(picked[1]!)}` : `${picked.length}/2 escolhidos`}
+          </span>
+          <Button size="sm" disabled={picked.length !== 2 || pending} onClick={save}>
+            {pending ? <Loader2 className="animate-spin" /> : <Crown />} Confirmar
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -137,3 +137,62 @@ export async function resetDraft(scheduleId: string, date: string, scope: "draft
   refresh();
   return { ok: true, message: scope === "all" ? "Seleção e votos de capitão reiniciados." : "Seleção reiniciada." };
 }
+
+/**
+ * Super admin: define os 2 capitães na mão (para destravar um mix com
+ * problema). Desfaz a seleção que houver e recomeça do pedra-papel-tesoura
+ * com os capitães escolhidos; os votos de capitão ficam como estão.
+ */
+export async function setCaptains(
+  scheduleId: string,
+  date: string,
+  captainA: string,
+  captainB: string,
+): Promise<DraftResult> {
+  const session = await getSession();
+  if (!session?.isSuperAdmin) return fail("Apenas o super admin pode definir os capitães.");
+  if (!captainA || !captainB || captainA === captainB) return fail("Escolha 2 capitães diferentes.");
+  const admin = createSupabaseAdminClient();
+  if (!admin) return fail("Servidor não configurado.");
+  const match = { schedule_id: scheduleId, event_date: date };
+
+  const [{ data: classified, error }, { data: finalized }] = await Promise.all([
+    admin.rpc("mix_classified", { p_schedule: scheduleId, p_date: date }),
+    admin.from("mix_matches").select("id").match(match).limit(1).maybeSingle(),
+  ]);
+  if (error) return fail("Não foi possível consultar a lista.");
+  if (finalized) return fail("Este mix já foi finalizado.");
+  const ids = (classified as string[] | null) ?? [];
+  const { data: schedule } = await admin.from("mix_schedules").select("max_players").eq("id", scheduleId).maybeSingle();
+  if (ids.length < ((schedule?.max_players as number | undefined) ?? 10)) return fail(DB_ERRORS.NOT_ENOUGH_PLAYERS!);
+  if (!ids.includes(captainA) || !ids.includes(captainB)) return fail("Os capitães precisam estar classificados.");
+
+  // Desfaz a seleção atual e o que depende dos times (como em resetDraft).
+  const draft = await admin.from("mix_draft_state").delete().match(match);
+  if (draft.error) return fail("Não foi possível definir os capitães.");
+  await Promise.all([
+    admin.from("mix_predictions").delete().match(match),
+    admin.from("map_tiebreaker_rounds").delete().match(match),
+    admin
+      .from("mix_team_suggestions")
+      .update({ status: "rejected", decided_at: new Date().toISOString() })
+      .match(match)
+      .eq("status", "pending"),
+  ]);
+  const { error: insertError } = await admin
+    .from("mix_draft_state")
+    .insert({ ...match, captain_a: captainA, captain_b: captainB });
+  if (insertError) return fail("Não foi possível definir os capitães.");
+
+  after(() => notifyCaptains(scheduleId, date));
+  await audit({
+    action: "admin.set_captains",
+    outcome: "success",
+    actorId: session.id,
+    scheduleId,
+    eventDate: date,
+    detail: { captain_a: captainA, captain_b: captainB },
+  });
+  refresh();
+  return { ok: true, message: "Capitães definidos! Agora é o pedra-papel-tesoura." };
+}

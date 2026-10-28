@@ -30,7 +30,13 @@ import { JoinButton } from "./join-button";
 import { LiveRefresh } from "./live-refresh";
 import { DraftPanel } from "./draft-panel";
 import { SuggestionPanel } from "./suggestion-panel";
-import { AddPlayerButton, RemoveButton, ResetButton, StartDraftButton } from "./registration-controls";
+import {
+  AddPlayerButton,
+  RemoveButton,
+  ResetButton,
+  SetCaptainsButton,
+  StartDraftButton,
+} from "./registration-controls";
 import { VoteDialog } from "./vote-dialog";
 import { ShareMixButton } from "./share-mix";
 import { TiebreakerPanel } from "./tiebreaker-panel";
@@ -245,6 +251,15 @@ export async function NextMixPanel() {
                 </Button>
               )}
               {addable && <AddPlayerButton scheduleId={schedule.id} date={occurrence.date} players={addable} />}
+              {session?.isSuperAdmin && full && !result.mix.finalizedMatchId && (
+                <SetCaptainsButton
+                  scheduleId={schedule.id}
+                  date={occurrence.date}
+                  players={classifiedList.map((r) => ({ id: r.userId, name: r.displayName, avatarUrl: r.avatarUrl }))}
+                  current={draft ? [draft.captainA, draft.captainB] : []}
+                  hasDraft={!!draft}
+                />
+              )}
               {canManageMixes && registrations.length > 0 && (
                 <ResetButton scheduleId={schedule.id} date={occurrence.date} />
               )}
