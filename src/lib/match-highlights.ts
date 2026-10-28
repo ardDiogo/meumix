@@ -7,6 +7,8 @@ export interface StatRow {
   name: string;
   team: "A" | "B";
   elo: number | null;
+  /** ELO ganho (ou perdido) neste mix. */
+  eloDelta?: number | null;
   /** Nick atual da conta (o do print pode ser diferente). */
   profileNick?: string | null;
   /** Foto do perfil Steam, se vinculado. */

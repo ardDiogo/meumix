@@ -35,6 +35,10 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
       name: r.player_name as string,
       team: r.team as "A" | "B",
       elo: num(r.elo_after) ?? num(r.elo_before),
+      eloDelta:
+        r.calculate_elo !== false && r.elo_after != null && r.elo_before != null
+          ? Number(r.elo_after) - Number(r.elo_before)
+          : null,
       profileNick: r.user_id ? (nickOf.get(r.user_id as string) ?? null) : null,
       avatarUrl: r.user_id ? (avatars.get(r.user_id as string)?.avatarUrl ?? null) : null,
       k: r.kills ?? 0,
@@ -52,4 +56,45 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
       isLanterna: !!r.is_lanterna,
     })),
   };
+}
+
+/** Médias de um jogador nas outras partidas (base de comparação do mix). */
+export interface PlayerAverage {
+  mixes: number;
+  kdr: number;
+  adr: number | null;
+  fk: number;
+  kast: number | null;
+}
+
+const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+
+/** Média de cada jogador em todas as partidas, menos esta. */
+export async function playerAverages(matchId: string, userIds: string[]): Promise<Record<string, PlayerAverage>> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase || !userIds.length) return {};
+  const { data } = await supabase
+    .from("player_match_records")
+    .select("user_id, kills, deaths, first_kills, adr, kast")
+    .in("user_id", userIds)
+    .neq("match_id", matchId);
+  const byUser = new Map<string, NonNullable<typeof data>>();
+  for (const r of data ?? []) byUser.set(r.user_id as string, [...(byUser.get(r.user_id as string) ?? []), r]);
+  return Object.fromEntries(
+    [...byUser].map(([id, rows]) => {
+      const kills = rows.reduce((a, r) => a + (r.kills ?? 0), 0);
+      const deaths = rows.reduce((a, r) => a + (r.deaths ?? 0), 0);
+      const nums = (k: "adr" | "kast") => rows.map((r) => num(r[k])).filter((v): v is number => v != null);
+      return [
+        id,
+        {
+          mixes: rows.length,
+          kdr: deaths ? kills / deaths : kills,
+          adr: mean(nums("adr")),
+          fk: mean(rows.map((r) => r.first_kills ?? 0)) ?? 0,
+          kast: mean(nums("kast")),
+        },
+      ];
+    }),
+  );
 }

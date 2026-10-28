@@ -15,7 +15,8 @@ import { mapName } from "@/lib/maps";
 import { seriesScore, seriesWinner } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { getMixDetail } from "@/services/queries";
-import { getMatchReport } from "@/services/match-report";
+import { getMatchReport, playerAverages } from "@/services/match-report";
+import { MatchPerformance } from "@/components/mixes/match-performance";
 import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
 import { LinkGuests } from "@/components/mixes/link-guests";
@@ -61,6 +62,13 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
       : [null, null];
   const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;
   const guests = report?.rows.filter((r) => !r.userId) ?? [];
+  // Base do gráfico de desempenho: média de cada um nos outros mixes (falha = sem o tracinho).
+  const averages = report?.rows.length
+    ? await playerAverages(
+        mix.id,
+        report.rows.map((r) => r.userId).filter((id): id is string => !!id),
+      ).catch(() => ({}))
+    : {};
   const { session, canManageMixes } = await getPermissions();
   const canSendClip = kind === "supabase" && !!session;
   const playerIds = [...new Set([...mix.teams[0].playerIds, ...mix.teams[1].playerIds])];
@@ -248,6 +256,19 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                   </p>
                 </div>
                 <MatchStatsTable rows={report.rows} />
+              </Card>
+              <Card>
+                <CardHeader
+                  title="Desempenho no mix"
+                  description="Cada jogador neste mix comparado com a média dele nos outros."
+                />
+                <CardContent>
+                  <MatchPerformance
+                    rows={report.rows}
+                    averages={averages}
+                    teamNames={[mix.teams[0].name, mix.teams[1].name]}
+                  />
+                </CardContent>
               </Card>
               {canManageMixes && guests.length > 0 && (
                 <LinkGuests
