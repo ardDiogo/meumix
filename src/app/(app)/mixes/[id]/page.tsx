@@ -257,6 +257,14 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 </div>
                 <MatchStatsTable rows={report.rows} />
               </Card>
+              {canManageMixes && guests.length > 0 && (
+                <LinkGuests
+                  matchId={mix.id}
+                  guests={guests.map((g) => ({ recordId: g.key, name: g.name, rp: g.rp }))}
+                  profiles={linkable}
+                />
+              )}
+              <MatchHighlights rows={report.rows} />
               <Card>
                 <CardHeader
                   title="Desempenho no mix"
@@ -270,14 +278,6 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                   />
                 </CardContent>
               </Card>
-              {canManageMixes && guests.length > 0 && (
-                <LinkGuests
-                  matchId={mix.id}
-                  guests={guests.map((g) => ({ recordId: g.key, name: g.name, rp: g.rp }))}
-                  profiles={linkable}
-                />
-              )}
-              <MatchHighlights rows={report.rows} />
               <ChronicleCard
                 matchId={mix.id}
                 canManage={canManageMixes}
