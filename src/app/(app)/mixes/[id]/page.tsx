@@ -260,7 +260,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
               <Card>
                 <CardHeader
                   title="Desempenho no mix"
-                  description="Cada jogador neste mix comparado com a média dele nos outros."
+                  description="Quem mais jogou acima da própria média aparece primeiro."
                 />
                 <CardContent>
                   <MatchPerformance

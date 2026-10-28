@@ -45,9 +45,18 @@ export function MatchPerformance({
     const a = r.userId ? averages[r.userId] : undefined;
     return a && !elo ? (a[metric as Exclude<Metric, "elo">] ?? null) : null;
   };
+  // Ordem: quem mais passou da própria média primeiro; sem média (estreia,
+  // convidado) vai para o fim, pelo valor. No ELO, pelo ganho.
+  const diffOf = (x: { v: number | null; avg: number | null }) => (x.v != null && x.avg != null ? x.v - x.avg : null);
   const items = rows
     .map((r) => ({ r, v: valueOf(r, metric), avg: avgOf(r) }))
-    .sort((a, b) => (b.v ?? -Infinity) - (a.v ?? -Infinity) || a.r.name.localeCompare(b.r.name));
+    .sort(
+      (a, b) =>
+        Number(diffOf(b) != null) - Number(diffOf(a) != null) ||
+        (diffOf(b) ?? 0) - (diffOf(a) ?? 0) ||
+        (b.v ?? -Infinity) - (a.v ?? -Infinity) ||
+        a.r.name.localeCompare(b.r.name),
+    );
   const scale = Math.max(...items.flatMap((x) => [Math.abs(x.v ?? 0), x.avg ?? 0]), elo ? 1 : 0.01);
   const name = (r: StatRow) => r.profileNick ?? r.name;
 
@@ -103,7 +112,7 @@ export function MatchPerformance({
 
       <ol className="space-y-1">
         {items.map(({ r, v, avg }, i) => {
-          const diff = v != null && avg != null ? v - avg : null;
+          const diff = diffOf({ v, avg });
           const label = v == null ? "—" : elo ? signed(v, 0) : `${fmt(v, spec.digits)}${spec.suffix ?? ""}`;
           return (
             <li
