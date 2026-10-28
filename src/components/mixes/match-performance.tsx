@@ -28,6 +28,33 @@ const statOf = (r: StatRow, m: Stat): number | null =>
  */
 const FLOOR: Record<Stat, number> = { kdr: 0.5, adr: 40, fk: 2, kast: 40 };
 
+/** Faixa (±10%) em que o jogador conta como "na média" (amarelo). */
+const NEAR = 0.1;
+const YELLOW = "#eab308";
+const NO_AVG = "#52525b";
+
+const mixHex = (a: string, b: string, t: number) =>
+  "#" +
+  [1, 3, 5]
+    .map((i) => {
+      const x = parseInt(a.slice(i, i + 2), 16);
+      const y = parseInt(b.slice(i, i + 2), 16);
+      return Math.round(x + (y - x) * t)
+        .toString(16)
+        .padStart(2, "0");
+    })
+    .join("");
+
+/**
+ * Cor pela diferença relativa à média (0,25 = 25% acima): amarelo perto da
+ * média; verde acima e vermelho abaixo, cada vez mais vivos quanto mais longe.
+ */
+function toneColor(rel: number) {
+  if (Math.abs(rel) < NEAR) return YELLOW;
+  const t = Math.min(1, (Math.abs(rel) - NEAR) / 0.5);
+  return rel > 0 ? mixHex("#5b8a68", "#22c55e", t) : mixHex("#9a5a5a", "#ff3b3b", t);
+}
+
 /**
  * Geral: quanto o jogador passou (ou ficou abaixo) da própria média em cada
  * estatística, em %, limitado a ±100% por estatística, e a média disso.
@@ -50,8 +77,8 @@ const fmt = (n: number, digits: number) =>
 const signed = (n: number, digits: number) => (n > 0 ? "+" : n < 0 ? "−" : "±") + fmt(Math.abs(n), digits);
 
 /**
- * Desempenho no mix: uma barra por jogador na estatística escolhida, na cor
- * do time, de quem mais passou da própria média para quem ficou mais abaixo.
+ * Desempenho no mix: uma barra por jogador na estatística escolhida, colorida
+ * pela distância da média dele (verde acima, amarelo perto, vermelho abaixo), de quem mais passou da própria média para quem ficou mais abaixo.
  * O tracinho é a média do jogador nas outras partidas. No Geral (as 4
  * estatísticas juntas, em %) e no ELO, a barra sai do centro.
  */
@@ -114,28 +141,37 @@ export function MatchPerformance({
           ))}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-          {centered ? (
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-team-a" aria-hidden /> {teamNames[0]}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="size-2 rounded-full bg-team-b" aria-hidden /> {teamNames[1]}
+          </span>
+          {elo ? (
             <>
               <span className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-sm bg-win" aria-hidden />{" "}
-                {elo ? "Ganhou ELO" : "Acima da própria média"}
+                <span className="size-2.5 rounded-sm bg-win" aria-hidden /> Ganhou ELO
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-sm bg-loss" aria-hidden />{" "}
-                {elo ? "Perdeu ELO" : "Abaixo da própria média"}
+                <span className="size-2.5 rounded-sm bg-loss" aria-hidden /> Perdeu ELO
               </span>
             </>
           ) : (
             <>
               <span className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-sm bg-team-a" aria-hidden /> {teamNames[0]}
+                <span className="size-2.5 rounded-sm bg-win" aria-hidden /> Acima da média
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-sm bg-team-b" aria-hidden /> {teamNames[1]}
+                <span className="size-2.5 rounded-sm" style={{ backgroundColor: YELLOW }} aria-hidden /> Na média
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-3 w-0.5 rounded-full bg-fg" aria-hidden /> Média dele nos outros mixes
+                <span className="size-2.5 rounded-sm bg-loss" aria-hidden /> Abaixo da média
               </span>
+              {!geral && (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-0.5 rounded-full bg-fg" aria-hidden /> Média dele
+                </span>
+              )}
             </>
           )}
         </div>
@@ -144,6 +180,15 @@ export function MatchPerformance({
       <ol className="space-y-1">
         {items.map(({ r, v, avg }, i) => {
           const diff = diffOf({ v, avg });
+          // Cor da barra: pela distância da média (no Geral, o próprio %).
+          const rel = geral
+            ? v != null
+              ? v / 100
+              : null
+            : diff != null
+              ? diff / Math.max(avg!, FLOOR[metric as Stat])
+              : null;
+          const color = rel != null ? toneColor(rel) : NO_AVG;
           const label =
             v == null
               ? geral
@@ -168,6 +213,10 @@ export function MatchPerformance({
             >
               <span className="text-center text-xs text-muted tabular">{i + 1}</span>
               <span className="flex min-w-0 items-center gap-2">
+                <span
+                  className={cn("size-2 shrink-0 rounded-full", r.team === "A" ? "bg-team-a" : "bg-team-b")}
+                  title={teamNames[r.team === "A" ? 0 : 1]}
+                />
                 <Avatar name={name(r)} src={r.avatarUrl} size="xs" />
                 <span className="truncate text-sm font-medium">{name(r)}</span>
               </span>
@@ -183,11 +232,15 @@ export function MatchPerformance({
                       <span
                         className={cn(
                           "absolute inset-y-0",
-                          v > 0 ? "left-1/2 rounded-r-sm bg-win" : "rounded-l-sm bg-loss",
+                          v > 0 ? "left-1/2 rounded-r-sm" : "rounded-l-sm",
+                          elo && (v > 0 ? "bg-win" : "bg-loss"),
                         )}
-                        style={
-                          v > 0 ? { width: `${(v / scale) * 50}%` } : { right: "50%", width: `${(-v / scale) * 50}%` }
-                        }
+                        style={{
+                          ...(v > 0
+                            ? { width: `${(v / scale) * 50}%` }
+                            : { right: "50%", width: `${(-v / scale) * 50}%` }),
+                          ...(elo ? {} : { backgroundColor: color }),
+                        }}
                       />
                     )}
                   </>
@@ -196,11 +249,8 @@ export function MatchPerformance({
                     <span className="absolute inset-0 rounded-sm bg-surface-2" />
                     {v != null && v > 0 && (
                       <span
-                        className={cn(
-                          "absolute inset-y-0 left-0 rounded-sm",
-                          r.team === "A" ? "bg-team-a" : "bg-team-b",
-                        )}
-                        style={{ width: `${(v / scale) * 100}%` }}
+                        className="absolute inset-y-0 left-0 rounded-sm"
+                        style={{ width: `${(v / scale) * 100}%`, backgroundColor: color }}
                       />
                     )}
                     {avg != null && (
@@ -216,7 +266,7 @@ export function MatchPerformance({
                 <span
                   className={cn(
                     "text-sm font-semibold",
-                    centered && v != null
+                    elo && v != null
                       ? v > 0
                         ? "text-win"
                         : v < 0
@@ -226,6 +276,7 @@ export function MatchPerformance({
                         ? "text-subtle"
                         : "text-fg",
                   )}
+                  style={geral && v != null ? { color } : undefined}
                 >
                   {label}
                 </span>
@@ -234,7 +285,7 @@ export function MatchPerformance({
                     {" "}
                     {diff != null ? (
                       <span
-                        className={diff > 0 ? "text-win" : diff < 0 ? "text-loss" : ""}
+                        style={{ color }}
                         title={`Média nos outros mixes: ${fmt(avg!, spec.digits)}${spec.suffix ?? ""}`}
                       >
                         {signed(diff, spec.digits)}
