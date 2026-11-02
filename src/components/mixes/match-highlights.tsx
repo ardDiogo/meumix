@@ -137,54 +137,65 @@ const GC_STYLE: Record<
   },
 };
 
+type CardItem = {
+  key: string;
+  name: string;
+  avatarUrl: string | null;
+  style: { title: string; icon: typeof Crown; box: string; icon_: string };
+  detail: string;
+};
+
+/** Ficam no fim, nesta ordem: mais mortes (penúltimo) e lanterna (último). */
+const LAST: HighlightKey[] = ["deaths", "worst"];
+
 export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMapStored[] }) {
   const list = matchHighlights(rows);
+  if (!list.length) return null;
   // Importado da GC: os 6 destaques novos, com o nome e a foto do jogador do mix.
   const gcList = gc.length ? gcHighlights(aggregateGc(gc)) : [];
   const personOf = (l: GcLine) =>
     rows.find((r) => (l.userId ? r.userId === l.userId : r.name === l.nick)) ?? { name: l.nick, avatarUrl: null };
-  if (!list.length) return null;
+  const statCard = ({ key, row }: (typeof list)[number]): CardItem => ({
+    key,
+    name: row.name,
+    avatarUrl: row.avatarUrl,
+    style: STYLE[key],
+    detail: STYLE[key].detail(row),
+  });
+  // MVP primeiro, depois os demais e os da GC; mais mortes e lanterna por último.
+  const cards: CardItem[] = [
+    ...list.filter((h) => !LAST.includes(h.key)).map(statCard),
+    ...gcList.map(({ key, line }) => {
+      const p = personOf(line);
+      return {
+        key: `gc-${key}`,
+        name: p.name,
+        avatarUrl: p.avatarUrl,
+        style: GC_STYLE[key],
+        detail: GC_STYLE[key].detail(line),
+      };
+    }),
+    ...LAST.flatMap((k) => list.filter((h) => h.key === k).map(statCard)),
+  ];
   return (
     <Card>
       <CardHeader title="Destaques da partida" />
       <CardContent>
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {list.map(({ key, row }) => {
-            const s = STYLE[key];
+          {cards.map(({ key, name, avatarUrl, style: s, detail }) => {
             const Icon = s.icon;
             return (
               <li key={key} className={cn("flex items-center gap-3 rounded-lg border p-4", s.box)}>
-                <Avatar name={row.name} src={row.avatarUrl} size="lg" className="rounded-lg" />
+                <Avatar name={name} src={avatarUrl} size="lg" className="rounded-lg" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-xs text-muted">
                     <Icon className={cn("size-4 shrink-0", s.icon_)} aria-hidden /> {s.title}
                   </div>
-                  <div className="truncate font-semibold" title={row.name}>
-                    {row.name}
+                  <div className="truncate font-semibold" title={name}>
+                    {name}
                   </div>
                   <span className="mt-1.5 inline-block rounded-md bg-black/30 px-2 py-0.5 text-xs font-semibold tabular">
-                    {s.detail(row)}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-          {gcList.map(({ key, line }) => {
-            const s = GC_STYLE[key];
-            const Icon = s.icon;
-            const p = personOf(line);
-            return (
-              <li key={key} className={cn("flex items-center gap-3 rounded-lg border p-4", s.box)}>
-                <Avatar name={p.name} src={p.avatarUrl} size="lg" className="rounded-lg" />
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-xs text-muted">
-                    <Icon className={cn("size-4 shrink-0", s.icon_)} aria-hidden /> {s.title}
-                  </div>
-                  <div className="truncate font-semibold" title={p.name}>
-                    {p.name}
-                  </div>
-                  <span className="mt-1.5 inline-block rounded-md bg-black/30 px-2 py-0.5 text-xs font-semibold tabular">
-                    {s.detail(line)}
+                    {detail}
                   </span>
                 </div>
               </li>
