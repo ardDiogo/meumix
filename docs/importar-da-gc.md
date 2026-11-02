@@ -20,6 +20,14 @@ Sem o favorito (ex.: no celular): F12 → Network → Fetch/XHR → F5 → linha
 
 As três requisições são as mesmas que a página da GC faz ao abrir, com o login de quem clicou; os cookies da GC não saem do navegador. O servidor do MeuMix não acessa a GC.
 
+## Onde aparece
+
+Na página do mix, card **Análise da partida (GC)**, logo abaixo de "Estatísticas dos jogadores":
+
+- **Placar round a round** de cada mapa (um quadrado por round, na cor do time que venceu; D = bomba desarmada, B = bomba explodiu), com a **virada** (quando o vencedor perdia por 3+ rounds) e a **maior sequência**.
+- Abas iguais às da GC: **Geral** (GC Rating, Swing, K/A/D, ADR, KAST, HS%, 3K+/ACE), **Entries**, **Trades**, **Clutch**, **Utilitárias** e **Mira**, separadas por time.
+- Escolha **Todos os mapas** (contagens somadas; rating, ADR, KAST e mira como média pelos rounds) ou um mapa só.
+
 ## Onde fica salvo
 
 - `match_gc_maps` (migração 0035): um registro por mapa com tudo acima, já no lado A/B do mix.

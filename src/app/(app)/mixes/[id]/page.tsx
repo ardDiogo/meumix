@@ -17,6 +17,9 @@ import { cn } from "@/lib/utils";
 import { getMixDetail } from "@/services/queries";
 import { getMatchReport, playerAverages } from "@/services/match-report";
 import { MatchPerformance } from "@/components/mixes/match-performance";
+import { MatchGcAnalysis } from "@/components/mixes/match-gc-analysis";
+import { getGcMaps } from "@/services/gc-maps";
+import { playerSlug } from "@/lib/player-slug";
 import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
 import { LinkGuests } from "@/components/mixes/link-guests";
@@ -56,10 +59,10 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   // Endereço amigável: /mixes/<id> vira /mixes/outubro13.
   if (decodeURIComponent(param) !== detail.slug) redirect(`/mixes/${detail.slug}`);
   const { kind, mix, players, scoreboard, mapScoreboards, highlights } = detail;
-  const [report, chronicle] =
+  const [report, chronicle, gcMaps] =
     kind === "supabase" && mix.status === "finished"
-      ? await Promise.all([getMatchReport(mix.id), getChronicle(mix.id)])
-      : [null, null];
+      ? await Promise.all([getMatchReport(mix.id), getChronicle(mix.id), getGcMaps(mix.id)])
+      : [null, null, []];
   const PLATFORM = { gc: "GC", faceit: "Faceit", manual: "Manual" } as const;
   const guests = report?.rows.filter((r) => !r.userId) ?? [];
   // Base do gráfico de desempenho: média de cada um nos outros mixes (falha = sem o tracinho).
@@ -257,6 +260,34 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 </div>
                 <MatchStatsTable rows={report.rows} />
               </Card>
+              {gcMaps.length > 0 && (
+                <Card>
+                  <CardHeader
+                    title="Análise da partida (GC)"
+                    description="Placar round a round e as estatísticas completas da Gamers Club: rating, entries, trades, clutch, utilitárias e mira."
+                  />
+                  <CardContent>
+                    <MatchGcAnalysis
+                      maps={gcMaps}
+                      teams={[mix.teams[0].name, mix.teams[1].name]}
+                      people={Object.fromEntries(
+                        report.rows
+                          .filter((r) => r.userId)
+                          .map((r) => [
+                            r.userId!,
+                            {
+                              name: r.name,
+                              avatarUrl: r.avatarUrl,
+                              href: r.profileNick
+                                ? `/jogadores/${playerSlug(r.profileNick)}`
+                                : `/jogadores/${r.userId}`,
+                            },
+                          ]),
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              )}
               {canManageMixes && guests.length > 0 && (
                 <LinkGuests
                   matchId={mix.id}

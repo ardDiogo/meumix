@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { findMapName, nicksFromHighlights, parseGcPayload, storeGcMap, toOcrMap } from "./gc-api";
+import { aggregateGc, roundStory } from "./gc-analysis";
 import { mergeMaps } from "./gc-ocr";
 
 const line = (kills: number, deaths: number, extra: Record<string, unknown> = {}) => ({
@@ -194,5 +195,46 @@ describe("conversões", () => {
     assert.equal(findMapName("Mirage AWP Ace in Overtime"), "Mirage");
     assert.equal(findMapName("nada aqui"), null);
     assert.deepEqual(nicksFromHighlights(highlights), { "111": "Fulano", "222": "Ciclano", "333": "Beltrano" });
+  });
+});
+
+describe("análise (gc-analysis)", () => {
+  const base = (parseGcPayload({ v: 1, id: "999", stats, highlights, result }) as { ok: true; map: never }).map;
+  const m1 = storeGcMap(base, "de_inferno", false, (id) => (id === "111" ? "user-1" : null));
+  // Segundo mapa, mais curto: 10 rounds, rating 2,0 para o "111".
+  const m2 = {
+    ...m1,
+    rounds: m1.rounds
+      .slice(0, 1)
+      .concat(Array.from({ length: 9 }, () => ({ w: "A" as const, r: "elimination", ct: "A" as const }))),
+    players: m1.players.map((p) =>
+      p.gcId === "111" ? { ...p, rating: 2, k: 10, hs: 10, clutch: { ...p.clutch, biggest: 3 } } : p,
+    ),
+  };
+
+  it("soma os mapas: contagens somadas, rating pela quantidade de rounds", () => {
+    const line = aggregateGc([m1, m2]).find((l) => l.key === "user-1")!;
+    assert.equal(line.maps, 2);
+    assert.equal(line.k, 35);
+    assert.equal(line.hs, 16);
+    // 3 rounds com 1,31 e 10 rounds com 2,0.
+    assert.equal(Math.round(line.rating! * 1000), Math.round(((1.31 * 3 + 2 * 10) / 13) * 1000));
+    assert.equal(line.clutch.biggest, 3);
+    assert.equal(line.entries.duels, 10);
+    // Convidado fica pelo ID da GC.
+    assert.ok(aggregateGc([m1]).some((l) => l.key === "gc:333"));
+  });
+
+  it("conta a virada e a maior sequência", () => {
+    const rounds = [
+      ...Array.from({ length: 10 }, () => ({ w: "A" as const, r: "elimination", ct: "A" as const })),
+      ...Array.from({ length: 13 }, () => ({ w: "B" as const, r: "elimination", ct: "B" as const })),
+    ];
+    const story = roundStory({ ...m1, rounds });
+    assert.equal(story.winner, "B");
+    assert.deepEqual(story.comeback, { from: { a: 10, b: 0 }, deficit: 10 });
+    assert.deepEqual(story.streak, { team: "B", length: 13, from: 11 });
+    // Sem virada de verdade (menos de 3 rounds de desvantagem): nada.
+    assert.equal(roundStory(m1).comeback, null);
   });
 });
