@@ -15,7 +15,10 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { Input, Label, Select } from "../ui/input";
 import { TeamDot } from "../mixes/badges";
+import { gcAlias, storeGcMap, type GcMap } from "@/lib/gc-api";
+import { clearGcQueue } from "@/lib/gc-queue";
 import { FaceitImport } from "./faceit-import";
+import { GcApiImport } from "./gc-api-import";
 import { GcImport } from "./gc-import";
 
 interface PlayerDraft extends Omit<
@@ -26,6 +29,8 @@ interface PlayerDraft extends Omit<
   elo: number | null;
   /** Nick do print que o admin vinculou a este jogador (vira apelido salvo). */
   aliasFrom?: string;
+  /** Nick com que o jogador veio na importação (liga ao ID da GC). */
+  importNick?: string;
   kills: string;
   deaths: string;
   assists: string;
@@ -82,7 +87,10 @@ export function FinalizeForm({
   const router = useRouter();
   const [saving, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [platform, setPlatform] = useState<"manual" | "gc" | "faceit">("gc");
+  // "gc": importado da página da partida; "gc-prints": lido dos prints (os dois salvam como GC).
+  const [platform, setPlatform] = useState<"manual" | "gc" | "gc-prints" | "faceit">("gc");
+  /** Mapas importados da GC (estatísticas completas, salvas junto com a partida). */
+  const [gcMaps, setGcMaps] = useState<{ map: GcMap; mapId: string }[] | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [mapRows, setMapRows] = useState<{ mapId: string; scoreA: string; scoreB: string }[]>(
     (initialMaps.length ? initialMaps : [maps[0]?.id ?? ""]).map((id) => ({ mapId: id, scoreA: "", scoreB: "" })),
@@ -132,6 +140,7 @@ export function FinalizeForm({
         mk: guest.mk,
         drop: guest.drop,
         aliasFrom: guest.name,
+        importNick: guest.importNick,
       };
       if (current.some((r) => r.userId === userId)) {
         return current.filter((r) => r.key !== guestKey).map((r) => (r.userId === userId ? { ...r, ...stats } : r));
@@ -181,6 +190,11 @@ export function FinalizeForm({
       setError("Preencha o placar de todos os mapas.");
       return;
     }
+    // A resposta da GC não traz o RP, e o ELO do mix é o RP: sem ele, ninguém ganharia nem perderia nada.
+    if (platform === "gc" && rows.every((r) => !r.calculateElo || intOr0(r.rp) === 0)) {
+      setError("Preencha o RP de cada jogador (soma dos mapas). A GC não manda o RP, e é ele que muda o ELO.");
+      return;
+    }
     const payloadPlayers: FinalizePlayer[] = rows.map((r) => ({
       userId: r.userId,
       name: r.name,
@@ -203,21 +217,44 @@ export function FinalizeForm({
         ? [{ alias: r.aliasFrom, userId: r.userId }]
         : [],
     );
+    // GC: cada ID da GC fica ligado ao jogador (as próximas importações já vêm certas)
+    // e as estatísticas completas de cada mapa vão junto, no lado A/B do mix.
+    const rowOfGc = new Map<string, PlayerDraft>();
+    for (const g of gcMaps ?? [])
+      for (const p of g.map.players) {
+        const row = rows.find((r) => r.importNick === p.nick);
+        if (row) rowOfGc.set(p.gcId, row);
+      }
+    for (const [gcId, row] of rowOfGc)
+      if (row.userId) payloadAliases.push({ alias: gcAlias(gcId), userId: row.userId });
+    const payloadGc = (gcMaps ?? []).map((g, i) => {
+      let same = 0;
+      let swapped = 0;
+      for (const p of g.map.players) {
+        const row = rowOfGc.get(p.gcId);
+        if (!row) continue;
+        if (row.team === p.team) same++;
+        else swapped++;
+      }
+      return storeGcMap(g.map, mapRows[i]?.mapId ?? g.mapId, swapped > same, (id) => rowOfGc.get(id)?.userId ?? null);
+    });
     if (!confirm("Finalizar o mix? O ELO dos jogadores será atualizado e isso não pode ser desfeito por aqui.")) return;
     start(async () => {
       const result = await finalizeMix({
         scheduleId,
         date,
-        platform,
+        platform: platform === "gc-prints" ? "gc" : platform,
         maps: payloadMaps,
         players: payloadPlayers,
         aliases: payloadAliases,
+        gcMaps: payloadGc.length === mapRows.length ? payloadGc : undefined,
       });
       if (!result.ok) {
         setError(result.message);
         toast.error(result.message);
         return;
       }
+      if (gcMaps) clearGcQueue();
       toast.success("Mix finalizado! ELO atualizado.");
       router.push(`/mixes/${result.matchId}`);
     });
@@ -226,8 +263,12 @@ export function FinalizeForm({
   const cell = "h-8 w-16 px-2 text-right tabular";
 
   /** Preenche o formulário com o resultado da leitura dos prints. */
-  function applyImport(result: MergedResult, links: Record<string, string> = {}) {
+  function applyImport(result: MergedResult, links: Record<string, string>, source: "gc" | "gc-prints" | "faceit") {
     const notes = [...result.warnings];
+    if (source === "gc")
+      notes.push(
+        "A GC não manda o RP: preencha o RP de cada jogador (soma dos mapas) antes de finalizar. É ele que muda o ELO.",
+      );
     const profileRows = rows.filter((r) => r.userId);
     // Vínculo garantido (SteamID / ID Faceit) vale antes da semelhança de nick.
     // …e os apelidos salvos em finalizações anteriores.
@@ -284,11 +325,13 @@ export function FinalizeForm({
       firstKills: String(p.fk),
       adr: p.adr == null ? "" : String(p.adr),
       kast: p.kast == null ? "" : String(p.kast),
-      rp: String(p.rp),
+      // Importado da GC: sem RP na resposta (fica em branco para o admin preencher).
+      rp: source === "gc" ? "" : String(p.rp),
       s: p.s ? String(p.s) : "",
       fa: String(p.fa),
       mk: String(p.mk),
       drop: String(p.drop),
+      importNick: p.name,
     });
 
     // Nicks sem inscrição no mix: procura entre os demais cadastrados antes de virar convidado.
@@ -346,7 +389,7 @@ export function FinalizeForm({
         ...fill(g),
       })),
     ]);
-    setPlatform(Object.keys(links).length || platform === "faceit" ? "faceit" : "gc");
+    setPlatform(source);
     setWarnings(notes);
   }
 
@@ -360,15 +403,41 @@ export function FinalizeForm({
           <Select
             id="platform"
             value={platform}
-            onChange={(e) => setPlatform(e.target.value as "manual" | "gc" | "faceit")}
+            onChange={(e) => setPlatform(e.target.value as "manual" | "gc" | "gc-prints" | "faceit")}
           >
-            <option value="gc">GC (imagens das estatísticas)</option>
+            <option value="gc">GC (importar da partida)</option>
+            <option value="gc-prints">GC (imagens das estatísticas)</option>
             <option value="faceit">Faceit (link da partida)</option>
             <option value="manual">Manual (digitar as estatísticas)</option>
           </Select>
         </div>
-        {platform === "gc" && <GcImport maps={maps} onImported={applyImport} />}
-        {platform === "faceit" && <FaceitImport onImported={applyImport} />}
+        {platform === "gc" && (
+          <GcApiImport
+            maps={maps}
+            aliases={aliases}
+            onImported={(result, links, chosen) => {
+              setGcMaps(chosen);
+              applyImport(result, links, "gc");
+            }}
+          />
+        )}
+        {platform === "gc-prints" && (
+          <GcImport
+            maps={maps}
+            onImported={(result) => {
+              setGcMaps(null);
+              applyImport(result, {}, "gc-prints");
+            }}
+          />
+        )}
+        {platform === "faceit" && (
+          <FaceitImport
+            onImported={(result, links) => {
+              setGcMaps(null);
+              applyImport(result, links ?? {}, "faceit");
+            }}
+          />
+        )}
       </div>
       {warnings.length > 0 && (
         <ul className="space-y-1 rounded-md border border-brand/40 bg-brand/5 px-4 py-3 text-sm">

@@ -159,10 +159,13 @@ export function chronicleFacts(input: ChronicleInput): string[] {
   top("Mais first kills", fk, `${fk?.fk}`);
   const lowFk = minBy(ps, (p) => p.fk);
   top("Menos first kills", lowFk, `${lowFk?.fk}`);
-  const rpUp = maxBy(ps, (p) => p.rp);
-  top("Maior ganho de RP", rpUp, signed(rpUp?.rp ?? 0));
-  const rpDown = minBy(ps, (p) => p.rp);
-  top("Maior perda de RP", rpDown, signed(rpDown?.rp ?? 0));
+  // Sem RP (todos zerados), não há ganho nem perda para contar.
+  if (ps.some((p) => p.rp !== 0)) {
+    const rpUp = maxBy(ps, (p) => p.rp);
+    top("Maior ganho de RP", rpUp, signed(rpUp?.rp ?? 0));
+    const rpDown = minBy(ps, (p) => p.rp);
+    top("Maior perda de RP", rpDown, signed(rpDown?.rp ?? 0));
+  }
 
   // Estreia só é notícia se for de poucos (no primeiro mix registrado, todo mundo "estreia").
   const debuts = ps.filter((p) => p.id && input.history[p.id]?.mixes === 1);

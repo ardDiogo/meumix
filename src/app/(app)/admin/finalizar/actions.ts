@@ -11,6 +11,7 @@ import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { notifyMixResult } from "@/services/notify";
 import { generateChronicle } from "@/services/chronicle";
+import type { GcMapStored } from "@/lib/gc-api";
 
 export interface FinalizeMap {
   mapId: string;
@@ -52,6 +53,8 @@ export async function finalizeMix(input: {
   players: FinalizePlayer[];
   /** Nicks do print vinculados à mão a jogadores (salvos para as próximas leituras). */
   aliases?: { alias: string; userId: string }[];
+  /** Importado da página da GC: estatísticas completas de cada mapa, na ordem dos mapas. */
+  gcMaps?: GcMapStored[];
 }): Promise<FinalizeResult> {
   const session = await getSession();
   if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem finalizar mixes." };
@@ -91,6 +94,11 @@ export async function finalizeMix(input: {
       return { ok: false, message: `Confira ADR (0–500), KAST (0–100) e RP (−200 a 200) de ${p.name}.` };
     }
   }
+
+  // Estatísticas da GC: um registro por mapa, no tamanho de uma série normal.
+  const gcMaps = input.gcMaps?.length === maps.length ? input.gcMaps : [];
+  if (gcMaps.length && JSON.stringify(gcMaps).length > 400_000)
+    return { ok: false, message: "Dados da GC grandes demais. Importe de novo." };
 
   const { mvp, lanterna } = pickMvpAndLanterna(players);
   const { data, error } = await admin.rpc("finalize_mix", {
@@ -141,6 +149,8 @@ export async function finalizeMix(input: {
     if (aliasError) console.error("[finalize] apelidos:", aliasError.code, aliasError.message);
   }
 
+  if (gcMaps.length) await saveGcMaps(admin, data as string, gcMaps, inMix as Set<string>, session!.id);
+
   // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
   await recomputeBadgesSafely();
   // Depois de responder: avisos no celular e a crônica do mix (IA ou modelo pronto).
@@ -151,4 +161,46 @@ export async function finalizeMix(input: {
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
     revalidatePath(path, "layout");
   return { ok: true, matchId: data as string };
+}
+
+/**
+ * Guarda as estatísticas completas da GC (sem a migração 0035, só avisa no log)
+ * e os clipes do Allstar que a GC já processou, de jogadores deste mix.
+ */
+async function saveGcMaps(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  matchId: string,
+  gcMaps: GcMapStored[],
+  inMix: Set<string>,
+  by: string,
+) {
+  const owned = (id: string | null) => (id && inMix.has(id) ? id : null);
+  const rows = gcMaps.map((m, i) => ({
+    match_id: matchId,
+    map_order: i + 1,
+    map_id: String(m.mapId).slice(0, 32),
+    gc_match_id: /^\d{1,12}$/.test(m.gcMatchId) ? m.gcMatchId : null,
+    data: { ...m, players: m.players.map((p) => ({ ...p, userId: owned(p.userId) })) },
+  }));
+  const { error } = await admin.from("match_gc_maps").insert(rows);
+  if (error) console.error("[finalize] estatísticas da GC:", error.code, error.message);
+
+  const userOf = new Map(gcMaps.flatMap((m) => m.players.map((p) => [p.gcId, owned(p.userId)] as const)));
+  const clips = gcMaps
+    .flatMap((m) => m.clips ?? [])
+    .flatMap((c) => {
+      const userId = userOf.get(c.gcId);
+      if (!userId || !/^[A-Za-z0-9_-]{6,64}$/.test(c.clipId)) return [];
+      const title = String(c.title).trim().slice(0, 80);
+      const kind = /\bace\b/i.test(title) ? "ace" : /clutch|1v\d/i.test(title) ? "clutch" : "clip";
+      return [
+        { user_id: userId, match_id: matchId, provider: "allstar", clip_id: c.clipId, title, kind, created_by: by },
+      ];
+    });
+  if (clips.length) {
+    const { error: clipError } = await admin
+      .from("clips")
+      .upsert(clips, { onConflict: "provider,clip_id", ignoreDuplicates: true });
+    if (clipError) console.error("[finalize] clipes da GC:", clipError.code, clipError.message);
+  }
 }
