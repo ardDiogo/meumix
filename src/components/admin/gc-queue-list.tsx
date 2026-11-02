@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink, X } from "lucide-react";
+import { prettyMap } from "@/lib/gc-api";
 import type { GcQueued } from "@/lib/gc-queue";
 import { removeFromGcQueue } from "@/lib/gc-queue";
 import { Select } from "../ui/input";
@@ -49,7 +50,7 @@ export function GcQueueList({
               ))}
             </Select>
           ) : (
-            <span className="font-medium">{q.map.mapHint ?? "Mapa a confirmar"}</span>
+            <span className="font-medium">{prettyMap(q.map.mapHint) ?? "Mapa a confirmar"}</span>
           )}
           <span className="font-display font-bold tabular">
             {q.map.scoreA} × {q.map.scoreB}

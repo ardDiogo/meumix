@@ -1,8 +1,9 @@
 /**
  * Importação da partida pela própria página da GC (docs/importar-da-gc.md).
  * O botão "Enviar ao MeuMix" roda na aba da GC, logado, e manda as respostas
- * de `/api/lobby/match/{id}/stats` e `/api/allstar/highlights/lobby/{id}`
- * sem mexer; aqui elas são conferidas e convertidas. Funções puras.
+ * de `/api/lobby/match/{id}/stats`, `/lobby/match/{id}/1` (resultado: RP,
+ * mapa, nick e SteamID) e `/api/allstar/highlights/lobby/{id}` sem mexer;
+ * aqui elas são conferidas e convertidas. Funções puras.
  */
 import type { OcrMap, OcrPlayer } from "./gc-ocr";
 
@@ -12,6 +13,8 @@ export interface GcPayload {
   /** Número da partida na GC (o do link). */
   id: string;
   stats: unknown;
+  /** Resultado da partida (`/lobby/match/{id}/1`). */
+  result?: unknown;
   highlights: unknown;
   /** Nomes de mapa encontrados no texto da página (pista para o mapa). */
   pageMaps?: string[];
@@ -20,6 +23,10 @@ export interface GcPayload {
 export interface GcPlayer {
   gcId: string;
   nick: string;
+  /** SteamID64 (liga ao jogador com a Steam vinculada; não fica salvo). */
+  steamId?: string | null;
+  /** Pontos de ranking da GC no mapa (é o que muda o ELO do MeuMix); null se não veio. */
+  rp: number | null;
   /** Time na GC (A/B da própria GC, não o do MeuMix). */
   team: "A" | "B";
   k: number;
@@ -133,6 +140,33 @@ function clipsFromHighlights(raw: unknown): GcClip[] {
   });
 }
 
+/** Do resultado da partida: RP, nick e SteamID de cada ID da GC, e o mapa. */
+function fromResult(raw: unknown) {
+  const jogos = obj(obj(raw).jogos);
+  const teams = obj(jogos.players);
+  const byId: Record<string, { rp: number | null; nick: string; steamId: string | null }> = {};
+  for (const list of [teams.team_a, teams.team_b])
+    for (const x of Array.isArray(list) ? list : []) {
+      const row = obj(x);
+      const player = obj(row.player);
+      const id = String(row.idplayer ?? player.id ?? "");
+      if (!/^\d{1,12}$/.test(id)) continue;
+      const rp = Number(row.rating_points);
+      const steam = String(player.plSteamID64 ?? "");
+      byId[id] = {
+        rp: row.rating_points != null && row.rating_points !== "" && Number.isFinite(rp) ? Math.round(rp) : null,
+        nick: text(player.nick, 64),
+        steamId: /^7656119\d{10}$/.test(steam) ? steam : null,
+      };
+    }
+  const map = text(jogos.map_name, 32);
+  return { byId, map: /^de_[a-z0-9_]+$/.test(map) ? map : null };
+}
+
+/** Nome para mostrar: "de_mirage" → "Mirage". */
+export const prettyMap = (hint: string | null) =>
+  hint ? hint.replace(/^de_/, "").replace(/^./, (c) => c.toUpperCase()) : null;
+
 /** Primeiro nome de mapa conhecido num texto. */
 export function findMapName(s: string | null | undefined) {
   if (!s) return null;
@@ -166,6 +200,7 @@ export function parseGcPayload(raw: unknown): GcParseResult {
     return { ok: false, message: "Isso não parece a resposta de estatísticas da GC (faltam os jogadores)." };
 
   const nicks = nicksFromHighlights(highlights);
+  const result = fromResult("scoreboard" in p ? null : p.result);
   const list: GcPlayer[] = ids.map((gcId) => {
     const s = obj(scoreboard[gcId]);
     const pl = obj(players[gcId]);
@@ -179,7 +214,9 @@ export function parseGcPayload(raw: unknown): GcParseResult {
     const multi = Array.isArray(s.roundsWithKills) ? s.roundsWithKills.slice(0, 5).map(int) : [];
     return {
       gcId,
-      nick: nicks[gcId] ?? `GC ${gcId}`,
+      nick: result.byId[gcId]?.nick || nicks[gcId] || `GC ${gcId}`,
+      steamId: result.byId[gcId]?.steamId ?? null,
+      rp: result.byId[gcId]?.rp ?? null,
       team: pl.team === "B" ? "B" : "A",
       k: int(s.kills),
       a: int(s.assists),
@@ -233,6 +270,7 @@ export function parseGcPayload(raw: unknown): GcParseResult {
 
   const clips = clipsFromHighlights(highlights);
   const mapHint =
+    result.map ??
     findMapName(clips.map((c) => c.title).join(" ")) ??
     (Array.isArray(p.pageMaps) && p.pageMaps.length === 1 ? findMapName(String(p.pageMaps[0])) : null);
 
@@ -255,12 +293,12 @@ export function toOcrMap(m: GcMap, mapName: string | null): OcrMap {
         adr: p.adr,
         kdr: Math.round((p.k / Math.max(p.d, 1)) * 100) / 100,
         kast: p.kast,
-        // A resposta da GC não traz S, RP nem DROP.
+        // A GC não traz S nem DROP.
         s: 0,
         fa: p.fa,
         mk: p.mk,
         fk: p.fk,
-        rp: 0,
+        rp: p.rp ?? 0,
         drop: 0,
       })),
   });
@@ -277,7 +315,7 @@ export interface GcMapStored {
   scoreA: number;
   scoreB: number;
   rounds: { w: "A" | "B"; r: string; ct: "A" | "B" }[];
-  players: (Omit<GcPlayer, "team"> & { team: "A" | "B"; userId: string | null })[];
+  players: (Omit<GcPlayer, "team" | "steamId"> & { team: "A" | "B"; userId: string | null })[];
   clips: GcClip[];
 }
 
@@ -302,7 +340,12 @@ export function storeGcMap(
       r: r.reason,
       ct: r.aSide === "CT" ? side("A") : side("B"),
     })),
-    players: m.players.map((p) => ({ ...p, team: side(p.team), userId: userOf(p.gcId) })),
+    // O SteamID só serve para ligar o jogador: não fica salvo.
+    players: m.players.map((p) => {
+      const out = { ...p, team: side(p.team), userId: userOf(p.gcId) };
+      delete out.steamId;
+      return out;
+    }),
     clips: m.clips,
   };
 }

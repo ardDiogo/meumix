@@ -85,6 +85,24 @@ const highlights = {
   ],
 };
 
+// Resultado da partida (/lobby/match/{id}/1): RP, nick e SteamID.
+const result = {
+  jogos: {
+    map_name: "de_mirage",
+    players: {
+      team_a: [
+        {
+          idplayer: "111",
+          rating_points: "19",
+          player: { id: "111", nick: "Fulano Real", plSteamID64: "76561198000000001" },
+        },
+        { idplayer: "222", rating_points: "-36", player: { id: "222", nick: "Ciclano", plSteamID64: "123" } },
+      ],
+      team_b: [{ idplayer: "333", rating_points: "0", player: { id: "333", nick: "Beltrano" } }],
+    },
+  },
+};
+
 describe("parseGcPayload", () => {
   it("lê o que o botão manda: jogadores, times, nicks, placar, rounds e clipe", () => {
     const r = parseGcPayload({ v: 1, id: "999", stats, highlights, pageMaps: ["Mirage", "Nuke"] });
@@ -110,6 +128,21 @@ describe("parseGcPayload", () => {
     assert.deepEqual(m.clips, [{ gcId: "111", clipId: "abc123def456", title: "Inferno AK Ace" }]);
   });
 
+  it("com o resultado: RP, mapa, nick e SteamID (inválido fica de fora)", () => {
+    const r = parseGcPayload({ v: 1, id: "999", stats, highlights, result });
+    assert.ok(r.ok);
+    const by = (id: string) => r.map.players.find((x) => x.gcId === id)!;
+    assert.equal(r.map.mapHint, "de_mirage");
+    assert.equal(by("111").rp, 19);
+    assert.equal(by("111").nick, "Fulano Real");
+    assert.equal(by("111").steamId, "76561198000000001");
+    assert.equal(by("222").rp, -36);
+    assert.equal(by("222").steamId, null);
+    assert.equal(by("333").rp, 0);
+    // Sem linha no resultado: RP desconhecido (o admin preenche).
+    assert.equal(by("444").rp, null);
+  });
+
   it("aceita o JSON da stats colado direto", () => {
     const r = parseGcPayload(stats);
     assert.ok(r.ok);
@@ -131,15 +164,17 @@ describe("parseGcPayload", () => {
 });
 
 describe("conversões", () => {
-  const map = (parseGcPayload({ v: 1, id: "999", stats, highlights }) as { ok: true; map: never }).map;
+  const map = (parseGcPayload({ v: 1, id: "999", stats, highlights, result }) as { ok: true; map: never }).map;
 
   it("vira um mapa no formato dos prints e soma como sempre", () => {
     const merged = mergeMaps([toOcrMap(map, "Inferno")]);
+    // Nome do resultado da partida vale mais que o do destaque.
+    assert.ok(merged.players.some((p) => p.name === "Fulano Real"));
     assert.equal(merged.players.length, 4);
     assert.deepEqual(merged.maps[0], { mapName: "Inferno", scoreX: 13, scoreY: 11 });
-    const f = merged.players.find((p) => p.name === "Fulano")!;
+    const f = merged.players.find((p) => p.name === "Fulano Real")!;
     assert.equal(f.k, 25);
-    assert.equal(f.rp, 0);
+    assert.equal(merged.players.find((p) => p.name === "Ciclano")!.rp, -36);
   });
 
   it("salva no lado do mix: inverte times, placar e rounds quando o A da GC é o B do mix", () => {
@@ -150,6 +185,8 @@ describe("conversões", () => {
     const p = s.players.find((x) => x.gcId === "111")!;
     assert.equal(p.team, "B");
     assert.equal(p.userId, "user-1");
+    assert.equal(p.rp, 19);
+    assert.ok(!("steamId" in p), "SteamID não fica salvo");
     assert.equal(s.players.find((x) => x.gcId === "333")!.userId, null);
   });
 

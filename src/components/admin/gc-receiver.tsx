@@ -3,7 +3,7 @@
 import { ArrowLeft, CheckCircle2, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { parseGcPayload } from "@/lib/gc-api";
+import { parseGcPayload, prettyMap } from "@/lib/gc-api";
 import { GC_RETURN_KEY } from "@/lib/gc-bookmarklet";
 import { addToGcQueue, gcQueueSnapshot, parseGcQueue, subscribeGcQueue } from "@/lib/gc-queue";
 import { Button } from "../ui/button";
@@ -32,7 +32,7 @@ export function GcReceiver() {
           result = {
             ok: true,
             message: `Partida ${parsed.map.gcMatchId} recebida: ${parsed.map.scoreA} × ${parsed.map.scoreB}${
-              parsed.map.mapHint ? ` em ${parsed.map.mapHint}` : ""
+              parsed.map.mapHint ? ` em ${prettyMap(parsed.map.mapHint)}` : ""
             }.`,
           };
       } catch {

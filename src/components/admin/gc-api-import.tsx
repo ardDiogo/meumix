@@ -19,12 +19,20 @@ import { GcQueueList } from "./gc-queue-list";
 export function GcApiImport({
   maps,
   aliases,
+  steamIds,
   onImported,
 }: {
   maps: { id: string; name: string }[];
   /** Apelidos salvos (inclui os IDs da GC já ligados: "gc:123"). */
   aliases: Record<string, string>;
-  onImported: (result: MergedResult, links: Record<string, string>, gcMaps: { map: GcMap; mapId: string }[]) => void;
+  /** SteamID64 → jogador (quem vinculou a Steam é reconhecido já na primeira vez). */
+  steamIds: Record<string, string>;
+  onImported: (
+    result: MergedResult,
+    links: Record<string, string>,
+    gcMaps: { map: GcMap; mapId: string }[],
+    rpMissing: boolean,
+  ) => void;
 }) {
   const raw = useSyncExternalStore(subscribeGcQueue, gcQueueSnapshot, () => "[]");
   const queue = useMemo(() => parseGcQueue(raw), [raw]);
@@ -75,10 +83,15 @@ export function GcApiImport({
     const links: Record<string, string> = {};
     for (const c of chosen)
       for (const p of c.map.players) {
-        const userId = aliases[aliasKey(gcAlias(p.gcId))];
+        const userId = aliases[aliasKey(gcAlias(p.gcId))] ?? (p.steamId ? steamIds[p.steamId] : undefined);
         if (userId) links[p.nick] = userId;
       }
-    onImported(result, links, chosen);
+    onImported(
+      result,
+      links,
+      chosen,
+      chosen.some((c) => c.map.players.some((p) => p.rp == null)),
+    );
     toast.success(
       `${chosen.length} ${chosen.length > 1 ? "mapas importados" : "mapa importado"}. Confira antes de finalizar.`,
     );

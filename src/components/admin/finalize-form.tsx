@@ -72,6 +72,7 @@ export function FinalizeForm({
   players,
   otherProfiles = [],
   aliases = {},
+  steamIds = {},
 }: {
   scheduleId: string;
   date: string;
@@ -82,6 +83,8 @@ export function FinalizeForm({
   otherProfiles?: { userId: string; name: string; elo: number }[];
   /** Apelidos salvos: nick do print (normalizado) → jogador. */
   aliases?: Record<string, string>;
+  /** SteamID64 → jogador (importação da GC). */
+  steamIds?: Record<string, string>;
 }) {
   const levels = useLevels();
   const router = useRouter();
@@ -263,9 +266,15 @@ export function FinalizeForm({
   const cell = "h-8 w-16 px-2 text-right tabular";
 
   /** Preenche o formulário com o resultado da leitura dos prints. */
-  function applyImport(result: MergedResult, links: Record<string, string>, source: "gc" | "gc-prints" | "faceit") {
+  function applyImport(
+    result: MergedResult,
+    links: Record<string, string>,
+    source: "gc" | "gc-prints" | "faceit",
+    /** Importado da GC sem o RP de alguém (o resultado da partida não veio). */
+    rpMissing = false,
+  ) {
     const notes = [...result.warnings];
-    if (source === "gc")
+    if (source === "gc" && rpMissing)
       notes.push(
         "A GC não manda o RP: preencha o RP de cada jogador (soma dos mapas) antes de finalizar. É ele que muda o ELO.",
       );
@@ -326,7 +335,7 @@ export function FinalizeForm({
       adr: p.adr == null ? "" : String(p.adr),
       kast: p.kast == null ? "" : String(p.kast),
       // Importado da GC: sem RP na resposta (fica em branco para o admin preencher).
-      rp: source === "gc" ? "" : String(p.rp),
+      rp: source === "gc" && rpMissing ? "" : String(p.rp),
       s: p.s ? String(p.s) : "",
       fa: String(p.fa),
       mk: String(p.mk),
@@ -415,9 +424,10 @@ export function FinalizeForm({
           <GcApiImport
             maps={maps}
             aliases={aliases}
-            onImported={(result, links, chosen) => {
+            steamIds={steamIds}
+            onImported={(result, links, chosen, rpMissing) => {
               setGcMaps(chosen);
-              applyImport(result, links, "gc");
+              applyImport(result, links, "gc", rpMissing);
             }}
           />
         )}

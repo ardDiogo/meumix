@@ -49,6 +49,12 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
     data: null,
   };
   const aliases = Object.fromEntries((aliasRows ?? []).map((a) => [a.alias_norm as string, a.user_id as string]));
+  // SteamID de quem vinculou a Steam: a importação da GC reconhece o jogador já na primeira vez.
+  const { data: steamRows } = (await createSupabaseAdminClient()
+    ?.from("profiles")
+    .select("id, steam_id")
+    .not("steam_id", "is", null)) ?? { data: null };
+  const steamIds = Object.fromEntries((steamRows ?? []).map((p) => [p.steam_id as string, p.id as string]));
 
   // Times da escolha (se houver); senão, os classificados alternados entre A e B.
   const draft = occurrence.draft;
@@ -63,6 +69,7 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
       maps={occurrence.votes.maps}
       initialMaps={occurrence.tiebreaker.finalMaps.map((x) => x.id)}
       aliases={aliases}
+      steamIds={steamIds}
       otherProfiles={(profiles ?? [])
         .filter((p) => !classified.some((r) => r.userId === p.id))
         .map((p) => ({ userId: p.id as string, name: p.display_name as string, elo: (p.elo as number) ?? 0 }))}
