@@ -161,3 +161,81 @@ export function roundStory(m: GcMapStored): RoundStory {
   });
   return { scores, winner, comeback: comeback && comeback.deficit >= 3 ? comeback : null, streak };
 }
+
+export type GcHighlightKey = "entry" | "trader" | "clutch" | "flash" | "nade" | "aim";
+
+export interface GcHighlight {
+  key: GcHighlightKey;
+  line: GcLine;
+}
+
+/** Mínimo de kills para disputar a melhor mira (poucas kills distorcem a precisão). */
+export const AIM_MIN_KILLS = 10;
+
+/**
+ * Destaques com os dados da GC: melhor entry, melhor trader, clutchzeiro,
+ * quem mais cegou inimigos, maior dano com granada e melhor mira. Fica de
+ * fora o destaque em que ninguém pontuou.
+ */
+export function gcHighlights(lines: GcLine[]): GcHighlight[] {
+  const best = (score: (l: GcLine) => number, tie: (l: GcLine) => number = () => 0, pool = lines) =>
+    pool.reduce<GcLine | null>((top, l) => {
+      if (top == null) return l;
+      const d = score(l) - score(top);
+      return d > 0 || (d === 0 && tie(l) > tie(top)) ? l : top;
+    }, null);
+  const rate = (won: number, total: number) => (total ? won / total : 0);
+  const shooters = lines.filter((l) => l.k >= AIM_MIN_KILLS && l.aim.accuracy != null);
+  const picks: [GcHighlightKey, GcLine | null, (l: GcLine) => number][] = [
+    [
+      "entry",
+      best(
+        (l) => l.entries.won,
+        (l) => rate(l.entries.won, l.entries.duels),
+      ),
+      (l) => l.entries.won,
+    ],
+    [
+      "trader",
+      best(
+        (l) => l.trades.made,
+        (l) => -(l.trades.avgTime ?? 99),
+      ),
+      (l) => l.trades.made,
+    ],
+    [
+      "clutch",
+      best(
+        (l) => l.clutch.won,
+        (l) => l.clutch.biggest ?? 0,
+      ),
+      (l) => l.clutch.won,
+    ],
+    [
+      "flash",
+      best(
+        (l) => l.utility.flashed,
+        (l) => l.fa,
+      ),
+      (l) => l.utility.flashed,
+    ],
+    [
+      "nade",
+      best(
+        (l) => l.utility.damage,
+        (l) => -l.utility.grenades,
+      ),
+      (l) => l.utility.damage,
+    ],
+    [
+      "aim",
+      best(
+        (l) => l.aim.accuracy ?? 0,
+        (l) => l.hsRate ?? 0,
+        shooters,
+      ),
+      (l) => l.aim.accuracy ?? 0,
+    ],
+  ];
+  return picks.flatMap(([key, line, score]) => (line && score(line) > 0 ? [{ key, line }] : []));
+}

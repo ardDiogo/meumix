@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { findMapName, nicksFromHighlights, parseGcPayload, storeGcMap, toOcrMap } from "./gc-api";
-import { aggregateGc, roundStory } from "./gc-analysis";
+import { aggregateGc, gcHighlights, roundStory } from "./gc-analysis";
 import { mergeMaps } from "./gc-ocr";
 
 const line = (kills: number, deaths: number, extra: Record<string, unknown> = {}) => ({
@@ -236,5 +236,21 @@ describe("análise (gc-analysis)", () => {
     assert.deepEqual(story.streak, { team: "B", length: 13, from: 11 });
     // Sem virada de verdade (menos de 3 rounds de desvantagem): nada.
     assert.equal(roundStory(m1).comeback, null);
+  });
+
+  it("destaques da GC: um por categoria, sem quem não pontuou", () => {
+    const lines = aggregateGc([m1]);
+    const byKey = Object.fromEntries(gcHighlights(lines).map((h) => [h.key, h.line.key]));
+    // Todos iguais nas contagens: desempata pelo critério secundário ou fica o primeiro.
+    assert.deepEqual(Object.keys(byKey).sort(), ["aim", "clutch", "entry", "flash", "nade", "trader"]);
+    // Mira só para quem tem 10+ kills.
+    const fewKills = lines.map((l) => ({ ...l, k: 5 }));
+    assert.ok(!gcHighlights(fewKills).some((h) => h.key === "aim"));
+    // Ninguém venceu clutch: sem o destaque.
+    const noClutch = lines.map((l) => ({ ...l, clutch: { ...l.clutch, won: 0 } }));
+    assert.ok(!gcHighlights(noClutch).some((h) => h.key === "clutch"));
+    // O que mais cegou ganha.
+    const flash = lines.map((l) => (l.key === "gc:333" ? { ...l, utility: { ...l.utility, flashed: 50 } } : l));
+    assert.equal(gcHighlights(flash).find((h) => h.key === "flash")!.line.key, "gc:333");
   });
 });
