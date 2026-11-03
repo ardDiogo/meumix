@@ -279,3 +279,10 @@ export function orderHighlights<S extends { key: string }, G>(stats: S[], gc: G[
     ...last.flatMap((k) => stats.filter((h) => h.key === k).map((h) => ({ stat: h }))),
   ] as ({ stat: S; gc?: undefined } | { gc: G; stat?: undefined })[];
 }
+
+/** Divisões do placar: meio tempo no 12 e trocas da prorrogação (MR3) a partir do 24. */
+export const roundBreakAfter = (round: number) => round === 12 || (round >= 24 && (round - 24) % 3 === 0);
+
+/** Placar do ponto de vista de quem venceu: "2×10", "16×14". */
+export const winnerFirst = (s: { a: number; b: number }, w: "A" | "B") =>
+  w === "A" ? `${s.a}×${s.b}` : `${s.b}×${s.a}`;

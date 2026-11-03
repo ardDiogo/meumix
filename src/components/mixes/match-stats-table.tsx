@@ -14,7 +14,6 @@ import { LevelBadge } from "../players/level-badge";
 import { Avatar } from "../ui/avatar";
 import { TeamDot } from "./badges";
 import { playerSlug } from "@/lib/player-slug";
-import { RoundStrip } from "./round-strip";
 
 /** Linha da tabela: a estatística do mix e, se importado da GC, os dados completos. */
 type Row = StatRow & { gc?: GcLine };
@@ -299,17 +298,9 @@ function geralCols(withGc: boolean) {
 /**
  * Tabela "Estatísticas dos jogadores" do resultado do mix, ordenável por coluna.
  * Mix importado da GC: abas da GC (Geral, Entries, Trades, Clutch,
- * Utilitárias, Mira), escolha do mapa e o placar round a round no topo.
+ * Utilitárias, Mira) e escolha do mapa (o placar round a round fica no placar do topo).
  */
-export function MatchStatsTable({
-  rows,
-  gcMaps = [],
-  teams,
-}: {
-  rows: StatRow[];
-  gcMaps?: GcMapStored[];
-  teams?: [string, string];
-}) {
+export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps?: GcMapStored[] }) {
   const withGc = gcMaps.length > 0;
   const [tab, setTab] = useState<Tab>("geral");
   const [only, setOnly] = useState<number | null>(null);
@@ -343,15 +334,6 @@ export function MatchStatsTable({
 
   return (
     <div>
-      {/* Placar round a round no topo do card. */}
-      {withGc && teams && (
-        <div className="space-y-2 border-b border-border px-4 py-4">
-          <div className="text-xs font-semibold tracking-wider text-muted uppercase">Placar round a round</div>
-          {gcMaps.map((m, i) => (
-            <RoundStrip key={`${m.gcMatchId}-${i}`} map={m} teams={teams} />
-          ))}
-        </div>
-      )}
       {withGc && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
           <div

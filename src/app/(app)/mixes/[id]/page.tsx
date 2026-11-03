@@ -18,6 +18,7 @@ import { getMixDetail } from "@/services/queries";
 import { getMatchReport, playerAverages } from "@/services/match-report";
 import { MatchPerformance } from "@/components/mixes/match-performance";
 import { getGcMaps } from "@/services/gc-maps";
+import { RoundDots } from "@/components/mixes/round-strip";
 import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
 import { LinkGuests } from "@/components/mixes/link-guests";
@@ -113,6 +114,20 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   // Série empatada (ex.: 2×2 em 4 mapas): painel em cinza.
   const draw = finished && !winner && !!score;
 
+  const streamsCard =
+    streams.length > 0 ? (
+      <TwitchStreams
+        title={streams.some((s) => s.live) ? "Ao vivo na Twitch" : "Transmissões"}
+        description={`${streams.length} ${streams.length > 1 ? "canais" : "canal"} de jogadores deste mix`}
+        items={streams}
+        footnote={
+          streams.some((s) => !s.live && !s.meta.startsWith("Destaque"))
+            ? "A Twitch apaga as gravações depois de 7 dias (60 para Partner, Turbo ou Prime). Para guardar, o streamer transforma a gravação em Destaque."
+            : undefined
+        }
+      />
+    ) : null;
+
   return (
     <>
       <Button variant="ghost" size="sm" className="mb-3 -ml-2" asChild>
@@ -204,40 +219,41 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
             </div>
           </div>
         </div>
-        <ul className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
-          {mix.maps.map((m) => (
-            <li
-              key={m.order}
-              className="flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-sm"
-            >
-              <MapIcon id={m.mapId} size={20} />
-              <span className="font-medium">{mapName(m.mapId)}</span>
-              {m.scoreA != null && m.scoreB != null ? (
-                <span className="text-muted tabular">
-                  <span className={m.winner === "A" ? "text-fg" : ""}>{m.scoreA}</span>–
-                  <span className={m.winner === "B" ? "text-fg" : ""}>{m.scoreB}</span>
-                </span>
-              ) : (
-                <span className="text-xs text-subtle">a jogar</span>
-              )}
+        <ul
+          className={cn(
+            "flex gap-2 border-t border-border px-4 py-3",
+            // Com os rounds da GC: um mapa por linha, com os rounds ao lado.
+            gcMaps.length ? "flex-col" : "flex-wrap",
+          )}
+        >
+          {mix.maps.map((m, i) => (
+            <li key={m.order} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <div
+                className={cn(
+                  "flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-sm",
+                  // Mesma largura em todos os mapas: os rounds ficam alinhados.
+                  gcMaps.length > 0 && "sm:w-44",
+                )}
+              >
+                <MapIcon id={m.mapId} size={20} />
+                <span className="font-medium">{mapName(m.mapId)}</span>
+                {m.scoreA != null && m.scoreB != null ? (
+                  <span className="text-muted tabular">
+                    <span className={m.winner === "A" ? "text-fg" : ""}>{m.scoreA}</span>–
+                    <span className={m.winner === "B" ? "text-fg" : ""}>{m.scoreB}</span>
+                  </span>
+                ) : (
+                  <span className="text-xs text-subtle">a jogar</span>
+                )}
+              </div>
+              {gcMaps[i] && <RoundDots map={gcMaps[i]} teams={[mix.teams[0].name, mix.teams[1].name]} />}
             </li>
           ))}
         </ul>
       </Card>
 
-      {streams.length > 0 && (
-        <TwitchStreams
-          className="mb-4"
-          title={streams.some((s) => s.live) ? "Ao vivo na Twitch" : "Transmissões"}
-          description={`${streams.length} ${streams.length > 1 ? "canais" : "canal"} de jogadores deste mix`}
-          items={streams}
-          footnote={
-            streams.some((s) => !s.live && !s.meta.startsWith("Destaque"))
-              ? "A Twitch apaga as gravações depois de 7 dias (60 para Partner, Turbo ou Prime). Para guardar, o streamer transforma a gravação em Destaque."
-              : undefined
-          }
-        />
-      )}
+      {/* Sem as estatísticas, as transmissões ficam aqui; com elas, abaixo do Desempenho no mix. */}
+      {!report?.rows.length && streamsCard && <div className="mb-4">{streamsCard}</div>}
 
       {/* Com o placar completo, a tabela usa a largura toda e o painel lateral vai para baixo. */}
       <div className={cn("grid gap-4", !report?.rows.length && "xl:grid-cols-[1fr_18rem]")}>
@@ -256,7 +272,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                       : `Estatísticas de ${mapName(mix.maps[0]!.mapId)}`}
                   </p>
                 </div>
-                <MatchStatsTable rows={report.rows} gcMaps={gcMaps} teams={[mix.teams[0].name, mix.teams[1].name]} />
+                <MatchStatsTable rows={report.rows} gcMaps={gcMaps} />
               </Card>
               {canManageMixes && guests.length > 0 && (
                 <LinkGuests
@@ -279,6 +295,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                   />
                 </CardContent>
               </Card>
+              {streamsCard}
               <ChronicleCard
                 matchId={mix.id}
                 canManage={canManageMixes}

@@ -1,6 +1,15 @@
 import { ImageResponse } from "next/og";
 import { byMixScore, diffOf, kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
-import { aggregateGc, GC_HIGHLIGHT_TEXT, gcHighlights, orderHighlights, type GcHighlightKey } from "@/lib/gc-analysis";
+import {
+  aggregateGc,
+  GC_HIGHLIGHT_TEXT,
+  gcHighlights,
+  orderHighlights,
+  roundBreakAfter,
+  roundStory,
+  winnerFirst,
+  type GcHighlightKey,
+} from "@/lib/gc-analysis";
 import { getGcMaps } from "@/services/gc-maps";
 import { mapIcon, mapName } from "@/lib/maps";
 import { seriesScore, seriesWinner } from "@/lib/stats";
@@ -338,6 +347,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   );
 
   const sideColor = (side: "A" | "B") => (!winner ? C.muted : winner === side ? C.win : C.loss);
+  // Round: verde para o vencedor da série e vermelho para o outro (empate: as cores dos times).
+  const roundColor = (side: "A" | "B") => (winner ? sideColor(side) : side === "A" ? "#5da3e8" : "#e3bd5a");
   const sideLabel = (side: "A" | "B") => (!winner ? "EMPATE" : winner === side ? "VENCEDOR" : "DERROTA");
   const [d, m, y] = [mix.scheduledAt.slice(8, 10), mix.scheduledAt.slice(5, 7), mix.scheduledAt.slice(0, 4)];
   const display = fonts.some((f) => f.name === "Chakra Petch") ? "Chakra Petch" : "Inter";
@@ -347,6 +358,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
     140 +
     210 +
     76 +
+    // Um mapa por linha quando há os rounds da GC.
+    (gcMaps.length ? (mix.maps.length - 1) * 64 : 0) +
     100 +
     rows.length * ROW_H +
     90 +
@@ -462,32 +475,73 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
         })}
       </div>
 
-      {/* Mapas */}
-      <div style={{ display: "flex", gap: 12, marginTop: 16, height: 54 }}>
-        {mix.maps.map((mp, mi) => (
-          <div
-            key={mp.order}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "0 18px",
-              borderRadius: 10,
-              background: C.surface,
-              border: `1px solid ${mp.winner ? sideColor(mp.winner) : C.border}`,
-              fontSize: 20,
-            }}
-          >
-            {mapIcons[mi] && (
-              // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
-              <img src={mapIcons[mi]!} width={34} height={34} style={{ objectFit: "contain" }} />
-            )}
-            <span style={{ fontWeight: 700 }}>{mapName(mp.mapId)}</span>
-            <span style={{ color: mp.winner === "A" ? C.fg : C.muted }}>{mp.scoreA ?? "-"}</span>
-            <span style={{ color: C.subtle }}>–</span>
-            <span style={{ color: mp.winner === "B" ? C.fg : C.muted }}>{mp.scoreB ?? "-"}</span>
-          </div>
-        ))}
+      {/* Mapas (com os dados da GC: um por linha, com o vencedor de cada round ao lado) */}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: gcMaps.length ? "column" : "row",
+          gap: gcMaps.length ? 10 : 12,
+          marginTop: 16,
+        }}
+      >
+        {mix.maps.map((mp, mi) => {
+          const gm = gcMaps[mi];
+          const story = gm ? roundStory(gm) : null;
+          return (
+            <div key={mp.order} style={{ display: "flex", alignItems: "center", gap: 16, height: 54 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "0 18px",
+                  height: 54,
+                  // Mesma largura em todos os mapas: os rounds ficam alinhados.
+                  width: gcMaps.length ? 250 : undefined,
+                  borderRadius: 10,
+                  background: C.surface,
+                  border: `1px solid ${mp.winner ? sideColor(mp.winner) : C.border}`,
+                  fontSize: 20,
+                }}
+              >
+                {mapIcons[mi] && (
+                  // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
+                  <img src={mapIcons[mi]!} width={34} height={34} style={{ objectFit: "contain" }} />
+                )}
+                <span style={{ fontWeight: 700 }}>{mapName(mp.mapId)}</span>
+                <span style={{ color: mp.winner === "A" ? C.fg : C.muted }}>{mp.scoreA ?? "-"}</span>
+                <span style={{ color: C.subtle }}>–</span>
+                <span style={{ color: mp.winner === "B" ? C.fg : C.muted }}>{mp.scoreB ?? "-"}</span>
+              </div>
+              {gm && story && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    {gm.rounds.map((r, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          width: 15,
+                          height: 15,
+                          borderRadius: 3,
+                          background: roundColor(r.w),
+                          marginRight: roundBreakAfter(i + 1) && i + 1 < gm.rounds.length ? 7 : 0,
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {story.comeback && story.winner && (
+                    <span style={{ fontSize: 14, color: C.muted }}>
+                      {`Virada de ${winnerFirst(story.comeback.from, story.winner)} para ${winnerFirst(
+                        story.scores.at(-1) ?? { a: gm.scoreA, b: gm.scoreB },
+                        story.winner,
+                      )}`}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Estatísticas */}
