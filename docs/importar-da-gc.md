@@ -22,15 +22,12 @@ As três requisições são as mesmas que a página da GC faz ao abrir, com o lo
 
 ## Onde aparece
 
-Na página do mix (ordem: Estatísticas dos jogadores → Destaques da partida → Análise da partida (GC) → Desempenho no mix → Crônica):
+Na página do mix (ordem: Estatísticas dos jogadores → Destaques da partida → Desempenho no mix → Crônica):
 
-- **Destaques da partida** ganha 6 cards: **Melhor entry** (mais aberturas vencidas), **Melhor trader** (mais trades), **Clutchzeiro** (mais clutches vencidos), **Mais inimigos cegados**, **Maior dano com granada** e **Melhor mira** (maior precisão, com 10+ kills). Destaque em que ninguém pontuou não aparece.
+- **Estatísticas dos jogadores** (um card só): com os dados da GC, ganha as abas **Geral · Entries · Trades · Clutch · Utilitárias · Mira**, todas ordenáveis clicando na coluna. A Geral é a tabela de sempre com **Rating**, **Swing** e **HS%**; nas outras abas dá para ver **todos os mapas** (contagens somadas; rating, ADR, KAST e mira como média pelos rounds) ou um mapa só. No fim do card, o **placar round a round** de cada mapa (um quadrado por round, na cor do time que venceu; D = bomba desarmada, B = bomba explodiu), com a **virada** (quando o vencedor perdia por 3+ rounds) e a **maior sequência**.
+- **Destaques da partida** ganha 6 cards: **Melhor entry** (mais aberturas vencidas), **Melhor trader** (mais trades), **Clutchzeiro** (mais clutches vencidos), **Mais inimigos cegados**, **Dano com granada** e **Melhor mira** (maior precisão, com 10+ kills). Destaque em que ninguém pontuou não aparece. Também vão para a imagem compartilhada.
 
-Card **Análise da partida (GC)**:
-
-- **Placar round a round** de cada mapa (um quadrado por round, na cor do time que venceu; D = bomba desarmada, B = bomba explodiu), com a **virada** (quando o vencedor perdia por 3+ rounds) e a **maior sequência**.
-- Abas iguais às da GC: **Geral** (GC Rating, Swing, K/A/D, ADR, KAST, HS%, 3K+/ACE), **Entries**, **Trades**, **Clutch**, **Utilitárias** e **Mira**, separadas por time.
-- Escolha **Todos os mapas** (contagens somadas; rating, ADR, KAST e mira como média pelos rounds) ou um mapa só.
+Mix sem os dados da GC (prints, Faceit, manual): só a tabela de sempre e os destaques de sempre.
 
 ## Onde fica salvo
 
