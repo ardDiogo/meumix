@@ -41,7 +41,13 @@ export type BadgeRule =
   | "bolao_spectator"
   | "bolao_perfect"
   | "bolao_miss_streak"
-  | "bolao_zero";
+  | "bolao_zero"
+  | "gc_ace"
+  | "gc_clutch_master"
+  | "gc_comeback"
+  | "gc_entry_top"
+  | "gc_hs_top"
+  | "gc_hs_low";
 
 /** Destaques do último mix (os mesmos cards de "Destaques da partida"). */
 export const TOP_RULES = {
@@ -116,6 +122,28 @@ export const BADGE_RULES: Record<
   bolao_spectator: { label: "Palpitar sem jogar", kind: "dynamic", defaults: { n: 3 }, priority: 35 },
   bolao_miss_streak: { label: "Errar o vencedor seguido", kind: "dynamic", defaults: { n: 3 }, priority: 19 },
   bolao_zero: { label: "Zerar o último bolão", kind: "dynamic", defaults: {}, priority: 18 },
+  // Com os dados importados da GC (só mixes importados pelo botão contam).
+  gc_ace: { label: "Ace (5 kills num round)", kind: "permanent", defaults: {}, priority: 58 },
+  gc_clutch_master: { label: "Vencer um clutch 1vN", kind: "permanent", defaults: { min_vs: 3 }, priority: 57 },
+  gc_comeback: { label: "Virar um mapa", kind: "permanent", defaults: { deficit: 7 }, priority: 56 },
+  gc_entry_top: {
+    label: "Melhor entry dos últimos mixes",
+    kind: "dynamic",
+    defaults: { window: 5, min_duels: 10 },
+    priority: 64,
+  },
+  gc_hs_top: {
+    label: "Maior HS% dos últimos mixes",
+    kind: "dynamic",
+    defaults: { window: 5, min_kills: 30 },
+    priority: 63,
+  },
+  gc_hs_low: {
+    label: "Pior HS% dos últimos mixes",
+    kind: "dynamic",
+    defaults: { window: 5, min_kills: 30 },
+    priority: 17,
+  },
 };
 
 /** Prioridade para mostrar no PICK (manuais ficam no meio). */
@@ -151,6 +179,25 @@ export interface EngineMatch {
   bets?: EngineBet[];
   /** Todos os jogadores com conta neste mix (inclusive sem ELO aplicado). */
   participants?: string[];
+  /** Dados importados da GC (mixes importados pelo botão; os outros ficam sem). */
+  gc?: EngineGc;
+}
+
+export interface EngineGc {
+  /** Somados os mapas do mix, por jogador com conta. */
+  players: {
+    userId: string;
+    kills: number;
+    headshots: number;
+    /** Rounds com 5 kills. */
+    aces: number;
+    /** Maior clutch vencido (3 = 1v3). */
+    biggestClutch: number | null;
+    entriesWon: number;
+    entriesDuels: number;
+  }[];
+  /** Mapas virados: a maior desvantagem que o vencedor tirou. */
+  comebacks: { mapId: string; deficit: number; from: string; final: string; winners: string[] }[];
 }
 
 export interface EngineBet {
@@ -262,6 +309,24 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
   const spectatorStreak = new Map<string, number>();
   const missStreak = new Map<string, number>();
   const bestBet = new Map<string, number>();
+  // GC.
+  const gcWindow: EngineGc[] = [];
+  const bestClutch = new Map<string, number>();
+  const bestComeback = new Map<string, number>();
+  /** Somas dos últimos `window` mixes importados da GC, por jogador. */
+  const gcSums = (window: number) => {
+    const acc = new Map<string, { kills: number; hs: number; won: number; duels: number }>();
+    for (const g of gcWindow.slice(-window))
+      for (const p of g.players) {
+        const a = acc.get(p.userId) ?? { kills: 0, hs: 0, won: 0, duels: 0 };
+        a.kills += p.kills;
+        a.hs += p.headshots;
+        a.won += p.entriesWon;
+        a.duels += p.entriesDuels;
+        acc.set(p.userId, a);
+      }
+    return acc;
+  };
 
   const standings = (eloOf: (u: string) => number | undefined) =>
     [...mixes.keys()]
@@ -500,6 +565,74 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
       }
     }
 
+    // Insígnias com os dados da GC (só mixes importados pelo botão).
+    if (match.gc) {
+      gcWindow.push(match.gc);
+      for (const p of match.gc.players) {
+        // Ace e Clutch Master (permanentes).
+        if (p.aces > 0)
+          for (const b of byRule("gc_ace"))
+            start(b, p.userId, "ace", when, `Ace (5 kills num round) no mix de ${label}`);
+        bestClutch.set(p.userId, Math.max(bestClutch.get(p.userId) ?? 0, p.biggestClutch ?? 0));
+        for (const b of byRule("gc_clutch_master")) {
+          const min = param(b, "min_vs");
+          if ((p.biggestClutch ?? 0) >= min)
+            start(b, p.userId, "clutch", when, `Venceu um 1v${p.biggestClutch} no mix de ${label}`);
+        }
+      }
+      // Rei da Virada (permanente): estava no time que virou o mapa.
+      for (const c of match.gc.comebacks)
+        for (const u of c.winners) {
+          bestComeback.set(u, Math.max(bestComeback.get(u) ?? 0, c.deficit));
+          for (const b of byRule("gc_comeback"))
+            if (c.deficit >= param(b, "deficit"))
+              start(b, u, "virada", when, `Virada de ${c.from} para ${c.final} em ${mapName(c.mapId)} (${label})`);
+        }
+      // Do momento: somas dos últimos mixes importados da GC (a janela é a mesma para todos).
+      const pick = (
+        b: EngineBadge,
+        list: [string, number][],
+        better: (x: number, y: number) => number,
+        reason: (v: number) => string,
+        lost: string,
+      ) => {
+        const best = [...list].sort(([ua, a], [ub, c]) => better(a, c) || ua.localeCompare(ub))[0] ?? null;
+        for (const u of holders(b)) if (u !== best?.[0]) stop(b, u, when, `${lost} no mix de ${label}`);
+        if (best) start(b, best[0], `${b.rule}:${match.id}`, when, reason(best[1]));
+      };
+      for (const b of byRule("gc_entry_top")) {
+        const w = param(b, "window");
+        const list = [...gcSums(w).entries()]
+          .filter(([, a]) => a.duels >= param(b, "min_duels") && a.won > 0)
+          .map(([u, a]) => [u, a.won] as [string, number]);
+        pick(
+          b,
+          list,
+          (x, y) => y - x,
+          (v) => `${v} aberturas vencidas nos últimos ${w} mixes (até ${label})`,
+          "Outro jogador abriu mais rounds",
+        );
+      }
+      for (const [rule, dir, lost] of [
+        ["gc_hs_top", 1, "Outro jogador teve o maior HS%"],
+        ["gc_hs_low", -1, "Outro jogador teve o pior HS%"],
+      ] as const) {
+        for (const b of byRule(rule)) {
+          const w = param(b, "window");
+          const list = [...gcSums(w).entries()]
+            .filter(([, a]) => a.kills >= param(b, "min_kills"))
+            .map(([u, a]) => [u, (a.hs / a.kills) * 100] as [string, number]);
+          pick(
+            b,
+            list,
+            (x, y) => (y - x) * dir,
+            (v) => `${Math.round(v)}% de headshot nos últimos ${w} mixes (até ${label})`,
+            lost,
+          );
+        }
+      }
+    }
+
     // Veterano (permanente: nunca é encerrada).
     for (const b of byRule("veteran")) {
       const n = param(b, "mixes");
@@ -648,6 +781,53 @@ export function computeBadges(input: EngineInput): { rows: DerivedBadge[]; progr
       }
     }
   }
+  // Progresso das insígnias da GC (só de quem tem mix importado da GC).
+  const gcPlayers = new Set(gcWindow.flatMap((g) => g.players.map((p) => p.userId)));
+  for (const u of gcPlayers) {
+    for (const b of byRule("gc_ace")) push(u, b, 0, 1, "Fazer um ace (5 kills num round)");
+    for (const b of byRule("gc_clutch_master")) {
+      const min = param(b, "min_vs");
+      const best = bestClutch.get(u) ?? 0;
+      push(u, b, best, min, best ? `Maior clutch vencido: 1v${best} · falta o 1v${min}` : `Vencer um 1v${min}`);
+    }
+    for (const b of byRule("gc_comeback")) {
+      const need = param(b, "deficit");
+      const best = bestComeback.get(u) ?? 0;
+      push(
+        u,
+        b,
+        best,
+        need,
+        best
+          ? `Maior virada: tirou ${best} rounds de desvantagem · precisa de ${need}`
+          : `Virar um mapa perdendo por ${need}+ rounds`,
+      );
+    }
+    for (const b of byRule("gc_entry_top")) {
+      const w = param(b, "window");
+      const min = param(b, "min_duels");
+      const acc = gcSums(w);
+      const mine = acc.get(u);
+      const top = Math.max(0, ...[...acc.values()].filter((a) => a.duels >= min).map((a) => a.won));
+      if (!mine || mine.duels < min)
+        push(u, b, mine?.duels ?? 0, min, `${mine?.duels ?? 0} de ${min} duelos de abertura nos últimos ${w} mixes`);
+      else push(u, b, mine.won, Math.max(top, 1), `${mine.won} aberturas vencidas · o 1º tem ${top}`);
+    }
+    for (const rule of ["gc_hs_top", "gc_hs_low"] as const) {
+      for (const b of byRule(rule)) {
+        const w = param(b, "window");
+        const min = param(b, "min_kills");
+        const mine = gcSums(w).get(u);
+        if (!mine || mine.kills < min)
+          push(u, b, mine?.kills ?? 0, min, `${mine?.kills ?? 0} de ${min} kills nos últimos ${w} mixes para disputar`);
+        else {
+          const hs = Math.round((mine.hs / mine.kills) * 100);
+          push(u, b, rule === "gc_hs_top" ? hs : 0, 100, `Seu HS% nos últimos ${w} mixes: ${hs}%`);
+        }
+      }
+    }
+  }
+
   // Progresso do bolão (inclui quem só palpita).
   const bolaoOrder = bolaoRanking(bolaoScores);
   for (const u of bettors) {

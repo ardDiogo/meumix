@@ -4,10 +4,13 @@ import {
   type BadgeRule,
   type EngineBadge,
   type EngineBet,
+  type EngineGc,
   type EngineMatch,
   type TopKey,
 } from "@/lib/badge-engine";
 import { outcomeOf, scorePrediction } from "@/lib/bolao";
+import type { GcMapStored } from "@/lib/gc-api";
+import { roundStory, winnerFirst } from "@/lib/gc-analysis";
 import { matchHighlights, type StatRow } from "@/lib/match-highlights";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -57,7 +60,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     }));
   if (!badges.length) return { ok: true, inseridas: 0, atualizadas: 0, removidas: 0, badges: 0 };
 
-  const [matches, records, profiles, maps, allRows, predictions, drafts] = await Promise.all([
+  const [matches, records, profiles, maps, allRows, predictions, drafts, gcRows] = await Promise.all([
     admin.from("mix_matches").select("id, schedule_id, event_date, finalized_at, maps"),
     // O Supabase devolve no máximo 1000 linhas por consulta: lê em páginas.
     allPages((from, to) =>
@@ -90,6 +93,8 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
       .select("schedule_id, event_date, user_id, winner_captain, maps_won, maps_lost, mvp_id, lanterna_id")
       .limit(20000),
     admin.from("mix_draft_state").select("schedule_id, event_date, captain_a, captain_b"),
+    // Dados importados da GC (sem a migração 0035, só fica sem as insígnias da GC).
+    admin.from("match_gc_maps").select("match_id, map_order, map_id, data").order("map_order"),
   ]);
   if (matches.error || records.error || profiles.error) {
     return { ok: false, message: "Não foi possível ler os resultados." };
@@ -196,6 +201,54 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     }));
   };
 
+  // GC: por mix, os jogadores com conta somados nos mapas e os mapas virados.
+  const gcMapsOf = new Map<string, GcMapStored[]>();
+  for (const r of gcRows.error ? [] : (gcRows.data ?? [])) {
+    const map = { ...(r.data as GcMapStored), mapId: r.map_id as string };
+    if (!Array.isArray(map.players) || !Array.isArray(map.rounds)) continue;
+    gcMapsOf.set(r.match_id as string, [...(gcMapsOf.get(r.match_id as string) ?? []), map]);
+  }
+  const gcOf = (matchId: string): EngineGc | undefined => {
+    const list = gcMapsOf.get(matchId);
+    if (!list?.length) return undefined;
+    const players = new Map<string, EngineGc["players"][number]>();
+    for (const m of list)
+      for (const p of m.players) {
+        if (!p.userId) continue;
+        const a = players.get(p.userId) ?? {
+          userId: p.userId,
+          kills: 0,
+          headshots: 0,
+          aces: 0,
+          biggestClutch: null,
+          entriesWon: 0,
+          entriesDuels: 0,
+        };
+        a.kills += p.k ?? 0;
+        a.headshots += p.hs ?? 0;
+        a.aces += p.multi?.[4] ?? 0;
+        if (p.clutch?.biggest) a.biggestClutch = Math.max(a.biggestClutch ?? 0, p.clutch.biggest);
+        a.entriesWon += p.entries?.won ?? 0;
+        a.entriesDuels += p.entries?.duels ?? 0;
+        players.set(p.userId, a);
+      }
+    const comebacks = list.flatMap((m) => {
+      const story = roundStory(m);
+      if (!story.comeback || !story.winner) return [];
+      const final = story.scores.at(-1) ?? { a: m.scoreA, b: m.scoreB };
+      return [
+        {
+          mapId: m.mapId,
+          deficit: story.comeback.deficit,
+          from: winnerFirst(story.comeback.from, story.winner),
+          final: winnerFirst(final, story.winner),
+          winners: m.players.filter((p) => p.userId && p.team === story.winner).map((p) => p.userId!),
+        },
+      ];
+    });
+    return { players: [...players.values()], comebacks };
+  };
+
   const engineMatches: EngineMatch[] = (matches.data ?? []).map((m) => ({
     id: m.id as string,
     date: m.event_date as string,
@@ -211,6 +264,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     participants: [
       ...new Set((rowsByMatch.get(m.id as string) ?? []).map((r) => r.userId).filter((u): u is string => !!u)),
     ],
+    gc: gcOf(m.id as string),
   }));
 
   const { rows, progress } = computeBadges({

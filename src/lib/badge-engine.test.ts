@@ -416,3 +416,84 @@ describe("Bolão", () => {
     assert.equal(active(rows, "b-chu", "ze").length, 1);
   });
 });
+
+describe("GC (mixes importados da GC)", () => {
+  const ACE: EngineBadge = { id: "b-ace", rule: "gc_ace" };
+  const CLUTCH: EngineBadge = { id: "b-clu", rule: "gc_clutch_master", params: { min_vs: 3 } };
+  const VIRADA: EngineBadge = { id: "b-vir", rule: "gc_comeback", params: { deficit: 7 } };
+  const ABRE: EngineBadge = { id: "b-abr", rule: "gc_entry_top", params: { window: 2, min_duels: 5 } };
+  const CABECA: EngineBadge = { id: "b-hs", rule: "gc_hs_top", params: { window: 2, min_kills: 10 } };
+  const ALFACE: EngineBadge = { id: "b-alf", rule: "gc_hs_low", params: { window: 2, min_kills: 10 } };
+  const ALL = [ACE, CLUTCH, VIRADA, ABRE, CABECA, ALFACE];
+  type P = NonNullable<EngineMatch["gc"]>["players"][number];
+  const gp = (userId: string, extra: Partial<P> = {}): P => ({
+    userId,
+    kills: 20,
+    headshots: 8,
+    aces: 0,
+    biggestClutch: null,
+    entriesWon: 3,
+    entriesDuels: 6,
+    ...extra,
+  });
+  const gcMix = (players: P[], comebacks: NonNullable<EngineMatch["gc"]>["comebacks"] = []) => ({
+    ...mix([W]),
+    gc: { players, comebacks },
+  });
+
+  it("Ace, Clutch Master e Rei da Virada: permanentes, uma vez só", () => {
+    const { rows } = computeBadges({
+      matches: [
+        gcMix(
+          [gp("ard", { aces: 1, biggestClutch: 3 }), gp("barker", { biggestClutch: 2 })],
+          [{ mapId: "de_mirage", deficit: 8, from: "2×10", final: "16×14", winners: ["barker"] }],
+        ),
+        gcMix(
+          [gp("ard", { aces: 2 }), gp("barker")],
+          [{ mapId: "de_nuke", deficit: 5, from: "3×8", final: "13×9", winners: ["ard"] }],
+        ),
+      ],
+      badges: ALL,
+    });
+    assert.equal(of(rows, "b-ace", "ard").length, 1);
+    assert.equal(active(rows, "b-ace", "ard").length, 1);
+    assert.equal(of(rows, "b-ace", "barker").length, 0);
+    assert.equal(active(rows, "b-clu", "ard").length, 1);
+    assert.equal(of(rows, "b-clu", "barker").length, 0, "1v2 não basta");
+    assert.equal(active(rows, "b-vir", "barker").length, 1);
+    assert.match(of(rows, "b-vir", "barker")[0]!.reason, /2×10 para 16×14 em Mirage/);
+    assert.equal(of(rows, "b-vir", "ard").length, 0, "virada de 5 rounds não basta");
+  });
+
+  it("Abre-Alas, Cabeçudo e Mão de Alface: janela dos últimos mixes e mínimos", () => {
+    const m1 = gcMix([
+      gp("ard", { entriesWon: 6, entriesDuels: 8, kills: 20, headshots: 14 }),
+      gp("barker", { entriesWon: 2, entriesDuels: 6, kills: 20, headshots: 4 }),
+      gp("tm", { entriesWon: 9, entriesDuels: 9, kills: 5, headshots: 5 }),
+    ]);
+    const first = computeBadges({ matches: [m1], badges: ALL }).rows;
+    assert.equal(active(first, "b-abr", "tm").length, 1, "9 aberturas com 9 duelos (mín. 5)");
+    assert.equal(active(first, "b-hs", "ard").length, 1);
+    assert.equal(active(first, "b-alf", "barker").length, 1);
+    assert.equal(of(first, "b-hs", "tm").length, 0, "100% de HS mas só 5 kills");
+
+    // Dois mixes depois, o m1 sai da janela (2): o Barker vira o melhor de HS.
+    const m2 = gcMix([gp("barker", { kills: 20, headshots: 15 }), gp("ard", { kills: 20, headshots: 2 })]);
+    const m3 = gcMix([gp("barker", { kills: 20, headshots: 15 }), gp("ard", { kills: 20, headshots: 2 })]);
+    const { rows, progress } = computeBadges({ matches: [m1, m2, m3], badges: ALL });
+    assert.equal(active(rows, "b-hs", "barker").length, 1);
+    assert.equal(active(rows, "b-hs", "ard").length, 0);
+    assert.ok(of(rows, "b-hs", "ard")[0]!.deactivatedAt);
+    assert.equal(active(rows, "b-alf", "ard").length, 1);
+    assert.equal(active(rows, "b-abr", "tm").length, 0, "fora da janela");
+    const p = progress.find((x) => x.userId === "barker" && x.badgeId === "b-clu")!;
+    assert.match(p.detail, /Vencer um 1v3/);
+  });
+
+  it("mix sem dados da GC não mexe nas insígnias da GC", () => {
+    const m1 = gcMix([gp("ard", { kills: 20, headshots: 14 }), gp("barker", { kills: 20, headshots: 4 })]);
+    const { rows } = computeBadges({ matches: [m1, mix([W]), mix([L])], badges: ALL });
+    assert.equal(active(rows, "b-hs", "ard").length, 1);
+    assert.equal(active(rows, "b-alf", "barker").length, 1);
+  });
+});
