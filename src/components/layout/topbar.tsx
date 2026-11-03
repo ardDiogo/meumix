@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import type { Community } from "@/types/domain";
 import { Logo } from "../brand/logo";
+import { RefreshButton } from "../pwa/app-refresh";
 import { MobileNav } from "./mobile-nav";
 import { PlayerSearch } from "./player-search";
 import { TopNav } from "./top-nav";
@@ -32,6 +33,7 @@ export function Topbar({
           >
             <Search className="size-4" />
           </Link>
+          <RefreshButton />
           <UserMenu user={user} showAdmin={showAdmin} />
         </div>
       </div>

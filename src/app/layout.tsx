@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { PwaRegister } from "@/components/pwa/pwa";
+import { AppRefresh } from "@/components/pwa/app-refresh";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         {children}
         <PwaRegister />
+        <AppRefresh />
         <Toaster
           theme="dark"
           position="bottom-right"
