@@ -146,9 +146,12 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
           {cards.map(({ key, name, avatarUrl, style: s, detail }) => {
             const Icon = s.icon;
             return (
-              <li key={key} className={cn("flex items-center gap-2.5 rounded-lg border px-2.5 py-2", s.box)}>
-                {/* No celular, sem a foto: o texto ocupa o card todo. */}
-                <Avatar name={name} src={avatarUrl} size="md" className="rounded-md max-sm:hidden" />
+              <li
+                key={key}
+                className={cn("flex items-center gap-2 rounded-lg border px-2 py-2 sm:gap-2.5 sm:px-2.5", s.box)}
+              >
+                {/* Foto menor no celular, para sobrar espaço para o texto. */}
+                <Avatar name={name} src={avatarUrl} size="sm" className="shrink-0 rounded-md sm:size-10" />
                 <div className="min-w-0">
                   <div className="flex items-center gap-1 text-[11px] leading-tight text-muted">
                     <Icon className={cn("size-3.5 shrink-0", s.icon_)} aria-hidden />
