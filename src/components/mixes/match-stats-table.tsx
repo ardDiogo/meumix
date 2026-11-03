@@ -7,7 +7,7 @@ import { MapIcon } from "@/components/maps/map-icon";
 import type { GcMapStored } from "@/lib/gc-api";
 import { aggregateGc, type GcLine } from "@/lib/gc-analysis";
 import { mapName } from "@/lib/maps";
-import { diffOf, kdrOf, type StatRow } from "@/lib/match-highlights";
+import { byMixScore, diffOf, kdrOf, mixScore, type StatRow } from "@/lib/match-highlights";
 import type { MapId } from "@/types/domain";
 import { cn } from "@/lib/utils";
 import { LevelBadge } from "../players/level-badge";
@@ -33,6 +33,13 @@ const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
 const BASE_COLS: Col[] = [
+  {
+    key: "pts",
+    label: "PTS",
+    title: "Pontuação do mix (a mesma do MVP): kills × 3 + assistências × 1,5 + ADR × 0,2 − mortes × 2",
+    value: mixScore,
+    render: (r) => <span className="font-display font-bold">{fmt(mixScore(r), 1)}</span>,
+  },
   {
     key: "k",
     label: "K",
@@ -135,7 +142,7 @@ type Tab = "geral" | "entries" | "trades" | "clutch" | "utility" | "aim";
 
 /** Abas como as da GC; fora a Geral, só existem com os dados importados da GC. */
 const TABS: { key: Tab; label: string; sort: string; cols: Col[] }[] = [
-  { key: "geral", label: "Geral", sort: "k", cols: [] },
+  { key: "geral", label: "Geral", sort: "pts", cols: [] },
   {
     key: "entries",
     label: "Entries",
@@ -309,7 +316,7 @@ export function MatchStatsTable({
   const spec = TABS.find((t) => t.key === tab)!;
   const cols = useMemo(() => (tab === "geral" ? geralCols(withGc) : spec.cols), [tab, withGc, spec]);
   // Trocar de aba volta para a ordenação padrão dela.
-  const [sort, setSort] = useState<{ key: string; desc: boolean }>({ key: "k", desc: true });
+  const [sort, setSort] = useState<{ key: string; desc: boolean }>({ key: "pts", desc: true });
 
   // Dados da GC por jogador (pelo ID do MeuMix; convidado, pelo nick). A Geral usa o mix inteiro.
   const lines = useMemo(
@@ -321,14 +328,16 @@ export function MatchStatsTable({
       ...r,
       gc: lines.find((l) => (r.userId ? l.userId === r.userId : l.nick === r.name)),
     }));
+    // Padrão (PTS): MVP primeiro, lanterna por último, o resto pela pontuação do mix.
+    if (sort.key === "pts") return withLines.sort((x, y) => (sort.desc ? byMixScore(x, y) : byMixScore(y, x)));
     const col = cols.find((c) => c.key === sort.key) ?? cols[0]!;
     return withLines.sort((x, y) => {
       const a = col.value(x);
       const b = col.value(y);
       // Sem valor (ex.: sem dados da GC) vai sempre para o fim.
-      if (a == null || b == null) return (a == null ? 1 : 0) - (b == null ? 1 : 0) || y.k - x.k;
-      // Empate: mesma ordem da imagem compartilhada (mais kills, depois mais assistências).
-      return (sort.desc ? b - a : a - b) || y.k - x.k || y.a - x.a;
+      if (a == null || b == null) return (a == null ? 1 : 0) - (b == null ? 1 : 0) || byMixScore(x, y);
+      // Empate: a ordem padrão (pontuação do mix).
+      return (sort.desc ? b - a : a - b) || byMixScore(x, y);
     });
   }, [rows, lines, cols, sort]);
 

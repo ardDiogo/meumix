@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { diffOf, kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
+import { byMixScore, diffOf, kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
 import { aggregateGc, GC_HIGHLIGHT_TEXT, gcHighlights, orderHighlights, type GcHighlightKey } from "@/lib/gc-analysis";
 import { getGcMaps } from "@/services/gc-maps";
 import { mapIcon, mapName } from "@/lib/maps";
@@ -286,7 +286,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
     return new Response("Resultado não encontrado.", { status: 404 });
   }
 
-  const rows = [...report.rows].sort((a, b) => b.k - a.k || b.a - a.a);
+  // Mesma ordem da tabela: MVP primeiro, lanterna por último, o resto pela pontuação do mix.
+  const rows = [...report.rows].sort(byMixScore);
   // Destaques na ordem da página: MVP primeiro, os da GC, mais mortes e lanterna no fim.
   const gcList = gcMaps.length ? gcHighlights(aggregateGc(gcMaps)) : [];
   const highlights = orderHighlights(matchHighlights(rows), gcList).map(({ stat, gc }) => {

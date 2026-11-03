@@ -1,4 +1,4 @@
-import { pickMvpAndLanterna } from "./match-rules";
+import { mvpScore, pickMvpAndLanterna } from "./match-rules";
 
 /** Linha da tabela de estatísticas do resultado (somatório da série). */
 export interface StatRow {
@@ -30,6 +30,20 @@ export interface StatRow {
 
 export const diffOf = (r: StatRow) => r.k - r.d;
 export const kdrOf = (r: StatRow) => (r.d ? r.k / r.d : r.k);
+
+/** Pontuação do mix (a mesma que escolhe o MVP). */
+export const mixScore = (r: StatRow) => mvpScore({ kills: r.k, deaths: r.d, assists: r.a, adr: r.adr });
+
+/**
+ * Ordem padrão dos jogadores do mix: MVP primeiro, lanterna por último e o
+ * resto pela pontuação do mix (empate: mais kills, depois mais assistências).
+ */
+export const byMixScore = (x: StatRow, y: StatRow) =>
+  Number(y.isMvp) - Number(x.isMvp) ||
+  Number(x.isLanterna) - Number(y.isLanterna) ||
+  mixScore(y) - mixScore(x) ||
+  y.k - x.k ||
+  y.a - x.a;
 
 export type HighlightKey = "mvp" | "kills" | "adr" | "kdr" | "fk" | "assists" | "deaths" | "worst";
 
