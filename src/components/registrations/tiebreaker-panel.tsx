@@ -47,6 +47,17 @@ export function TiebreakerPanel({
             >
               <MapEmblem id={m.id as MapId} size={18} />
               {m.name}
+              <span
+                className="text-xs font-medium text-muted tabular"
+                title={
+                  m.tiebreakVotes != null
+                    ? `${m.votes} na votação de mapas e ${m.tiebreakVotes} no desempate`
+                    : `${m.votes} na votação de mapas`
+                }
+              >
+                {m.votes} {m.votes === 1 ? "voto" : "votos"}
+                {m.tiebreakVotes != null && ` · ${m.tiebreakVotes} no desempate`}
+              </span>
               {m.random && (
                 <span
                   className="inline-flex items-center gap-1 text-[11px] font-medium text-muted"

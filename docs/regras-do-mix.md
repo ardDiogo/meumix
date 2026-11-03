@@ -87,6 +87,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 ## 6) Escolha dos times
 
 - Ordem de escolha: **1 – 2 – 2 – 2 – 1** (vencedor do PPT pega 1, depois alterna 2 a 2, e o último jogador vai para o outro capitão). 5 turnos, 10 jogadores.
+- A última escolha é automática: quando sobra um jogador só (depois do 4º turno), ele vai direto para o time da vez, sem o capitão precisar clicar. O aviso "5. … pickou …" sai do mesmo jeito.
 - Antes de confirmar cada escolha, o app **relê o estado atual no banco** e confirma que ainda é a vez daquele capitão e que o jogador está livre (evita erros com cliques simultâneos).
 - A ordem em que cada jogador foi escolhido fica registrada e é exibida.
 - Ao fim do 5º turno, a escolha é marcada como concluída (e dispara a checagem de desempate de mapas).

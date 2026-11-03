@@ -93,16 +93,50 @@ export async function pickPlayer(scheduleId: string, date: string, playerId: str
     p_player: playerId,
   });
   if (error) return fail(dbMessage(error.message));
+  type PickState = Parameters<typeof notifyPickTurn>[2] & {
+    status: string;
+    captain_a: string;
+    captain_b: string;
+    team_a: string[];
+    team_b: string[];
+    current_turn: "a" | "b" | null;
+  };
+  let state = data as PickState | null;
+  const picks = [{ player: playerId, by: session.id, state }];
+  let autoMessage = "";
+  // Sobrou um jogador só: vai direto para o time da vez (a última escolha não tem o que escolher).
+  if (state?.status === "draft" && state.current_turn) {
+    const { data: classified } = await admin.rpc("mix_classified", { p_schedule: scheduleId, p_date: date });
+    const taken = new Set([...(state.team_a ?? []), ...(state.team_b ?? [])]);
+    const left = ((classified as string[] | null) ?? []).filter((id) => !taken.has(id));
+    if (left.length === 1) {
+      const captain = state.current_turn === "a" ? state.captain_a : state.captain_b;
+      const last = await admin.rpc("draft_pick", {
+        p_schedule: scheduleId,
+        p_date: date,
+        p_user: captain,
+        p_player: left[0],
+      });
+      if (!last.error && last.data) {
+        state = last.data as PickState;
+        picks.push({ player: left[0]!, by: captain, state });
+        const { data: who } = await admin.from("profiles").select("display_name").eq("id", left[0]!).maybeSingle();
+        autoMessage = ` ${(who?.display_name as string | undefined) ?? "O último jogador"} foi para o outro time automaticamente.`;
+      }
+    }
+  }
   // Escolha concluída → checa desempate de mapas (idempotente).
-  const completed = (data as { status?: string } | null)?.status === "completed";
+  const completed = state?.status === "completed";
   if (completed) await detectTiebreaker(scheduleId, date);
   after(async () => {
-    await notifyPicked(scheduleId, date, playerId, session.id);
-    if (data) await notifyPickTurn(scheduleId, date, data as Parameters<typeof notifyPickTurn>[2], session.id);
+    for (const p of picks) {
+      await notifyPicked(scheduleId, date, p.player, p.by);
+      if (p.state) await notifyPickTurn(scheduleId, date, p.state, p.by);
+    }
     if (completed) await notifyTeamsDefined(scheduleId, date);
   });
   refresh();
-  return { ok: true, message: "Jogador escolhido!" };
+  return { ok: true, message: `Jogador escolhido!${autoMessage}` };
 }
 
 /**

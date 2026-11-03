@@ -100,7 +100,8 @@ export interface TiebreakerView {
   enabled: boolean;
   rounds: TiebreakerRoundView[];
   /** Mapas definidos para o mix (após a escolha dos times). */
-  finalMaps: { id: string; name: string; random: boolean }[];
+  /** `votes`: votos na votação de mapas; `tiebreakVotes`: no desempate que o definiu (se houve). */
+  finalMaps: { id: string; name: string; random: boolean; votes: number; tiebreakVotes: number | null }[];
   pending: boolean;
 }
 
@@ -409,10 +410,16 @@ export async function loadTiebreaker(
   const main = votes.maps.map((m) => ({ id: m.id, votes: counts.get(m.id) ?? 0 }));
   const result = finalMaps(main, rows, enabled);
 
-  return {
+  const view: TiebreakerView = {
     enabled,
     pending: result.pending,
-    finalMaps: result.maps.map((id) => ({ id, name: names.get(id) ?? id, random: result.random.includes(id) })),
+    finalMaps: result.maps.map((id) => ({
+      id,
+      name: names.get(id) ?? id,
+      random: result.random.includes(id),
+      votes: counts.get(id) ?? 0,
+      tiebreakVotes: null,
+    })),
     rounds: rows.map((r) => {
       const mine = (rvotes ?? []).filter((v) => v.round_id === r.id);
       return {
@@ -432,6 +439,12 @@ export async function loadTiebreaker(
       };
     }),
   };
+  // Mapa que entrou pelo desempate: os votos do round que o definiu.
+  for (const m of view.finalMaps) {
+    const round = view.rounds.find((r) => r.winning.includes(m.id) || r.random.includes(m.id));
+    if (round) m.tiebreakVotes = round.candidates.find((c) => c.id === m.id)?.votes ?? 0;
+  }
+  return view;
 }
 
 async function loadFinalizedMatch(scheduleId: string, date: string) {
