@@ -20,8 +20,8 @@ import { getDataSource } from "@/services";
 
 /**
  * Card único do resultado do mix (PNG) para compartilhar no WhatsApp:
- * placar com vencedor/perdedor, mapas, estatísticas, destaques e a crônica do
- * mix (sem ela com `?cronica=0`).
+ * placar com vencedor/perdedor, mapas, estatísticas e destaques. A crônica vai
+ * escrita na mensagem, não na imagem (só entra com `?cronica=1`).
  */
 
 const C = {
@@ -283,7 +283,7 @@ function ChronicleSection({ c, display, images }: { c: Chronicle; display: strin
 export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/card">) {
   const { id } = await ctx.params;
   const ds = getDataSource();
-  const withChronicle = new URL(request.url).searchParams.get("cronica") !== "0";
+  const withChronicle = new URL(request.url).searchParams.get("cronica") === "1";
   const [mix, report, stored, gcMaps] = await Promise.all([
     ds.getMix(id),
     getMatchReport(id),

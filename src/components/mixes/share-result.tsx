@@ -34,7 +34,7 @@ export function ShareResult({
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<Record<string, File>>({});
   const [loading, setLoading] = useState(false);
-  // A crônica (se houver e não estiver oculta) vai sempre na imagem e na mensagem.
+  // A imagem vai sem a crônica; ela segue escrita na mensagem (se houver e não estiver oculta).
   const src = `/api/mixes/${matchId}/card`;
   const file = files[src] ?? null;
 
@@ -94,7 +94,7 @@ export function ShareResult({
       </DialogTrigger>
       <DialogContent
         title="Compartilhar resultado"
-        description="Card com placar, estatísticas, destaques e a crônica para mandar no grupo."
+        description="Card com placar, estatísticas e destaques para mandar no grupo. A crônica vai escrita na mensagem."
         className="max-w-lg"
       >
         <div className="max-h-[55vh] overflow-y-auto rounded-md border border-border bg-bg">
