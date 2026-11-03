@@ -15,14 +15,20 @@ import {
   Zap,
 } from "lucide-react";
 import type { GcMapStored } from "@/lib/gc-api";
-import { aggregateGc, gcHighlights, type GcHighlightKey, type GcLine } from "@/lib/gc-analysis";
+import {
+  aggregateGc,
+  GC_HIGHLIGHT_TEXT,
+  gcHighlights,
+  orderHighlights,
+  type GcHighlightKey,
+  type GcLine,
+} from "@/lib/gc-analysis";
 import { kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
 import { cn } from "@/lib/utils";
 import { Avatar } from "../ui/avatar";
 import { Card, CardContent, CardHeader } from "../ui/card";
 
 const fmt2 = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const pct = (n: number | null) => `${Math.round(n ?? 0)}%`;
 
 const STYLE: Record<
   HighlightKey,
@@ -86,55 +92,14 @@ const STYLE: Record<
   },
 };
 
-/** Destaques que só existem com os dados importados da GC. */
-const GC_STYLE: Record<
-  GcHighlightKey,
-  { title: string; icon: typeof Crown; box: string; icon_: string; detail: (l: GcLine) => string }
-> = {
-  entry: {
-    title: "Melhor entry",
-    icon: DoorOpen,
-    box: "border-sky-500/30 bg-sky-500/10",
-    icon_: "text-sky-400",
-    detail: (l) => `${l.entries.won} de ${l.entries.duels} aberturas (${pct((l.entries.won / l.entries.duels) * 100)})`,
-  },
-  trader: {
-    title: "Melhor trader",
-    icon: Repeat,
-    box: "border-teal-500/30 bg-teal-500/10",
-    icon_: "text-teal-400",
-    detail: (l) =>
-      `${l.trades.made} trades${l.trades.avgTime != null ? ` · ${l.trades.avgTime.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}s` : ""}`,
-  },
-  clutch: {
-    title: "Clutchzeiro",
-    icon: Flame,
-    box: "border-fuchsia-500/30 bg-fuchsia-500/10",
-    icon_: "text-fuchsia-400",
-    detail: (l) =>
-      `${l.clutch.won} ${l.clutch.won === 1 ? "clutch" : "clutches"}${l.clutch.biggest ? ` · maior 1v${l.clutch.biggest}` : ""}`,
-  },
-  flash: {
-    title: "Mais inimigos cegados",
-    icon: Sun,
-    box: "border-amber-300/30 bg-amber-300/10",
-    icon_: "text-amber-300",
-    detail: (l) => `${l.utility.flashed} cegados${l.fa ? ` · ${l.fa} flash assists` : ""}`,
-  },
-  nade: {
-    title: "Maior dano com granada",
-    icon: Bomb,
-    box: "border-lime-500/30 bg-lime-500/10",
-    icon_: "text-lime-400",
-    detail: (l) => `${l.utility.damage} de dano · ${l.utility.grenades} granadas`,
-  },
-  aim: {
-    title: "Melhor mira",
-    icon: Focus,
-    box: "border-indigo-500/30 bg-indigo-500/10",
-    icon_: "text-indigo-400",
-    detail: (l) => `${pct(l.aim.accuracy)} de precisão · ${pct(l.hsRate)} HS`,
-  },
+/** Ícone e cores dos destaques que só existem com os dados importados da GC. */
+const GC_STYLE: Record<GcHighlightKey, { icon: typeof Crown; box: string; icon_: string }> = {
+  entry: { icon: DoorOpen, box: "border-sky-500/30 bg-sky-500/10", icon_: "text-sky-400" },
+  trader: { icon: Repeat, box: "border-teal-500/30 bg-teal-500/10", icon_: "text-teal-400" },
+  clutch: { icon: Flame, box: "border-fuchsia-500/30 bg-fuchsia-500/10", icon_: "text-fuchsia-400" },
+  flash: { icon: Sun, box: "border-amber-300/30 bg-amber-300/10", icon_: "text-amber-300" },
+  nade: { icon: Bomb, box: "border-lime-500/30 bg-lime-500/10", icon_: "text-lime-400" },
+  aim: { icon: Focus, box: "border-indigo-500/30 bg-indigo-500/10", icon_: "text-indigo-400" },
 };
 
 type CardItem = {
@@ -145,9 +110,6 @@ type CardItem = {
   detail: string;
 };
 
-/** Ficam no fim, nesta ordem: mais mortes (penúltimo) e lanterna (último). */
-const LAST: HighlightKey[] = ["deaths", "worst"];
-
 export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMapStored[] }) {
   const list = matchHighlights(rows);
   if (!list.length) return null;
@@ -155,48 +117,49 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
   const gcList = gc.length ? gcHighlights(aggregateGc(gc)) : [];
   const personOf = (l: GcLine) =>
     rows.find((r) => (l.userId ? r.userId === l.userId : r.name === l.nick)) ?? { name: l.nick, avatarUrl: null };
-  const statCard = ({ key, row }: (typeof list)[number]): CardItem => ({
-    key,
-    name: row.name,
-    avatarUrl: row.avatarUrl,
-    style: STYLE[key],
-    detail: STYLE[key].detail(row),
-  });
-  // MVP primeiro, depois os demais e os da GC; mais mortes e lanterna por último.
-  const cards: CardItem[] = [
-    ...list.filter((h) => !LAST.includes(h.key)).map(statCard),
-    ...gcList.map(({ key, line }) => {
-      const p = personOf(line);
+  const cards: CardItem[] = orderHighlights(list, gcList).map(({ stat, gc: g }) => {
+    if (stat) {
+      const st = STYLE[stat.key];
       return {
-        key: `gc-${key}`,
-        name: p.name,
-        avatarUrl: p.avatarUrl,
-        style: GC_STYLE[key],
-        detail: GC_STYLE[key].detail(line),
+        key: stat.key,
+        name: stat.row.name,
+        avatarUrl: stat.row.avatarUrl,
+        style: st,
+        detail: st.detail(stat.row),
       };
-    }),
-    ...LAST.flatMap((k) => list.filter((h) => h.key === k).map(statCard)),
-  ];
+    }
+    const p = personOf(g.line);
+    const t = GC_HIGHLIGHT_TEXT[g.key];
+    return {
+      key: `gc-${g.key}`,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      style: { ...GC_STYLE[g.key], title: t.title },
+      detail: t.detail(g.line),
+    };
+  });
   return (
     <Card>
       <CardHeader title="Destaques da partida" />
       <CardContent>
-        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {cards.map(({ key, name, avatarUrl, style: s, detail }) => {
             const Icon = s.icon;
             return (
-              <li key={key} className={cn("flex items-center gap-3 rounded-lg border p-4", s.box)}>
-                <Avatar name={name} src={avatarUrl} size="lg" className="rounded-lg" />
+              <li key={key} className={cn("flex items-center gap-2.5 rounded-lg border px-2.5 py-2", s.box)}>
+                {/* No celular, sem a foto: o texto ocupa o card todo. */}
+                <Avatar name={name} src={avatarUrl} size="md" className="rounded-md max-sm:hidden" />
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-xs text-muted">
-                    <Icon className={cn("size-4 shrink-0", s.icon_)} aria-hidden /> {s.title}
+                  <div className="flex items-center gap-1 text-[11px] leading-tight text-muted">
+                    <Icon className={cn("size-3.5 shrink-0", s.icon_)} aria-hidden />
+                    <span className="sm:truncate">{s.title}</span>
                   </div>
-                  <div className="truncate font-semibold" title={name}>
+                  <div className="truncate text-sm leading-snug font-semibold" title={name}>
                     {name}
                   </div>
-                  <span className="mt-1.5 inline-block rounded-md bg-black/30 px-2 py-0.5 text-xs font-semibold tabular">
+                  <div className="text-[11px] font-semibold text-muted tabular sm:truncate" title={detail}>
                     {detail}
-                  </span>
+                  </div>
                 </div>
               </li>
             );

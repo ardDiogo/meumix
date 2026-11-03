@@ -239,3 +239,43 @@ export function gcHighlights(lines: GcLine[]): GcHighlight[] {
   ];
   return picks.flatMap(([key, line, score]) => (line && score(line) > 0 ? [{ key, line }] : []));
 }
+
+const pctText = (n: number | null) => `${Math.round(n ?? 0)}%`;
+const sec = (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}s`;
+
+/** Título e texto de cada destaque da GC (página do mix e imagem compartilhada). */
+export const GC_HIGHLIGHT_TEXT: Record<GcHighlightKey, { title: string; detail: (l: GcLine) => string }> = {
+  entry: {
+    title: "Melhor entry",
+    detail: (l) =>
+      `${l.entries.won} de ${l.entries.duels} aberturas (${pctText((l.entries.won / l.entries.duels) * 100)})`,
+  },
+  trader: {
+    title: "Melhor trader",
+    detail: (l) => `${l.trades.made} trades${l.trades.avgTime != null ? ` · ${sec(l.trades.avgTime)}` : ""}`,
+  },
+  clutch: {
+    title: "Clutchzeiro",
+    detail: (l) =>
+      `${l.clutch.won} ${l.clutch.won === 1 ? "clutch" : "clutches"}${l.clutch.biggest ? ` · maior 1v${l.clutch.biggest}` : ""}`,
+  },
+  flash: {
+    title: "Mais inimigos cegados",
+    detail: (l) => `${l.utility.flashed} cegados${l.fa ? ` · ${l.fa} flash assists` : ""}`,
+  },
+  nade: { title: "Dano com granada", detail: (l) => `${l.utility.damage} de dano · ${l.utility.grenades} granadas` },
+  aim: { title: "Melhor mira", detail: (l) => `${pctText(l.aim.accuracy)} de precisão · ${pctText(l.hsRate)} HS` },
+};
+
+/**
+ * Ordem dos destaques: MVP e os demais, depois os da GC; mais mortes
+ * (penúltimo) e lanterna (último) sempre no fim.
+ */
+export function orderHighlights<S extends { key: string }, G>(stats: S[], gc: G[]) {
+  const last = ["deaths", "worst"];
+  return [
+    ...stats.filter((h) => !last.includes(h.key)).map((h) => ({ stat: h })),
+    ...gc.map((h) => ({ gc: h })),
+    ...last.flatMap((k) => stats.filter((h) => h.key === k).map((h) => ({ stat: h }))),
+  ] as ({ stat: S; gc?: undefined } | { gc: G; stat?: undefined })[];
+}

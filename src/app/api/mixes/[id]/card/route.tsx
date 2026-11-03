@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 import { diffOf, kdrOf, matchHighlights, type HighlightKey, type StatRow } from "@/lib/match-highlights";
+import { aggregateGc, GC_HIGHLIGHT_TEXT, gcHighlights, orderHighlights, type GcHighlightKey } from "@/lib/gc-analysis";
+import { getGcMaps } from "@/services/gc-maps";
 import { mapIcon, mapName } from "@/lib/maps";
 import { seriesScore, seriesWinner } from "@/lib/stats";
 import { getMatchReport } from "@/services/match-report";
@@ -152,6 +154,16 @@ const HL: Record<HighlightKey, { title: string; color: string; detail: (r: StatR
   },
 };
 
+/** Cores dos destaques que vêm da importação da GC. */
+const GC_HL: Record<GcHighlightKey, string> = {
+  entry: "#0EA5E9",
+  trader: "#14B8A6",
+  clutch: "#D946EF",
+  flash: "#FCD34D",
+  nade: "#84CC16",
+  aim: "#6366F1",
+};
+
 /* --------------------------------- Crônica -------------------------------- */
 
 const EMOJI = /\p{Extended_Pictographic}(?:\u200d\p{Extended_Pictographic}|\ufe0f|\p{Emoji_Modifier})*/gu;
@@ -263,10 +275,11 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   const { id } = await ctx.params;
   const ds = getDataSource();
   const withChronicle = new URL(request.url).searchParams.get("cronica") !== "0";
-  const [mix, report, stored] = await Promise.all([
+  const [mix, report, stored, gcMaps] = await Promise.all([
     ds.getMix(id),
     getMatchReport(id),
     withChronicle ? getChronicle(id) : null,
+    getGcMaps(id),
   ]);
   const chronicle = stored && !stored.hidden ? stored.content : null;
   if (!mix || mix.status !== "finished" || !report?.rows.length) {
@@ -274,7 +287,32 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   }
 
   const rows = [...report.rows].sort((a, b) => b.k - a.k || b.a - a.a);
-  const highlights = matchHighlights(rows);
+  // Destaques na ordem da página: MVP primeiro, os da GC, mais mortes e lanterna no fim.
+  const gcList = gcMaps.length ? gcHighlights(aggregateGc(gcMaps)) : [];
+  const highlights = orderHighlights(matchHighlights(rows), gcList).map(({ stat, gc }) => {
+    if (stat) {
+      const h = HL[stat.key];
+      return {
+        key: stat.key,
+        title: h.title,
+        color: h.color,
+        row: stat.row as StatRow | null,
+        name: stat.row.name,
+        detail: h.detail(stat.row),
+      };
+    }
+    const row = rows.find((r) => (gc.line.userId ? r.userId === gc.line.userId : r.name === gc.line.nick)) ?? null;
+    const t = GC_HIGHLIGHT_TEXT[gc.key];
+    return {
+      key: `gc-${gc.key}`,
+      title: t.title,
+      color: GC_HL[gc.key],
+      row,
+      name: row?.name ?? gc.line.nick,
+      // Duas linhas no card ("·" vira quebra): numa só não cabe.
+      detail: t.detail(gc.line).replace(" · ", "|"),
+    };
+  });
   const winner = seriesWinner(mix);
   const score = seriesScore(mix) ?? [0, 0];
   const origin = new URL(request.url).origin;
@@ -311,7 +349,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
     100 +
     rows.length * ROW_H +
     90 +
-    Math.ceil(highlights.length / 4) * 118 +
+    Math.ceil(highlights.length / 4) * 100 +
     (chronicle ? chronicleHeight(chronicle) : 0) +
     110;
   const bgLeft =
@@ -551,37 +589,34 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
         Destaques da partida
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 12 }}>
-        {highlights.map(({ key, row }) => {
-          const h = HL[key];
+        {highlights.map(({ key, title, color, row, name, detail }) => {
+          const h = { title, color };
           return (
             <div
               key={key}
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 14,
+                gap: 12,
                 width: 241,
-                height: 106,
-                padding: "0 14px",
+                height: 88,
+                padding: "0 12px",
                 borderRadius: 14,
                 border: `1px solid ${h.color}66`,
                 background: `${h.color}1A`,
               }}
             >
-              <Avatar name={row.name} src={avatarOf.get(row.key) ?? null} size={60} />
+              <Avatar name={name} src={row ? (avatarOf.get(row.key) ?? null) : null} size={50} />
               <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
                 <span style={{ fontSize: 14, color: h.color, fontWeight: 700 }}>{h.title}</span>
-                <span style={{ fontSize: 19, fontWeight: 700, whiteSpace: "nowrap" }}>
-                  {row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name}
+                <span style={{ fontSize: 18, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {name.length > 13 ? `${name.slice(0, 12)}…` : name}
                 </span>
-                {h
-                  .detail(row)
-                  .split("|")
-                  .map((line) => (
-                    <span key={line} style={{ fontSize: 13, color: C.muted, whiteSpace: "nowrap" }}>
-                      {line}
-                    </span>
-                  ))}
+                {detail.split("|").map((line) => (
+                  <span key={line} style={{ fontSize: 13, color: C.muted, whiteSpace: "nowrap" }}>
+                    {line}
+                  </span>
+                ))}
               </div>
             </div>
           );
