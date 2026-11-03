@@ -32,11 +32,10 @@ export function ShareResult({
   chronicle?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [withChronicle, setWithChronicle] = useState(true);
   const [files, setFiles] = useState<Record<string, File>>({});
   const [loading, setLoading] = useState(false);
-  const useChronicle = !!chronicle && withChronicle;
-  const src = `/api/mixes/${matchId}/card${useChronicle ? "" : "?cronica=0"}`;
+  // A crônica (se houver e não estiver oculta) vai sempre na imagem e na mensagem.
+  const src = `/api/mixes/${matchId}/card`;
   const file = files[src] ?? null;
 
   // Baixa a imagem ao abrir: o compartilhamento precisa acontecer logo após o clique.
@@ -58,7 +57,7 @@ export function ShareResult({
   }, [open, file, src, fileName]);
 
   const link = typeof window === "undefined" ? "" : window.location.href.split("?")[0]!;
-  const message = useChronicle ? `${chronicle}\n\n${link}` : `${text}\n\nVeja as estatísticas completas: ${link}`;
+  const message = chronicle ? `${chronicle}\n\n${link}` : `${text}\n\nVeja as estatísticas completas: ${link}`;
 
   function download() {
     if (!file) return;
@@ -98,17 +97,6 @@ export function ShareResult({
         description="Card com placar, estatísticas, destaques e a crônica para mandar no grupo."
         className="max-w-lg"
       >
-        {chronicle && (
-          <label className="mb-3 flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={withChronicle}
-              onChange={(e) => setWithChronicle(e.target.checked)}
-              className="size-4 accent-[#FF6A00]"
-            />
-            Incluir a crônica na imagem e na mensagem
-          </label>
-        )}
         <div className="max-h-[55vh] overflow-y-auto rounded-md border border-border bg-bg">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img key={src} src={src} alt="Card do resultado do mix" className="w-full" />

@@ -292,7 +292,7 @@ function geralCols(withGc: boolean) {
 /**
  * Tabela "Estatísticas dos jogadores" do resultado do mix, ordenável por coluna.
  * Mix importado da GC: abas da GC (Geral, Entries, Trades, Clutch,
- * Utilitárias, Mira), escolha do mapa e o placar round a round no fim.
+ * Utilitárias, Mira), escolha do mapa e o placar round a round no topo.
  */
 export function MatchStatsTable({
   rows,
@@ -334,6 +334,15 @@ export function MatchStatsTable({
 
   return (
     <div>
+      {/* Placar round a round no topo do card. */}
+      {withGc && teams && (
+        <div className="space-y-2 border-b border-border px-4 py-4">
+          <div className="text-xs font-semibold tracking-wider text-muted uppercase">Placar round a round</div>
+          {gcMaps.map((m, i) => (
+            <RoundStrip key={`${m.gcMatchId}-${i}`} map={m} teams={teams} />
+          ))}
+        </div>
+      )}
       {withGc && (
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
           <div
@@ -446,17 +455,11 @@ export function MatchStatsTable({
           </tbody>
         </table>
       </div>
-      {withGc && teams && (
-        <div className="space-y-2 border-t border-border px-4 py-4">
-          <div className="text-xs font-semibold tracking-wider text-muted uppercase">Placar round a round</div>
-          {gcMaps.map((m, i) => (
-            <RoundStrip key={`${m.gcMatchId}-${i}`} map={m} teams={teams} />
-          ))}
-          <p className="text-xs text-subtle">
-            Dados da Gamers Club. Com mais de um mapa, contagens são somadas e rating, ADR, KAST e mira são médias pelos
-            rounds.
-          </p>
-        </div>
+      {withGc && (
+        <p className="border-t border-border px-4 py-3 text-xs text-subtle">
+          Dados da Gamers Club. Com mais de um mapa, contagens são somadas e rating, ADR, KAST e mira são médias pelos
+          rounds.
+        </p>
       )}
     </div>
   );
