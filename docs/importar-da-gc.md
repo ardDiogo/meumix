@@ -22,10 +22,11 @@ As três requisições são as mesmas que a página da GC faz ao abrir, com o lo
 
 ## Onde aparece
 
-Na página do mix (ordem: Estatísticas dos jogadores → Destaques da partida → Desempenho no mix → Crônica):
+Na página do mix (ordem: Estatísticas dos jogadores → Destaques da partida → Desempenho no mix → Análise da partida → Transmissões → Crônica):
 
 - **Estatísticas dos jogadores** (um card só): com os dados da GC, ganha as abas **Geral · Entries · Trades · Clutch · Utilitárias · Mira**, todas ordenáveis clicando na coluna. A Geral é a tabela de sempre com **Rating**, **Swing** e **HS%**; nas outras abas dá para ver **todos os mapas** (contagens somadas; rating, ADR, KAST e mira como média pelos rounds) ou um mapa só. No **placar do topo** da página, ao lado de cada mapa, o **placar round a round** de cada mapa (um quadrado por round, na cor do time que venceu; D = bomba desarmada, B = bomba explodiu), com a **virada** (quando o vencedor perdia por 5+ rounds) e a **maior sequência**.
 - **Destaques da partida** ganha 6 cards: **Melhor entry** (mais aberturas vencidas), **Melhor trader** (mais trades), **Clutchzeiro** (mais clutches vencidos), **Mais inimigos cegados**, **Dano com granada** e **Melhor mira** (maior precisão, com 10+ kills). Destaque em que ninguém pontuou não aparece. Também vão para a imagem compartilhada.
+- **Análise da partida**: um parágrafo por jogador (aba por time, vencedor primeiro, do maior rating para o menor) com dois a quatro fatos com números — melhor rating, variação de rating entre os mapas, aberturas (quem mais abriu, o pior aproveitamento do time), trades, cegados, KAST, clutches, aces, AWP — e uma dica prática (ex.: deixar a entrada para o colega que mais venceu aberturas, treinar 1 contra 2, usar mais utilitária). Montada por regras em `src/lib/match-analysis.ts`, sem IA: só cita números que estão nos dados.
 
 Mix sem os dados da GC (prints, Faceit, manual): só a tabela de sempre e os destaques de sempre.
 

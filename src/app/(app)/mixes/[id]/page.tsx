@@ -20,6 +20,9 @@ import { byMixScore } from "@/lib/match-highlights";
 import { MatchPerformance } from "@/components/mixes/match-performance";
 import { getGcMaps } from "@/services/gc-maps";
 import { aggregateGc } from "@/lib/gc-analysis";
+import { matchAnalysis } from "@/lib/match-analysis";
+import type { MapId } from "@/types/domain";
+import { MatchAnalysis } from "@/components/mixes/match-analysis";
 import { RoundDots } from "@/components/mixes/round-strip";
 import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
@@ -311,6 +314,27 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                   />
                 </CardContent>
               </Card>
+              {gcMaps.length > 0 && (
+                <Card>
+                  <CardHeader
+                    title="Análise da partida"
+                    description="Jogador por jogador: o que os números da GC mostram e uma dica para o próximo mix."
+                  />
+                  <CardContent>
+                    <MatchAnalysis
+                      teams={matchAnalysis(gcMaps, {
+                        winner,
+                        names: Object.fromEntries(report.rows.filter((r) => r.userId).map((r) => [r.userId!, r.name])),
+                        mapName: (id) => mapName(id as MapId),
+                      })}
+                      teamNames={[mix.teams[0].name, mix.teams[1].name]}
+                      avatars={Object.fromEntries(
+                        report.rows.filter((r) => r.userId).map((r) => [r.userId!, r.avatarUrl]),
+                      )}
+                    />
+                  </CardContent>
+                </Card>
+              )}
               {streamsCard}
               <ChronicleCard
                 matchId={mix.id}
