@@ -16,6 +16,7 @@ import { seriesScore, seriesWinner } from "@/lib/stats";
 import { cn } from "@/lib/utils";
 import { getMixDetail } from "@/services/queries";
 import { getMatchReport, playerAverages } from "@/services/match-report";
+import { byMixScore } from "@/lib/match-highlights";
 import { MatchPerformance } from "@/components/mixes/match-performance";
 import { getGcMaps } from "@/services/gc-maps";
 import { RoundDots } from "@/components/mixes/round-strip";
@@ -28,6 +29,7 @@ import { EditMatchDate } from "@/components/mixes/edit-match-date";
 import { getPermissions } from "@/services/auth";
 import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
+import { Avatar } from "@/components/ui/avatar";
 import { AddClipDialog } from "@/components/clips/add-clip-dialog";
 import { ClipCard } from "@/components/clips/clip-card";
 import { ImportAllstarDialog } from "@/components/clips/import-allstar-dialog";
@@ -201,6 +203,23 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 )}
                 {draw && <span className="font-semibold text-muted">Empate · </span>}
                 {team.playerIds.length} jogadores
+              </div>
+              {/* Fotos dos jogadores do time, pequenas (MVP primeiro, na ordem da pontuação do mix). */}
+              <div className={cn("mt-2 flex -space-x-1.5 sm:gap-1 sm:space-x-0", i === 1 && "justify-end")}>
+                {(report?.rows.length
+                  ? [...report.rows]
+                      .filter((r) => r.team === team.side)
+                      .sort(byMixScore)
+                      .map((r) => ({ key: r.key, name: r.name, avatarUrl: r.avatarUrl }))
+                  : team.playerIds.map((id) => {
+                      const p = players.get(id);
+                      return { key: id, name: p?.nickname ?? "Jogador", avatarUrl: p?.avatarUrl ?? null };
+                    })
+                ).map((p) => (
+                  <span key={p.key} title={p.name}>
+                    <Avatar name={p.name} src={p.avatarUrl} size="xs" className="opacity-90 ring-2 ring-surface" />
+                  </span>
+                ))}
               </div>
             </div>
           ))}
