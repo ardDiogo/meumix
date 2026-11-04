@@ -543,6 +543,9 @@ export function FinalizeForm({
                 <th className="px-3 py-2 text-center" title="Desmarque para não alterar o ELO deste jogador">
                   Calcular
                 </th>
+                <th className="px-2 py-2">
+                  <span className="sr-only">Remover</span>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -649,6 +652,21 @@ export function FinalizeForm({
                         onChange={(e) => update(r.key, { calculateElo: e.target.checked })}
                         className="size-4 accent-brand"
                       />
+                    </td>
+                    {/* Inscrito que não jogou (ou linha a mais): sai da partida, sem ELO nem estatísticas. */}
+                    <td className="px-2 py-1.5 text-center">
+                      <button
+                        type="button"
+                        aria-label={`Remover ${r.name} da partida`}
+                        title="Remover da partida (não jogou)"
+                        onClick={() => {
+                          if (confirm(`Remover ${r.name} desta partida? Ele não ganha nem perde ELO.`))
+                            setRows((list) => list.filter((x) => x.key !== r.key));
+                        }}
+                        className="rounded-md p-1.5 text-muted hover:bg-loss/10 hover:text-loss"
+                      >
+                        <Trash2 className="size-4" />
+                      </button>
                     </td>
                   </tr>
                 );
