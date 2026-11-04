@@ -645,21 +645,6 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
           )}
         </div>
 
-        {/* Desempenho no mix: largura toda, em duas colunas. */}
-        <div style={{ ...card, flexDirection: "column", marginTop: 16, padding: "16px 18px" }}>
-          <Section title="Desempenho no mix" display={display} />
-          <div style={{ display: "flex", gap: 40 }}>
-            {[perf.slice(0, Math.ceil(perf.length / 2)), perf.slice(Math.ceil(perf.length / 2))].map((col, ci) => (
-              <div key={ci} style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
-                {perfRows(col)}
-              </div>
-            ))}
-          </div>
-          <span style={{ fontSize: 11, color: C.subtle, marginTop: 8 }}>
-            comparado com a média de cada um nos outros mixes
-          </span>
-        </div>
-
         {/* MVP e lanterna + destaques */}
         <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
           {mvp && (
@@ -890,6 +875,21 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
               })}
             </div>
           ))}
+        </div>
+
+        {/* Desempenho no mix: largura toda, em duas colunas, embaixo da tabela. */}
+        <div style={{ ...card, flexDirection: "column", marginTop: 16, padding: "16px 18px" }}>
+          <Section title="Desempenho no mix" display={display} />
+          <div style={{ display: "flex", gap: 40 }}>
+            {[perf.slice(0, Math.ceil(perf.length / 2)), perf.slice(Math.ceil(perf.length / 2))].map((col, ci) => (
+              <div key={ci} style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+                {perfRows(col)}
+              </div>
+            ))}
+          </div>
+          <span style={{ fontSize: 11, color: C.subtle, marginTop: 8 }}>
+            comparado com a média de cada um nos outros mixes
+          </span>
         </div>
       </div>
 
