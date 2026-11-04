@@ -234,16 +234,20 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
             </div>
           </div>
         </div>
-        {/* Mapas lado a lado: emblema no círculo, placar e os rounds embaixo (dados da GC). */}
+        {/* Mapas lado a lado (geralmente 3 ou 4): emblema no círculo, placar e os rounds embaixo (dados da GC). */}
         <ul
           className={cn(
-            "grid divide-y divide-border border-t border-border sm:divide-x sm:divide-y-0",
+            // Linhas entre os mapas: o fundo da grade aparece no espaço de 1px entre eles.
+            "grid gap-px border-t border-border bg-border",
             mix.maps.length === 2 && "sm:grid-cols-2",
-            mix.maps.length >= 3 && "sm:grid-cols-3",
+            mix.maps.length === 3 && "sm:grid-cols-3",
+            // 4 mapas: 2×2 no tablet e uma linha só na tela grande.
+            mix.maps.length === 4 && "sm:grid-cols-2 xl:grid-cols-4",
+            mix.maps.length >= 5 && "xl:grid-cols-5",
           )}
         >
           {mix.maps.map((m, i) => (
-            <li key={m.order} className="flex min-w-0 items-center gap-3 px-4 py-2.5 sm:py-3">
+            <li key={m.order} className="flex min-w-0 items-center gap-3 bg-surface px-4 py-2.5 sm:py-3">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-surface-3 to-surface-2 ring-2 ring-brand/80 ring-offset-2 ring-offset-surface">
                 <MapIcon id={m.mapId} size={34} />
               </span>
