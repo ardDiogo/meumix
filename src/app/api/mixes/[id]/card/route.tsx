@@ -270,7 +270,6 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   const sideLabel = (side: "A" | "B") => (!winner ? "EMPATE" : winner === side ? "VENCEDOR" : "DERROTA");
   const teamName = (side: "A" | "B") => mix.teams.find((t) => t.side === side)?.name ?? `Time ${side}`;
   const when = new Date(mix.scheduledAt);
-  const day = when.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
   const date = when.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const hour = when.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
   const display = fonts.some((f) => f.name === "Chakra Petch") ? "Chakra Petch" : "Inter";
@@ -396,6 +395,19 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 display: "flex",
                 padding: "8px 14px",
                 borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.18)",
+                background: "rgba(8,9,11,0.6)",
+                fontSize: 19,
+                fontWeight: 700,
+              }}
+            >
+              {`${rounds} rounds`}
+            </span>
+            <span
+              style={{
+                display: "flex",
+                padding: "8px 14px",
+                borderRadius: 8,
                 border: `1px solid ${C.brand}`,
                 color: C.brand,
                 fontFamily: display,
@@ -407,25 +419,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
             </span>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
-          <div style={{ width: 22, height: 4, background: C.brand, display: "flex" }} />
-          <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: 4, color: C.brand }}>RESULTADO DO MIX</span>
-        </div>
-        <div
-          style={{ display: "flex", fontFamily: display, fontSize: 68, fontWeight: 700, lineHeight: 1, marginTop: 16 }}
-        >
-          <span>MIX DE&nbsp;</span>
-          <span style={{ color: C.brand }}>{day}</span>
-        </div>
-        <span style={{ fontSize: 20, color: C.muted, marginTop: 8 }}>
-          {`${mix.maps.length} ${mix.maps.length > 1 ? "mapas" : "mapa"} · ${rounds} rounds · ${rows.length} jogadores`}
-        </span>
-
         {/* Placar */}
         <div
           style={{
             ...card,
-            marginTop: 30,
+            // Sem título: a arte do site fica à mostra acima do placar.
+            marginTop: 150,
             alignItems: "center",
             justifyContent: "space-between",
             padding: "26px 34px",
