@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarClock, Clapperboard, ExternalLink, Trophy, Tv, Users } from "lucide-react";
+import { ArrowLeft, Clapperboard, ExternalLink } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -35,8 +35,7 @@ import { ClipCard } from "@/components/clips/clip-card";
 import { ImportAllstarDialog } from "@/components/clips/import-allstar-dialog";
 import { ImportTwitchButton } from "@/components/clips/import-twitch-button";
 import { TwitchStreams } from "@/components/twitch/twitch-streams";
-import { mixBroadcasts, profileTwitch, toStreamItems } from "@/services/twitch";
-import { twitchChannelUrl } from "@/lib/twitch";
+import { mixBroadcasts, toStreamItems } from "@/services/twitch";
 import { toClipViews } from "@/services/clips";
 import { allstarProfileUrl } from "@/lib/allstar";
 import { MapIcon } from "@/components/maps/map-icon";
@@ -77,14 +76,8 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
   const canSendClip = kind === "supabase" && !!session;
   const playerIds = [...new Set([...mix.teams[0].playerIds, ...mix.teams[1].playerIds])];
   // Lives e gravações da Twitch dos jogadores deste mix.
-  const [broadcasts, twitchLogins] =
-    kind === "supabase"
-      ? await Promise.all([mixBroadcasts(mix.scheduledAt, playerIds), profileTwitch(playerIds)])
-      : [[], new Map<string, string>()];
+  const broadcasts = kind === "supabase" ? await mixBroadcasts(mix.scheduledAt, playerIds) : [];
   const streams = toStreamItems(broadcasts, players);
-  const channels = [...twitchLogins]
-    .map(([id, login]) => ({ name: players.get(id)?.nickname ?? login, url: twitchChannelUrl(login) }))
-    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
   // Perfil Allstar (pelo SteamID64) de quem jogou este mix, para achar os clipes da data.
   const allstarLinks = playerIds
     .map((id) => players.get(id))
@@ -110,8 +103,6 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
 
   const score = seriesScore(mix);
   const winner = seriesWinner(mix);
-  const mvp = mix.mvpPlayerId ? players.get(mix.mvpPlayerId) : undefined;
-  const organizers = mix.organizerIds.map((id) => players.get(id)).filter((p) => p != null);
   const finished = mix.status === "finished";
   // Série empatada (ex.: 2×2 em 4 mapas): painel em cinza.
   const draw = finished && !winner && !!score;
@@ -383,62 +374,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
           )}
         </div>
 
-        <aside className={cn(report?.rows.length ? "grid items-start gap-4 md:grid-cols-2" : "space-y-4")}>
-          <Card>
-            <CardHeader title="Informações" />
-            <dl className="divide-y divide-border text-sm">
-              <InfoRow icon={Trophy} label="MVP">
-                {mvp ? (
-                  <PlayerLink player={mvp} highlight />
-                ) : (
-                  <span className="text-muted">{finished ? "Não definido" : "Após a partida"}</span>
-                )}
-              </InfoRow>
-              <InfoRow icon={CalendarClock} label="Data">
-                {formatDateTime(mix.scheduledAt)}
-              </InfoRow>
-              <InfoRow icon={Users} label="Organização">
-                {organizers.length ? (
-                  <div className="flex flex-col gap-1.5">
-                    {organizers.map((p) => (
-                      <PlayerLink key={p.id} player={p} />
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-muted">—</span>
-                )}
-              </InfoRow>
-              <InfoRow icon={Tv} label="Transmissão">
-                {channels.length ? (
-                  <div className="flex flex-wrap gap-x-3 gap-y-1">
-                    {channels.map((c) => (
-                      <a
-                        key={c.url}
-                        href={c.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-brand hover:underline"
-                      >
-                        {c.name} <ExternalLink className="size-3" />
-                      </a>
-                    ))}
-                  </div>
-                ) : mix.twitchUrl ? (
-                  <a
-                    href={mix.twitchUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-brand hover:underline"
-                  >
-                    Twitch <ExternalLink className="size-3" />
-                  </a>
-                ) : (
-                  <span className="text-muted">Sem transmissão vinculada</span>
-                )}
-              </InfoRow>
-            </dl>
-          </Card>
-
+        <aside className="space-y-4">
           <Card>
             <CardHeader
               title="Clipes e highlights"
@@ -503,25 +439,5 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
         </aside>
       </div>
     </>
-  );
-}
-
-function InfoRow({
-  icon: Icon,
-  label,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-3 px-4 py-3">
-      <Icon className="mt-0.5 size-4 shrink-0 text-subtle" />
-      <div className="min-w-0 flex-1">
-        <dt className="text-[11px] font-semibold tracking-wider text-muted uppercase">{label}</dt>
-        <dd className="mt-0.5">{children}</dd>
-      </div>
-    </div>
   );
 }
