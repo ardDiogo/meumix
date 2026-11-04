@@ -205,7 +205,7 @@ export default async function DashboardPage() {
               icon={ShieldCheck}
               label="Clutches vencidos"
               value={String(highlights.clutchesWon)}
-              detail="Quando registrados"
+              detail="Nos últimos 10 mixes (dados da GC)"
             />
             <HighlightItem
               icon={Crosshair}

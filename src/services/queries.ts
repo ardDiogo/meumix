@@ -5,6 +5,8 @@ import { aggregatePlayer, buildScoreboard, playerMixResult } from "@/lib/stats";
 import type { ID, MapId, Player } from "@/types/domain";
 import type { Highlights, PlayerMixResult, PlayerProfile, RankingPeriod, RankingRow } from "@/types/views";
 import { getDataSource } from "./index";
+import type { GcMapStored } from "@/lib/gc-api";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { playerSlug } from "@/lib/player-slug";
 
 export const RANKING_PERIODS: Record<RankingPeriod, { label: string; days: number | null }> = {
@@ -103,8 +105,22 @@ export async function getPlayerProfile(id: ID): Promise<PlayerProfile | null> {
   };
 }
 
+/** Clutches vencidos pelo jogador nos mapas importados da GC destes mixes (sem a migração 0035: 0). */
+async function gcClutchesWon(playerId: string, matchIds: string[]) {
+  const ids = matchIds.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
+  if (!ids.length) return 0;
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return 0;
+  const { data, error } = await supabase.from("match_gc_maps").select("data").in("match_id", ids);
+  if (error) return 0;
+  return (data ?? []).reduce((sum, r) => {
+    const p = (r.data as GcMapStored).players?.find((x) => x.userId === playerId);
+    return sum + (p?.clutch?.won ?? 0);
+  }, 0);
+}
+
 /** Destaques individuais com base nos mixes recentes do jogador. */
-export function getPlayerHighlights(profile: PlayerProfile, window = 10): Highlights {
+export async function getPlayerHighlights(profile: PlayerProfile, window = 10): Promise<Highlights> {
   const recent = profile.recentMixes.slice(0, window);
   const lastMvpMix = profile.recentMixes.find((r) => r.isMvp)?.mix ?? null;
   const bestRecent = [...recent].sort((a, b) => b.kills - b.deaths - (a.kills - a.deaths))[0] ?? null;
@@ -115,7 +131,13 @@ export function getPlayerHighlights(profile: PlayerProfile, window = 10): Highli
   return {
     lastMvp: lastMvpMix ? { mix: lastMvpMix, player: profile.player } : null,
     bestRecent,
-    clutchesWon: agg.clutchesWon,
+    // Clutches: os registrados no placar e os dos mapas importados da GC.
+    clutchesWon:
+      agg.clutchesWon +
+      (await gcClutchesWon(
+        profile.player.id,
+        recent.map((r) => r.mix.id),
+      ).catch(() => 0)),
     firstKills: agg.firstKills,
   };
 }
@@ -157,7 +179,7 @@ export async function getDashboard() {
   const profile = playerId ? await getPlayerProfile(playerId) : null;
   if (!profile) return { kind: ds.kind, profile: null, highlights: null, players: new Map<ID, Player>() };
   const players = await ds.listPlayers();
-  const highlights = getPlayerHighlights(profile);
+  const highlights = await getPlayerHighlights(profile);
   return { kind: ds.kind, profile, highlights, players: new Map(players.map((p) => [p.id, p])) };
 }
 

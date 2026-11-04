@@ -82,7 +82,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const ds = getDataSource();
   const kind = ds.kind;
   const { player, elo, position, totalPlayers, stats, eloHistory, recentMixes } = profile;
-  const highlights = getPlayerHighlights(profile);
+  const highlights = await getPlayerHighlights(profile);
   const series = toEloSeries(eloHistory, new Map(recentMixes.map((r) => [r.mix.id, r.mix.name])));
   const recentChange = eloChangeSince(eloHistory, new Date(ds.now().getTime() - 30 * 86_400_000));
   const steamUrl = steamProfileUrl(player.steamId);
