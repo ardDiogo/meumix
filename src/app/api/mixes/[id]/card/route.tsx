@@ -224,9 +224,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   const mvp = stats.find((h) => h.key === "mvp")?.row ?? null;
   const worst = stats.find((h) => h.key === "worst")?.row ?? null;
   // Os outros destaques (sem MVP e lanterna, que têm o card próprio), na ordem da página.
-  const gcList = gcLines.length ? gcHighlights(gcLines) : [];
+  // Na imagem, só os destaques principais (da GC, só "Mais cegados"); o resto fica na página do mix.
+  const gcList = gcLines.length ? gcHighlights(gcLines).filter((h) => h.key === "flash") : [];
   const highlights = orderHighlights(
-    stats.filter((h) => h.key !== "mvp" && h.key !== "worst"),
+    stats.filter((h) => h.key !== "mvp" && h.key !== "worst" && h.key !== "deaths"),
     gcList,
   ).map(({ stat, gc }) => {
     if (stat) {
