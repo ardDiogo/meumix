@@ -620,30 +620,6 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
               >
                 {`${signed(mvp.rp)} RP · ${fmt(kdrOf(mvp), 2)} KDR`}
               </span>
-              {worst && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    width: "100%",
-                    marginTop: "auto",
-                    paddingTop: 14,
-                    borderTop: `1px solid ${C.border}`,
-                  }}
-                >
-                  <Avatar name={worst.name} src={avatar(worst)} size={44} />
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 3, color: C.muted }}>LANTERNA</span>
-                    <span style={{ fontSize: 18, fontWeight: 700 }}>
-                      {worst.name.length > 16 ? `${worst.name.slice(0, 15)}…` : worst.name}
-                    </span>
-                    <span
-                      style={{ fontSize: 13, color: C.muted }}
-                    >{`${worst.k}K / ${worst.d}D · ${fmt(kdrOf(worst), 2)} KDR`}</span>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
@@ -677,6 +653,49 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 </div>
               ))}
             </div>
+            {/* Lanterna: menor que o MVP, maior que os outros destaques. */}
+            {worst && (
+              <div
+                style={{
+                  ...card,
+                  alignItems: "center",
+                  gap: 16,
+                  marginTop: 10,
+                  padding: "14px 18px",
+                  border: "1px solid rgba(240,82,82,0.5)",
+                  backgroundImage: "linear-gradient(90deg, rgba(240,82,82,0.2), rgba(18,20,25,0.92) 70%)",
+                }}
+              >
+                <div style={{ display: "flex", borderRadius: 14, border: `2px solid ${C.loss}` }}>
+                  <Avatar name={worst.name} src={avatar(worst)} size={72} />
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+                  <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: 3, color: C.loss }}>LANTERNA</span>
+                  <span style={{ fontFamily: display, fontSize: 28, fontWeight: 700, whiteSpace: "nowrap" }}>
+                    {worst.name.length > 18 ? `${worst.name.slice(0, 17)}…` : worst.name}
+                  </span>
+                  <span style={{ fontSize: 16, color: "#D4D4D8" }}>{`${worst.k}K / ${worst.a}A / ${worst.d}D`}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                  <span
+                    style={{
+                      display: "flex",
+                      padding: "4px 12px",
+                      borderRadius: 999,
+                      fontSize: 15,
+                      fontWeight: 700,
+                      color: C.loss,
+                      background: "rgba(240,82,82,0.14)",
+                    }}
+                  >
+                    {`${fmt(kdrOf(worst), 2)} KDR`}
+                  </span>
+                  <span
+                    style={{ fontSize: 14, color: C.muted }}
+                  >{`${fmt(worst.adr, 1)} ADR · ${signed(worst.rp)} RP`}</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
