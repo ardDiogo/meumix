@@ -340,15 +340,18 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                 </Card>
               )}
               {streamsCard}
-              <ChronicleCard
-                matchId={mix.id}
-                canManage={canManageMixes}
-                meta={{
-                  date: mix.scheduledAt.slice(0, 10),
-                  teams: { A: mix.teams[0].name, B: mix.teams[1].name },
-                  maps: mix.maps.map((m) => ({ name: mapName(m.mapId), scoreA: m.scoreA, scoreB: m.scoreB })),
-                }}
-              />
+              {/* Mix da GC: a resenha de cada jogador já está na Análise da partida. */}
+              {gcMaps.length === 0 && (
+                <ChronicleCard
+                  matchId={mix.id}
+                  canManage={canManageMixes}
+                  meta={{
+                    date: mix.scheduledAt.slice(0, 10),
+                    teams: { A: mix.teams[0].name, B: mix.teams[1].name },
+                    maps: mix.maps.map((m) => ({ name: mapName(m.mapId), scoreA: m.scoreA, scoreB: m.scoreB })),
+                  }}
+                />
+              )}
               <BolaoResult matchId={mix.id} />
             </>
           ) : finished ? (

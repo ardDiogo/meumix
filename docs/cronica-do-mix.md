@@ -1,7 +1,9 @@
 # Crônica do mix
 
-Texto bem-humorado ("edição sem dó") sobre cada mix finalizado, na página do mix, na imagem de
-compartilhamento e pronto para colar no WhatsApp.
+Texto bem-humorado ("edição sem dó") sobre cada mix finalizado, na página do mix e pronto para
+colar no WhatsApp. Nos mixes importados da GC o card da crônica não aparece na página: a resenha de
+cada jogador fica na **Análise da partida** (ver `importar-da-gc.md`); a crônica continua sendo
+gerada e vai escrita na mensagem de compartilhar.
 
 ## Como é escrita
 
