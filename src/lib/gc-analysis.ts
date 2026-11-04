@@ -126,6 +126,9 @@ export function aggregateGc(maps: GcMapStored[]): GcLine[] {
   });
 }
 
+/** Desvantagem mínima (rounds) para contar como virada: perder 0×3 no começo e ganhar não é virada. */
+export const MIN_COMEBACK = 5;
+
 export interface RoundStory {
   /** Placar depois de cada round (lado do mix). */
   scores: { a: number; b: number }[];
@@ -159,7 +162,7 @@ export function roundStory(m: GcMapStored): RoundStory {
     run = i > 0 && m.rounds[i - 1]!.w === r.w ? run + 1 : 1;
     if (run > (streak?.length ?? 0)) streak = { team: r.w, length: run, from: i - run + 2 };
   });
-  return { scores, winner, comeback: comeback && comeback.deficit >= 3 ? comeback : null, streak };
+  return { scores, winner, comeback: comeback && comeback.deficit >= MIN_COMEBACK ? comeback : null, streak };
 }
 
 export type GcHighlightKey = "entry" | "trader" | "clutch" | "flash" | "nade" | "aim";

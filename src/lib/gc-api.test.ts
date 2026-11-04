@@ -234,8 +234,18 @@ describe("análise (gc-analysis)", () => {
     assert.equal(story.winner, "B");
     assert.deepEqual(story.comeback, { from: { a: 10, b: 0 }, deficit: 10 });
     assert.deepEqual(story.streak, { team: "B", length: 13, from: 11 });
-    // Sem virada de verdade (menos de 3 rounds de desvantagem): nada.
+    // Sem virada de verdade (menos de 5 rounds de desvantagem): nada.
     assert.equal(roundStory(m1).comeback, null);
+    // Perdeu os 3 primeiros e ganhou 13×9: não é virada.
+    const early = [
+      ...Array.from({ length: 3 }, () => ({ w: "B" as const, r: "elimination", ct: "B" as const })),
+      ...Array.from({ length: 13 }, (_, i) => ({
+        w: (i < 9 ? "A" : i < 12 ? "B" : "A") as "A" | "B",
+        r: "elimination",
+        ct: "A" as const,
+      })),
+    ];
+    assert.equal(roundStory({ ...m1, rounds: early }).comeback, null);
   });
 
   it("destaques da GC: um por categoria, sem quem não pontuou", () => {
