@@ -234,34 +234,32 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
             </div>
           </div>
         </div>
+        {/* Mapas lado a lado: emblema no círculo, placar e os rounds embaixo (dados da GC). */}
         <ul
           className={cn(
-            "flex gap-2 border-t border-border px-4 py-3",
-            // Com os rounds da GC: um mapa por linha, com os rounds ao lado.
-            gcMaps.length ? "flex-col" : "flex-wrap",
+            "grid divide-y divide-border border-t border-border sm:divide-x sm:divide-y-0",
+            mix.maps.length === 2 && "sm:grid-cols-2",
+            mix.maps.length >= 3 && "sm:grid-cols-3",
           )}
         >
           {mix.maps.map((m, i) => (
-            <li key={m.order} className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <div
-                className={cn(
-                  "flex items-center gap-2 rounded-md border border-border bg-surface-2 px-3 py-1.5 text-sm",
-                  // Mesma largura em todos os mapas: os rounds ficam alinhados.
-                  gcMaps.length > 0 && "sm:w-44",
-                )}
-              >
-                <MapIcon id={m.mapId} size={20} />
-                <span className="font-medium">{mapName(m.mapId)}</span>
+            <li key={m.order} className="flex min-w-0 items-center gap-3 px-4 py-2.5 sm:py-3">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-surface-3 to-surface-2 ring-2 ring-brand/80 ring-offset-2 ring-offset-surface">
+                <MapIcon id={m.mapId} size={34} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="font-display text-sm font-bold tracking-wide uppercase">{mapName(m.mapId)}</div>
                 {m.scoreA != null && m.scoreB != null ? (
-                  <span className="text-muted tabular">
-                    <span className={m.winner === "A" ? "text-fg" : ""}>{m.scoreA}</span>–
-                    <span className={m.winner === "B" ? "text-fg" : ""}>{m.scoreB}</span>
-                  </span>
+                  <div className="font-display text-lg leading-tight font-bold text-muted tabular">
+                    <span className={m.winner === "A" ? "text-brand" : ""}>{m.scoreA}</span>
+                    <span className="mx-1 text-subtle">–</span>
+                    <span className={m.winner === "B" ? "text-brand" : ""}>{m.scoreB}</span>
+                  </div>
                 ) : (
-                  <span className="text-xs text-subtle">a jogar</span>
+                  <div className="text-xs text-subtle">a jogar</div>
                 )}
+                {gcMaps[i] && <RoundDots map={gcMaps[i]} teams={[mix.teams[0].name, mix.teams[1].name]} compact />}
               </div>
-              {gcMaps[i] && <RoundDots map={gcMaps[i]} teams={[mix.teams[0].name, mix.teams[1].name]} />}
             </li>
           ))}
         </ul>
