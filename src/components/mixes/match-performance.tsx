@@ -7,16 +7,22 @@ import type { PlayerAverage } from "@/services/match-report";
 import { FLOOR, NO_AVG, overall, statOf, toneColor, YELLOW, type Stat } from "@/lib/performance";
 import { Avatar } from "../ui/avatar";
 
-type Metric = "geral" | "kdr" | "adr" | "fk" | "kast" | "elo";
+type Metric = "geral" | "kdr" | "adr" | "fk" | "kast" | "rating" | "swing" | "elo";
 
-const METRICS: { key: Metric; label: string; digits: number; suffix?: string }[] = [
+/** `gc`: só com os dados importados da GC (GC Rating e Swing). */
+const METRICS: { key: Metric; label: string; digits: number; suffix?: string; gc?: boolean }[] = [
   { key: "geral", label: "Geral", digits: 0, suffix: "%" },
   { key: "kdr", label: "KDR", digits: 2 },
   { key: "adr", label: "ADR", digits: 1 },
   { key: "fk", label: "FK", digits: 0 },
   { key: "kast", label: "KAST", digits: 1, suffix: "%" },
+  { key: "rating", label: "Rating", digits: 2, gc: true },
+  { key: "swing", label: "Swing", digits: 1, suffix: "%", gc: true },
   { key: "elo", label: "ELO", digits: 0 },
 ];
+
+/** Base da cor (quanto é "muito" acima ou abaixo): Rating 0,5; Swing em pontos percentuais, 5. */
+const GC_FLOOR = { rating: 0.5, swing: 5 };
 
 const fmt = (n: number, digits: number) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -32,21 +38,41 @@ export function MatchPerformance({
   rows,
   averages,
   teamNames,
+  gcNow = {},
 }: {
   rows: StatRow[];
   averages: Record<string, PlayerAverage>;
   teamNames: [string, string];
+  /** GC Rating e Swing deste mix por jogador (mix importado da GC). */
+  gcNow?: Record<string, { rating: number | null; swing: number | null }>;
 }) {
   const [metric, setMetric] = useState<Metric>("geral");
+  const hasGc = Object.keys(gcNow).length > 0;
+  const metrics = METRICS.filter((m) => !m.gc || hasGc);
   const spec = METRICS.find((m) => m.key === metric)!;
   const elo = metric === "elo";
   const geral = metric === "geral";
-  // Geral e ELO: barra a partir do centro (positivo à direita, negativo à esquerda).
-  const centered = elo || geral;
+  const swing = metric === "swing";
+  const gcMetric = metric === "rating" || swing;
+  // Geral, Swing e ELO: barra a partir do centro (positivo à direita, negativo à esquerda).
+  const centered = elo || geral || swing;
   const avgFor = (r: StatRow) => (r.userId ? averages[r.userId] : undefined);
-  const avgOf = (r: StatRow) => (centered ? null : (avgFor(r)?.[metric as Stat] ?? null));
+  // Swing em pontos percentuais (0,021 → 2,1).
+  const gcValue = (v: number | null | undefined) => (v == null ? null : swing ? v * 100 : v);
+  const avgOf = (r: StatRow) =>
+    gcMetric
+      ? gcValue(avgFor(r)?.[metric as "rating" | "swing"])
+      : centered
+        ? null
+        : (avgFor(r)?.[metric as Stat] ?? null);
   const valueOf = (r: StatRow) =>
-    elo ? (r.eloDelta ?? null) : geral ? (overall(r, avgFor(r))?.value ?? null) : statOf(r, metric as Stat);
+    elo
+      ? (r.eloDelta ?? null)
+      : geral
+        ? (overall(r, avgFor(r))?.value ?? null)
+        : gcMetric
+          ? gcValue(r.userId ? gcNow[r.userId]?.[metric as "rating" | "swing"] : null)
+          : statOf(r, metric as Stat);
   // Ordem: quem mais passou da própria média primeiro; sem média (estreia,
   // convidado) vai para o fim, pelo valor. No ELO, pelo ganho.
   const diffOf = (x: { v: number | null; avg: number | null }) => (x.v != null && x.avg != null ? x.v - x.avg : null);
@@ -59,7 +85,7 @@ export function MatchPerformance({
         (b.v ?? -Infinity) - (a.v ?? -Infinity) ||
         a.r.name.localeCompare(b.r.name),
     );
-  const scale = Math.max(...items.flatMap((x) => [Math.abs(x.v ?? 0), x.avg ?? 0]), centered ? 1 : 0.01);
+  const scale = Math.max(...items.flatMap((x) => [Math.abs(x.v ?? 0), Math.abs(x.avg ?? 0)]), centered ? 1 : 0.01);
   const name = (r: StatRow) => r.profileNick ?? r.name;
 
   return (
@@ -70,7 +96,7 @@ export function MatchPerformance({
           aria-label="Estatística"
           className="inline-flex max-w-full overflow-x-auto rounded-md border border-border bg-surface p-0.5"
         >
-          {METRICS.map((m) => (
+          {metrics.map((m) => (
             <button
               key={m.key}
               type="button"
@@ -132,7 +158,9 @@ export function MatchPerformance({
               ? v / 100
               : null
             : diff != null
-              ? diff / Math.max(avg!, FLOOR[metric as Stat])
+              ? gcMetric
+                ? diff / (swing ? GC_FLOOR.swing : Math.max(avg!, GC_FLOOR.rating))
+                : diff / Math.max(avg!, FLOOR[metric as Stat])
               : null;
           const color = rel != null ? toneColor(rel) : NO_AVG;
           const label =
@@ -143,7 +171,7 @@ export function MatchPerformance({
                   : "convidado"
                 : "—"
               : centered
-                ? `${signed(v, 0)}${spec.suffix ?? ""}`
+                ? `${signed(v, spec.digits)}${spec.suffix ?? ""}`
                 : `${fmt(v, spec.digits)}${spec.suffix ?? ""}`;
           // Geral: o detalhe de cada estatística ao passar o mouse.
           const breakdown = geral
@@ -174,6 +202,12 @@ export function MatchPerformance({
                 {centered ? (
                   <>
                     <span className="absolute inset-y-0 left-1/2 w-px bg-border-strong" />
+                    {swing && avg != null && (
+                      <span
+                        className="absolute -inset-y-1 z-10 w-0.5 -translate-x-1/2 rounded-full bg-fg"
+                        style={{ left: `${50 + (avg / scale) * 50}%` }}
+                      />
+                    )}
                     {v != null && v !== 0 && (
                       <span
                         className={cn(
@@ -222,11 +256,11 @@ export function MatchPerformance({
                         ? "text-subtle"
                         : "text-fg",
                   )}
-                  style={geral && v != null ? { color } : undefined}
+                  style={(geral || swing) && v != null ? { color } : undefined}
                 >
                   {label}
                 </span>
-                {!centered && (
+                {(!centered || swing) && (
                   <>
                     {" "}
                     {diff != null ? (

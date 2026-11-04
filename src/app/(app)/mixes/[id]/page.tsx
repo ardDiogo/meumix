@@ -19,6 +19,7 @@ import { getMatchReport, playerAverages } from "@/services/match-report";
 import { byMixScore } from "@/lib/match-highlights";
 import { MatchPerformance } from "@/components/mixes/match-performance";
 import { getGcMaps } from "@/services/gc-maps";
+import { aggregateGc } from "@/lib/gc-analysis";
 import { RoundDots } from "@/components/mixes/round-strip";
 import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
@@ -302,6 +303,11 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                     rows={report.rows}
                     averages={averages}
                     teamNames={[mix.teams[0].name, mix.teams[1].name]}
+                    gcNow={Object.fromEntries(
+                      aggregateGc(gcMaps)
+                        .filter((l) => l.userId)
+                        .map((l) => [l.userId!, { rating: l.rating, swing: l.swing }]),
+                    )}
                   />
                 </CardContent>
               </Card>

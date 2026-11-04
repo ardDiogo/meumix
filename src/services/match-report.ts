@@ -65,7 +65,12 @@ export interface PlayerAverage {
   adr: number | null;
   fk: number;
   kast: number | null;
+  /** GC Rating e Swing médios nos outros mixes importados da GC (pelos rounds); null sem nenhum. */
+  rating?: number | null;
+  swing?: number | null;
 }
+
+type GcPlayerRow = { userId: string | null; rating: number | null; swing: number | null };
 
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
@@ -78,6 +83,22 @@ export async function playerAverages(matchId: string, userIds: string[]): Promis
     .select("user_id, kills, deaths, first_kills, adr, kast")
     .in("user_id", userIds)
     .neq("match_id", matchId);
+  // Rating e Swing: dos outros mixes importados da GC (sem a migração 0035, ficam sem).
+  const { data: gcRows } = await supabase.from("match_gc_maps").select("data").neq("match_id", matchId);
+  const gcAcc = new Map<string, { rating: number; swing: number; rounds: number }>();
+  const wanted = new Set(userIds);
+  for (const g of gcRows ?? []) {
+    const m = g.data as { rounds?: unknown[]; scoreA?: number; scoreB?: number; players?: GcPlayerRow[] };
+    const rounds = m.rounds?.length || (m.scoreA ?? 0) + (m.scoreB ?? 0);
+    for (const p of m.players ?? []) {
+      if (!p.userId || !wanted.has(p.userId) || p.rating == null || !rounds) continue;
+      const a = gcAcc.get(p.userId) ?? { rating: 0, swing: 0, rounds: 0 };
+      a.rating += p.rating * rounds;
+      a.swing += (p.swing ?? 0) * rounds;
+      a.rounds += rounds;
+      gcAcc.set(p.userId, a);
+    }
+  }
   const byUser = new Map<string, NonNullable<typeof data>>();
   for (const r of data ?? []) byUser.set(r.user_id as string, [...(byUser.get(r.user_id as string) ?? []), r]);
   return Object.fromEntries(
@@ -93,6 +114,8 @@ export async function playerAverages(matchId: string, userIds: string[]): Promis
           adr: mean(nums("adr")),
           fk: mean(rows.map((r) => r.first_kills ?? 0)) ?? 0,
           kast: mean(nums("kast")),
+          rating: gcAcc.has(id) ? gcAcc.get(id)!.rating / gcAcc.get(id)!.rounds : null,
+          swing: gcAcc.has(id) ? gcAcc.get(id)!.swing / gcAcc.get(id)!.rounds : null,
         },
       ];
     }),
