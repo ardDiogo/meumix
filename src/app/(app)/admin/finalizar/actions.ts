@@ -11,6 +11,7 @@ import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { notifyMixResult } from "@/services/notify";
 import { generateChronicle } from "@/services/chronicle";
+import { generateAnalysis } from "@/services/match-analysis";
 import type { GcMapStored } from "@/lib/gc-api";
 
 export interface FinalizeMap {
@@ -153,10 +154,11 @@ export async function finalizeMix(input: {
 
   // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
   await recomputeBadgesSafely();
-  // Depois de responder: avisos no celular e a crônica do mix (IA ou modelo pronto).
+  // Depois de responder: avisos no celular, a crônica do mix (IA ou modelo pronto) e a análise (IA, mix da GC).
   after(async () => {
     await notifyMixResult(data as string);
     await generateChronicle(data as string, session!.id);
+    if (gcMaps.length) await generateAnalysis(data as string, session!.id);
   });
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
     revalidatePath(path, "layout");

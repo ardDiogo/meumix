@@ -22,6 +22,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.delete_match": "Excluiu mix finalizado",
   "admin.match_date": "Alterou a data do mix",
   "admin.chronicle": "Gerou ou editou a crônica do mix",
+  "admin.analysis": "Gerou a análise da partida pela IA",
   "admin.schedule_create": "Criou mix",
   "admin.schedule_end": "Encerrou mix",
   "admin.set_role": "Alterou papel (admin)",

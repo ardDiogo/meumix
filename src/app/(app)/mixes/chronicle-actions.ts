@@ -7,6 +7,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { generateChronicle } from "@/services/chronicle";
+import { generateAnalysis } from "@/services/match-analysis";
 
 export type ChronicleResult = { ok: boolean; message: string };
 
@@ -79,4 +80,16 @@ export async function setChronicleHidden(matchId: string, hidden: boolean): Prom
   if (error) return { ok: false, message: "Não foi possível salvar." };
   refresh();
   return { ok: true, message: hidden ? "Crônica ocultada." : "Crônica visível de novo." };
+}
+
+/** Escreve (ou reescreve) a análise da partida pela IA. */
+export async function regenerateAnalysis(matchId: string): Promise<ChronicleResult> {
+  const session = await getSession();
+  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores." };
+  if (!validId(matchId)) return { ok: false, message: "Mix inválido." };
+  const r = await generateAnalysis(matchId, session!.id);
+  if (!r.ok) return { ok: false, message: r.message };
+  await audit({ action: "admin.analysis", outcome: "success", actorId: session!.id, detail: { matchId } });
+  refresh();
+  return { ok: true, message: "Análise escrita pela IA." };
 }

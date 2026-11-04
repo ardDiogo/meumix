@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { GcMapStored } from "./gc-api";
-import { joinFacts, matchAnalysis } from "./match-analysis";
+import { analysisSheet, checkAiAnalysis, joinFacts, matchAnalysis } from "./match-analysis";
 
 type P = GcMapStored["players"][number];
 const player = (userId: string, team: "A" | "B", extra: Partial<P> = {}): P => ({
@@ -102,6 +102,54 @@ describe("matchAnalysis", () => {
     const barker = teams[1]!.players[0]!;
     assert.match(joinFacts(barker.facts), /jogou de AWP no Ancient/);
     assert.equal(barker.tip, "Para quem segura a AWP, abrir o round é o trabalho principal.");
+  });
+
+  const sheet = analysisSheet([m1, m2], {
+    winner: "A",
+    teams: { A: "Time trem", B: "Time barker" },
+    mapName: names,
+    names: { trem: "As vezes sei la" },
+  });
+
+  it("ficha da IA com os números de cada jogador", () => {
+    assert.deepEqual(
+      sheet.players.map((p) => p.id),
+      ["j1", "j2", "j3", "j4"],
+    );
+    const trem = sheet.players[0]!;
+    assert.equal(trem.name, "As vezes sei la");
+    assert.ok(trem.facts.includes("rating 1,30 no Inferno, arma principal AK-47"));
+    assert.ok(trem.facts.some((f) => /venceu 4 de 13 duelos de abertura \(31%\) \(o pior/.test(f)));
+    assert.match(trem.hint!, /kajura/);
+    assert.ok(sheet.context.includes("Inferno: Time trem 13 × 9 Time barker"));
+  });
+
+  it("aceita o texto da IA só sem número inventado", () => {
+    const ok = {
+      text: "Fechou com 1,28 de rating, mas venceu só 4 de 13 aberturas.",
+      tip: "Deixe a entrada para o kajura, que venceu 12 de 21.",
+      roast: "Rating de 1,28 e 4 de 13 aberturas: brilhou no 1v2 e tropeçou na porta.",
+    };
+    const r = checkAiAnalysis(
+      {
+        players: [
+          { id: "j1", ...ok },
+          { id: "j2", text: "Rating 1,15 e 21 aberturas.", tip: "Siga abrindo.", roast: "" },
+          { id: "j3", text: "Cegou 66 inimigos com 99 kills.", tip: "x", roast: "y" },
+          { id: "j4", text: "Jogou de AWP no Ancient.", tip: "Abra o round.", roast: "Mira de 7 dias." },
+        ],
+      },
+      sheet,
+    );
+    assert.ok(r);
+    assert.deepEqual(r!.trem, ok);
+    assert.equal(r!.paiked, undefined, "99 kills não está na ficha");
+    assert.equal(r!.barker, undefined, "7 não está na ficha");
+    assert.ok(r!.kajura, "1,15 é o rating do kajura na série");
+    assert.equal(checkAiAnalysis({ players: [{ id: "j1", ...ok }] }, sheet), null, "menos da metade");
+    const merged = matchAnalysis([m1, m2], { winner: "A", mapName: names, ai: r });
+    assert.equal(merged[0]!.players[0]!.text, ok.text);
+    assert.equal(merged[0]!.players[0]!.roast, ok.roast);
   });
 
   it("sem dados da GC, nada", () => {
