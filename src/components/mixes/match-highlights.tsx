@@ -110,14 +110,23 @@ type CardItem = {
   detail: string;
 };
 
+/**
+ * Destaques no mesmo layout da imagem compartilhada: MVP em destaque à
+ * esquerda, os outros destaques em grade e o lanterna num card médio embaixo.
+ */
 export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMapStored[] }) {
   const list = matchHighlights(rows);
   if (!list.length) return null;
+  const mvp = list.find((h) => h.key === "mvp")?.row ?? null;
+  const worst = list.find((h) => h.key === "worst")?.row ?? null;
   // Importado da GC: os 6 destaques novos, com o nome e a foto do jogador do mix.
   const gcList = gc.length ? gcHighlights(aggregateGc(gc)) : [];
   const personOf = (l: GcLine) =>
     rows.find((r) => (l.userId ? r.userId === l.userId : r.name === l.nick)) ?? { name: l.nick, avatarUrl: null };
-  const cards: CardItem[] = orderHighlights(list, gcList).map(({ stat, gc: g }) => {
+  const cards: CardItem[] = orderHighlights(
+    list.filter((h) => h.key !== "mvp" && h.key !== "worst"),
+    gcList,
+  ).map(({ stat, gc: g }) => {
     if (stat) {
       const st = STYLE[stat.key];
       return {
@@ -138,36 +147,84 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
       detail: t.detail(g.line),
     };
   });
+  const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
+
   return (
     <Card>
       <CardHeader title="Destaques da partida" />
-      <CardContent>
-        <ul className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {cards.map(({ key, name, avatarUrl, style: s, detail }) => {
-            const Icon = s.icon;
-            return (
+      <CardContent className="grid gap-3 md:grid-cols-[15rem_1fr]">
+        {mvp && (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-purple-500/55 bg-gradient-to-b from-purple-500/25 via-surface/90 to-surface px-4 py-5 text-center shadow-[0_0_28px_-8px] shadow-purple-500/50">
+            <span className="text-[11px] font-bold tracking-[0.25em] text-purple-400 uppercase">MVP da partida</span>
+            <Avatar
+              name={mvp.name}
+              src={mvp.avatarUrl}
+              size="xl"
+              className="mt-3 size-24 rounded-2xl border-[3px] border-purple-500 text-3xl"
+            />
+            <span className="mt-3 max-w-full truncate font-display text-2xl font-bold" title={mvp.name}>
+              {mvp.name}
+            </span>
+            <span className="text-sm text-muted tabular">
+              {mvp.k}K / {mvp.a}A / {mvp.d}D
+            </span>
+            <span className="mt-2 rounded-full bg-purple-500/15 px-3 py-0.5 text-xs font-bold text-purple-400 tabular">
+              {signed(mvp.rp)} RP · {fmt2(kdrOf(mvp))} KDR
+            </span>
+          </div>
+        )}
+        <div className="min-w-0 space-y-2.5">
+          <ul className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+            {cards.map(({ key, name, avatarUrl, style: s, detail }) => (
               <li
                 key={key}
-                className={cn("flex items-center gap-2 rounded-lg border px-2 py-2 sm:gap-2.5 sm:px-2.5", s.box)}
+                className={cn("flex items-center gap-2 rounded-lg border px-2 py-2 sm:gap-2.5 sm:px-3", s.box)}
               >
                 {/* Foto menor no celular, para sobrar espaço para o texto. */}
                 <Avatar name={name} src={avatarUrl} size="sm" className="shrink-0 rounded-md sm:size-10" />
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1 text-[11px] leading-tight text-muted">
-                    <Icon className={cn("size-3.5 shrink-0", s.icon_)} aria-hidden />
-                    <span className="sm:truncate">{s.title}</span>
+                  <div className={cn("text-[11px] leading-tight font-semibold sm:truncate sm:text-xs", s.icon_)}>
+                    {s.title}
                   </div>
-                  <div className="truncate text-sm leading-snug font-semibold" title={name}>
+                  <div className="truncate text-sm leading-snug font-bold sm:text-base" title={name}>
                     {name}
                   </div>
-                  <div className="text-[11px] font-semibold text-muted tabular sm:truncate" title={detail}>
+                  <div className="truncate text-[11px] text-muted tabular sm:text-xs" title={detail}>
                     {detail}
                   </div>
                 </div>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+          {worst && (
+            <div className="flex items-center gap-3 rounded-xl border border-loss/50 bg-gradient-to-r from-loss/20 via-surface/90 to-surface px-3 py-3 sm:gap-4 sm:px-4">
+              <Avatar
+                name={worst.name}
+                src={worst.avatarUrl}
+                size="lg"
+                className="size-14 shrink-0 rounded-xl border-2 border-loss sm:size-16"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="text-[11px] font-bold tracking-[0.25em] text-loss uppercase">Lanterna</div>
+                <div className="truncate font-display text-xl font-bold" title={worst.name}>
+                  {worst.name}
+                </div>
+                <div className="text-sm text-muted tabular">
+                  {worst.k}K / {worst.a}A / {worst.d}D
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className="rounded-full bg-loss/15 px-2.5 py-0.5 text-sm font-bold text-loss tabular">
+                  {fmt2(kdrOf(worst))} KDR
+                </span>
+                <span className="text-xs text-muted tabular">
+                  {worst.adr != null ? `${worst.adr.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ADR · ` : ""}
+                  {signed(worst.rp)} RP
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
