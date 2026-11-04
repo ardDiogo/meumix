@@ -60,7 +60,7 @@ const STYLE: Record<
     icon: Scale,
     box: "border-emerald-500/30 bg-emerald-500/10",
     icon_: "text-emerald-400",
-    detail: (r) => `${fmt2(kdrOf(r))} KDR (${r.k}/${r.d})`,
+    detail: (r) => `${fmt2(kdrOf(r))} KDR`,
   },
   fk: {
     title: "Mais first kills",
@@ -119,12 +119,12 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
   if (!list.length) return null;
   const mvp = list.find((h) => h.key === "mvp")?.row ?? null;
   const worst = list.find((h) => h.key === "worst")?.row ?? null;
-  // Importado da GC: os 6 destaques novos, com o nome e a foto do jogador do mix.
-  const gcList = gc.length ? gcHighlights(aggregateGc(gc)) : [];
+  // Os mesmos cards da imagem compartilhada: da GC, só "Mais cegados".
+  const gcList = gc.length ? gcHighlights(aggregateGc(gc)).filter((h) => h.key === "flash") : [];
   const personOf = (l: GcLine) =>
     rows.find((r) => (l.userId ? r.userId === l.userId : r.name === l.nick)) ?? { name: l.nick, avatarUrl: null };
   const cards: CardItem[] = orderHighlights(
-    list.filter((h) => h.key !== "mvp" && h.key !== "worst"),
+    list.filter((h) => h.key !== "mvp" && h.key !== "worst" && h.key !== "deaths"),
     gcList,
   ).map(({ stat, gc: g }) => {
     if (stat) {
@@ -143,7 +143,7 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
       key: `gc-${g.key}`,
       name: p.name,
       avatarUrl: p.avatarUrl,
-      style: { ...GC_STYLE[g.key], title: t.title },
+      style: { ...GC_STYLE[g.key], title: g.key === "flash" ? "Mais cegados" : t.title },
       detail: t.detail(g.line),
     };
   });
