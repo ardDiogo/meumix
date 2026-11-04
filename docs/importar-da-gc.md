@@ -32,7 +32,7 @@ Na página do mix (ordem: Estatísticas dos jogadores → Destaques da partida �
   - Sem IA (ou antes de gerar): versão por regras, com fatos e dica, sem resenha.
   - Guardada em `mix_analyses` (migração `0037_mix_analyses.sql`, só o servidor lê e escreve). Quem exclui a conta leva junto as análises dos mixes que jogou.
 
-Na página **Estatísticas**, o card **Dados da GC** soma todos os mapas importados por jogador (convidados ficam de fora), com as mesmas abas: Geral (rating, swing, K/A/D, KDR, ADR, KAST, HS%), Entries, Trades, Clutch, Utilitárias e Mira (com a arma principal). Toda aba mostra mapas e rounds de cada um e ordena clicando na coluna.
+Na página **Estatísticas**, abaixo dos Líderes, a seção **Dados da GC** soma todos os mapas importados por jogador (convidados ficam de fora; mínimo de 3 mapas) e mostra o top 5 em cards no mesmo estilo dos Líderes: rating, swing, aberturas vencidas, sucesso na abertura (mínimo de 10 duelos), trades, clutches vencidos, dano com granada, inimigos cegados, flash assists, granadas, precisão, HS%, head acc., abates por round e a arma principal mais usada.
 
 Mix sem os dados da GC (prints, Faceit, manual): só a tabela de sempre e os destaques de sempre.
 
