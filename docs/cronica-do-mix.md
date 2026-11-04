@@ -37,7 +37,7 @@ Testes: `npm run test:cronica`.
 - **Copiar para o WhatsApp**: texto formatado com placar, mapas, tópicos e link.
 - **Compartilhar resultado**: a imagem vai **sem** a crônica; a crônica (se houver e não estiver
   oculta) vai **escrita** na mensagem que acompanha a imagem. Para tirar a crônica da mensagem, o
-  admin oculta a crônica. (`?cronica=1` na rota da imagem ainda gera com ela.)
+  admin oculta a crônica.
 - Os emojis da imagem vêm do Twemoji (jsDelivr); sem acesso, viram marcadores laranja e a imagem
   sai do mesmo jeito.
 
