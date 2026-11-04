@@ -100,12 +100,19 @@ const initials = (name: string) =>
 function Avatar({ name, src, size }: { name: string; src: string | null; size: number }) {
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} width={size} height={size} style={{ borderRadius: size / 6, objectFit: "cover" }} alt="" />
+    <img
+      src={src}
+      width={size}
+      height={size}
+      style={{ borderRadius: size / 6, objectFit: "cover", flexShrink: 0 }}
+      alt=""
+    />
   ) : (
     <div
       style={{
         width: size,
         height: size,
+        flexShrink: 0,
         borderRadius: size / 6,
         background: C.surface2,
         border: `1px solid ${C.border}`,
@@ -137,11 +144,11 @@ const COLS: { label: string; width: number; gc?: boolean; cell: (r: Row) => Cell
   { label: "K", width: 56, cell: (r) => ({ text: String(r.k), color: C.win, bold: true, box: C.win }) },
   { label: "A", width: 40, cell: (r) => ({ text: String(r.a), color: "#D4D4D8" }) },
   { label: "D", width: 56, cell: (r) => ({ text: String(r.d), color: C.loss, bold: true, box: C.loss }) },
-  { label: "DIFF", width: 52, cell: (r) => ({ text: signed(diffOf(r)), color: tone(diffOf(r)) }) },
-  { label: "ADR", width: 62, cell: (r) => ({ text: fmt(r.adr, 1) }) },
-  { label: "KDR", width: 56, cell: (r) => ({ text: fmt(kdrOf(r), 2), bold: true }) },
-  { label: "KAST", width: 58, cell: (r) => ({ text: r.kast == null ? "-" : `${fmt(r.kast)}%` }) },
-  { label: "HS%", width: 54, gc: true, cell: (r) => ({ text: r.hs == null ? "-" : `${fmt(r.hs)}%` }) },
+  { label: "DIFF", width: 56, cell: (r) => ({ text: signed(diffOf(r)), color: tone(diffOf(r)) }) },
+  { label: "ADR", width: 68, cell: (r) => ({ text: fmt(r.adr, 1) }) },
+  { label: "KDR", width: 60, cell: (r) => ({ text: fmt(kdrOf(r), 2), bold: true }) },
+  { label: "KAST", width: 64, cell: (r) => ({ text: r.kast == null ? "-" : `${fmt(r.kast)}%` }) },
+  { label: "HS%", width: 62, gc: true, cell: (r) => ({ text: r.hs == null ? "-" : `${fmt(r.hs)}%` }) },
   { label: "FA", width: 36, cell: (r) => ({ text: String(r.fa) }) },
   { label: "MK", width: 40, cell: (r) => ({ text: String(r.mk) }) },
   { label: "FK", width: 38, cell: (r) => ({ text: String(r.fk) }) },
@@ -237,7 +244,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
     const t = GC_HIGHLIGHT_TEXT[gc.key];
     return {
       key: `gc-${gc.key}`,
-      title: t.title,
+      // Título curto no card da imagem (o nome inteiro não cabe com a fonte maior).
+      title: gc.key === "flash" ? "Mais cegados" : t.title,
       color: GC_HL[gc.key],
       row,
       name: row?.name ?? gc.line.nick,
@@ -286,7 +294,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   const perfScale = Math.max(...perf.map((p) => Math.abs(p.v ?? 0)), 1);
 
   // Mais de 3 mapas, 10 jogadores ou 12 destaques: a imagem cresce para caber.
-  const ROW_H = 44;
+  const ROW_H = 50;
   const height =
     HEIGHT +
     Math.max(0, mix.maps.length - 3) * 44 +
@@ -424,7 +432,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
           style={{
             ...card,
             // Sem título: a arte do site fica à mostra acima do placar.
-            marginTop: 150,
+            marginTop: 40,
             alignItems: "center",
             justifyContent: "space-between",
             padding: "26px 34px",
@@ -514,20 +522,20 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
             <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
               {perf.map(({ r, v }) => {
                 const color = v == null ? NO_AVG : toneColor(v / 100);
-                const w = v == null ? 0 : Math.max((Math.abs(v) / perfScale) * 74, 2);
+                const w = v == null ? 0 : Math.max((Math.abs(v) / perfScale) * 64, 2);
                 return (
-                  <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 8, height: 19 }}>
-                    <Avatar name={r.name} src={avatar(r)} size={19} />
-                    <span style={{ width: 96, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 8, height: 23 }}>
+                    <Avatar name={r.name} src={avatar(r)} size={22} />
+                    <span style={{ width: 104, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>
                       {r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name}
                     </span>
                     {/* Barra a partir do centro: à direita acima da média, à esquerda abaixo. */}
-                    <div style={{ display: "flex", width: 150, height: 10, position: "relative" }}>
+                    <div style={{ display: "flex", width: 130, height: 12, position: "relative" }}>
                       <div
                         style={{
                           display: "flex",
                           position: "absolute",
-                          left: 74,
+                          left: 64,
                           top: -2,
                           width: 1,
                           height: 14,
@@ -540,9 +548,9 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                             display: "flex",
                             position: "absolute",
                             top: 0,
-                            height: 10,
+                            height: 12,
                             width: w,
-                            left: v > 0 ? 75 : 74 - w,
+                            left: v > 0 ? 65 : 64 - w,
                             borderRadius: 2,
                             background: color,
                           }}
@@ -554,7 +562,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                         display: "flex",
                         justifyContent: "flex-end",
                         width: 56,
-                        fontSize: 13,
+                        fontSize: 15,
                         fontWeight: 700,
                         color: v == null ? C.subtle : color,
                       }}
@@ -648,7 +656,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                     alignItems: "center",
                     gap: 10,
                     width: 221,
-                    height: 72,
+                    height: 80,
                     padding: "0 12px",
                     borderRadius: 12,
                     border: `1px solid ${color}73`,
@@ -657,12 +665,12 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 >
                   <Avatar name={name} src={avatar(row)} size={40} />
                   <div style={{ display: "flex", flexDirection: "column" }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 700, color, whiteSpace: "nowrap" }}>{title}</span>
-                    <span style={{ fontSize: 17, fontWeight: 700, whiteSpace: "nowrap" }}>
-                      {name.length > 13 ? `${name.slice(0, 12)}…` : name}
+                    <span style={{ fontSize: 14, fontWeight: 700, color, whiteSpace: "nowrap" }}>{title}</span>
+                    <span style={{ fontSize: 19, fontWeight: 700, whiteSpace: "nowrap" }}>
+                      {name.length > 12 ? `${name.slice(0, 11)}…` : name}
                     </span>
-                    <span style={{ fontSize: 12.5, color: C.muted, whiteSpace: "nowrap" }}>
-                      {detail.length > 24 ? `${detail.slice(0, 23)}…` : detail}
+                    <span style={{ fontSize: 14, color: C.muted, whiteSpace: "nowrap" }}>
+                      {detail.length > 22 ? `${detail.slice(0, 21)}…` : detail}
                     </span>
                   </div>
                 </div>
@@ -704,7 +712,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
             style={{
               display: "flex",
               padding: "10px 18px",
-              fontSize: 12.5,
+              fontSize: 14,
               fontWeight: 700,
               letterSpacing: 1,
               color: C.muted,
@@ -726,7 +734,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 alignItems: "center",
                 height: ROW_H,
                 padding: "0 18px",
-                fontSize: 18,
+                fontSize: 21,
                 borderTop: "1px solid rgba(42,45,52,0.7)",
                 background: idx % 2 ? "rgba(255,255,255,0.015)" : "transparent",
               }}
@@ -736,7 +744,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 <div
                   style={{ display: "flex", width: 5, height: 26, borderRadius: 3, background: sideColor(r.team) }}
                 />
-                <Avatar name={r.name} src={avatar(r)} size={30} />
+                <Avatar name={r.name} src={avatar(r)} size={34} />
                 <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
                   {r.name.length > 18 ? `${r.name.slice(0, 17)}…` : r.name}
                 </span>
@@ -768,7 +776,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                         // Só K e D têm a caixinha (o gerador não aceita estilo vazio).
                         ...(v.box
                           ? {
-                              minWidth: 44,
+                              minWidth: 48,
                               padding: "2px 0",
                               borderRadius: 7,
                               border: `1px solid ${v.box}59`,
