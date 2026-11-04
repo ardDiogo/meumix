@@ -95,14 +95,23 @@ const BASE_COLS: Col[] = [
 const pctOf = (part: number, total: number) => (total ? (part / total) * 100 : null);
 const pctText = (n: number | null) => (n == null ? "-" : `${fmt(n)}%`);
 const ratingTone = (r: number | null) => (r == null ? "" : r >= 1.1 ? "text-win" : r <= 0.9 ? "text-loss" : "");
+/** Coluna que só lê os dados da GC (serve também para a tabela da página Estatísticas). */
+export type GcCol = {
+  key: string;
+  label: string;
+  title?: string;
+  value: (r: { gc?: GcLine }) => number | null;
+  render?: (r: { gc?: GcLine }) => React.ReactNode;
+};
+
 /** Coluna da GC: sem dados da GC para o jogador, "-" e vai para o fim na ordenação. */
-const gcCol = (
+export const gcCol = (
   key: string,
   label: string,
   value: (g: GcLine) => number | null,
   render?: (g: GcLine) => React.ReactNode,
   title?: string,
-): Col => ({
+): GcCol => ({
   key,
   label,
   title,
@@ -110,14 +119,14 @@ const gcCol = (
   render: (r) => (r.gc ? render ? render(r.gc) : (value(r.gc) ?? "-") : <span className="text-subtle">-</span>),
 });
 
-const RATING = gcCol(
+export const RATING = gcCol(
   "rating",
   "Rating",
   (g) => g.rating,
   (g) => <span className={cn("font-display font-bold", ratingTone(g.rating))}>{fmt(g.rating, 2)}</span>,
   "GC Rating (média dos mapas, pelos rounds)",
 );
-const SWING = gcCol(
+export const SWING = gcCol(
   "swing",
   "Swing",
   (g) => g.swing,
@@ -129,7 +138,7 @@ const SWING = gcCol(
     ),
   "Quanto o jogador mudou, em média, a chance de vitória do time por round",
 );
-const HS = gcCol(
+export const HS = gcCol(
   "hs",
   "HS%",
   (g) => g.hsRate,
@@ -137,11 +146,10 @@ const HS = gcCol(
   "Kills com headshot",
 );
 
-type Tab = "geral" | "entries" | "trades" | "clutch" | "utility" | "aim";
+export type Tab = "geral" | "entries" | "trades" | "clutch" | "utility" | "aim";
 
-/** Abas como as da GC; fora a Geral, só existem com os dados importados da GC. */
-const TABS: { key: Tab; label: string; sort: string; cols: Col[] }[] = [
-  { key: "geral", label: "Geral", sort: "pts", cols: [] },
+/** Abas da GC (Entries, Trades, Clutch, Utilitárias, Mira): mix e página Estatísticas. */
+export const GC_TABS: { key: Exclude<Tab, "geral">; label: string; sort: string; cols: GcCol[] }[] = [
   {
     key: "entries",
     label: "Entries",
@@ -286,6 +294,12 @@ const TABS: { key: Tab; label: string; sort: string; cols: Col[] }[] = [
       { key: "weapon", label: "Arma principal", value: () => null, render: (r) => r.gc?.aim.mainWeapon ?? "-" },
     ],
   },
+];
+
+/** Abas como as da GC; fora a Geral, só existem com os dados importados da GC. */
+const TABS: { key: Tab; label: string; sort: string; cols: Col[] }[] = [
+  { key: "geral", label: "Geral", sort: "pts", cols: [] },
+  ...GC_TABS,
 ];
 
 /** Aba Geral: as colunas de sempre; com os dados da GC, ganha Rating, Swing e HS%. */

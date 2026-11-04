@@ -13,6 +13,8 @@ import type { Player } from "@/types/domain";
 import type { PlayerAggregate } from "@/types/views";
 import { getCommunityStats } from "@/services/queries";
 import { MapIcon } from "@/components/maps/map-icon";
+import { GcCareerTable } from "@/components/stats/gc-career-table";
+import { getGcCareer } from "@/services/gc-maps";
 
 export const metadata: Metadata = { title: "Estatísticas" };
 
@@ -29,14 +31,15 @@ const BOARDS: { title: string; value: (s: PlayerAggregate) => number | null; for
 ];
 
 export default async function StatsPage() {
-  const { kind, community, totals, maps, leaders, minMixes, mapWinners, names, avatars } = await getCommunityStats();
+  const [{ kind, community, totals, maps, leaders, minMixes, mapWinners, names, avatars, players }, gcCareer] =
+    await Promise.all([getCommunityStats(), getGcCareer()]);
 
   return (
     <>
       <PageHeader
         eyebrow={community.name}
         title="Estatísticas"
-        description="Números gerais da comunidade: mapas, volume de jogos e líderes por métrica."
+        description="Números gerais da comunidade: mapas, volume de jogos, dados da GC e líderes por métrica."
         actions={<DemoBadge kind={kind} />}
       />
 
@@ -96,6 +99,16 @@ export default async function StatsPage() {
           <CardContent>
             <MapWinners maps={mapWinners} names={names} avatars={avatars} />
           </CardContent>
+        </Card>
+      )}
+
+      {gcCareer.length > 0 && (
+        <Card className="mt-4 overflow-hidden">
+          <CardHeader
+            title="Dados da GC"
+            description="Todos os mixes importados da Gamers Club: rating, aberturas, trades, clutches, utilitárias e mira de cada jogador. Clique na coluna para ordenar."
+          />
+          <GcCareerTable lines={gcCareer} players={Object.fromEntries(players.map((p) => [p.id, p]))} />
         </Card>
       )}
 

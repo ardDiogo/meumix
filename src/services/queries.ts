@@ -215,6 +215,7 @@ export async function getCommunityStats() {
     maps: [...maps.entries()].map(([mapId, v]) => ({ mapId, ...v })).sort((a, b) => b.played - a.played),
     leaders,
     minMixes,
+    players,
     names: Object.fromEntries(players.map((p) => [p.id, p.nickname])) as Record<string, string>,
     avatars: Object.fromEntries(players.map((p) => [p.id, p.avatarUrl])) as Record<string, string | null>,
     mapWinners: [...mapWins.entries()].map(([mapId, per]) => ({
