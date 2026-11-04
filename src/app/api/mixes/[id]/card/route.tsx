@@ -293,14 +293,68 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
     .map((r) => ({ r, v: overall(r, r.userId ? averages[r.userId] : undefined)?.value ?? null }))
     .sort((a, b) => Number(b.v != null) - Number(a.v != null) || (b.v ?? 0) - (a.v ?? 0) || byMixScore(a.r, b.r));
   const perfScale = Math.max(...perf.map((p) => Math.abs(p.v ?? 0)), 1);
+  const perfRows = (col: typeof perf) =>
+    col.map(({ r, v }) => {
+      const color = v == null ? NO_AVG : toneColor(v / 100);
+      const w = v == null ? 0 : Math.max((Math.abs(v) / perfScale) * 64, 2);
+      return (
+        <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 8, height: 23 }}>
+          <Avatar name={r.name} src={avatar(r)} size={22} />
+          <span style={{ width: 104, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>
+            {r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name}
+          </span>
+          {/* Barra a partir do centro: à direita acima da média, à esquerda abaixo. */}
+          <div style={{ display: "flex", width: 130, height: 12, position: "relative" }}>
+            <div
+              style={{
+                display: "flex",
+                position: "absolute",
+                left: 64,
+                top: -2,
+                width: 1,
+                height: 14,
+                background: "#3F3F46",
+              }}
+            />
+            {v != null && v !== 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  position: "absolute",
+                  top: 0,
+                  height: 12,
+                  width: w,
+                  left: v > 0 ? 65 : 64 - w,
+                  borderRadius: 2,
+                  background: color,
+                }}
+              />
+            )}
+          </div>
+          <span
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              width: 56,
+              fontSize: 15,
+              fontWeight: 700,
+              color: v == null ? C.subtle : color,
+            }}
+          >
+            {v == null
+              ? r.userId
+                ? "estreia"
+                : "convidado"
+              : `${v > 0 ? "+" : v < 0 ? "−" : "±"}${fmt(Math.abs(v))}%`}
+          </span>
+        </div>
+      );
+    });
 
-  // Mais de 3 mapas, 10 jogadores ou 12 destaques: a imagem cresce para caber.
+  // Mais de 10 jogadores ou 12 destaques: a imagem cresce para caber.
   const ROW_H = 50;
   const height =
-    HEIGHT +
-    Math.max(0, mix.maps.length - 3) * 44 +
-    Math.max(0, rows.length - 10) * ROW_H +
-    Math.max(0, Math.ceil(highlights.length / 3) - 4) * 82;
+    HEIGHT + Math.max(0, rows.length - 10) * ROW_H + Math.max(0, Math.ceil(highlights.length / 3) - 4) * 82;
   const bgLeft =
     winner === "A" ? "rgba(34,197,94,0.24)" : winner === "B" ? "rgba(240,82,82,0.22)" : "rgba(161,161,170,0.12)";
   const bgRight =
@@ -463,40 +517,102 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
           {teamBlock("B", true)}
         </div>
 
-        {/* Mapas e resumo */}
-        <div style={{ display: "flex", gap: 16, marginTop: 16 }}>
-          <div style={{ ...card, flexDirection: "column", flex: 1, padding: "16px 18px" }}>
-            <Section title="Mapas" display={display} />
+        {/* Mapas lado a lado (como no placar do site): emblema no círculo, placar e rounds embaixo. */}
+        <div
+          style={{
+            ...card,
+            flexDirection: "column",
+            marginTop: 16,
+            overflow: "hidden",
+            border: "1px solid rgba(255,106,0,0.45)",
+          }}
+        >
+          <div style={{ display: "flex" }}>
             {mix.maps.map((mp, mi) => {
               const gm = gcMaps[mi];
+              const n = mix.maps.length;
+              const w = Math.floor((WIDTH - 82 - (n - 1)) / n);
+              // Quadradinho do round do tamanho que couber na largura do mapa (7 a 10px; com 4 mapas e prorrogação, quebra a linha).
+              const breaks = gm
+                ? gm.rounds.filter((_, i) => roundBreakAfter(i + 1) && i + 1 < gm.rounds.length).length
+                : 0;
+              const dot = gm ? Math.max(7, Math.min(10, Math.floor((w - 36 - breaks * 5) / gm.rounds.length) - 2)) : 0;
               return (
-                <div key={mp.order} style={{ display: "flex", alignItems: "center", gap: 12, height: 44 }}>
-                  {mapIcons[mi] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={mapIcons[mi]!} width={30} height={30} style={{ objectFit: "contain" }} alt="" />
-                  ) : (
-                    <div style={{ width: 30, display: "flex" }} />
-                  )}
-                  <span style={{ width: 92, fontSize: 18, fontWeight: 700, whiteSpace: "nowrap" }}>
-                    {mapName(mp.mapId)}
-                  </span>
-                  <span style={{ display: "flex", width: 58, fontSize: 18, color: C.muted, whiteSpace: "nowrap" }}>
-                    <span style={{ color: mp.winner === "A" ? C.fg : C.muted }}>{mp.scoreA ?? "-"}</span>
-                    <span>–</span>
-                    <span style={{ color: mp.winner === "B" ? C.fg : C.muted }}>{mp.scoreB ?? "-"}</span>
-                  </span>
+                <div
+                  key={mp.order}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    width: w,
+                    padding: "14px 18px",
+                    borderLeft: mi ? `1px solid ${C.border}` : "1px solid transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 58,
+                        height: 58,
+                        borderRadius: 999,
+                        border: `3px solid ${C.brand}`,
+                        background: "#191C22",
+                      }}
+                    >
+                      {mapIcons[mi] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={mapIcons[mi]!} width={36} height={36} style={{ objectFit: "contain" }} alt="" />
+                      ) : (
+                        <span style={{ fontSize: 16, fontWeight: 700, color: C.muted }}>
+                          {mapName(mp.mapId).slice(0, 2).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span
+                        style={{
+                          fontFamily: display,
+                          fontSize: 20,
+                          fontWeight: 700,
+                          letterSpacing: 1,
+                          textTransform: "uppercase",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {mapName(mp.mapId)}
+                      </span>
+                      <span
+                        style={{ display: "flex", fontFamily: display, fontSize: 28, fontWeight: 700, color: C.muted }}
+                      >
+                        <span style={{ color: mp.winner === "A" ? C.brand : C.muted }}>{mp.scoreA ?? "-"}</span>
+                        <span style={{ color: "#52525B", margin: "0 8px" }}>–</span>
+                        <span style={{ color: mp.winner === "B" ? C.brand : C.muted }}>{mp.scoreB ?? "-"}</span>
+                      </span>
+                    </div>
+                  </div>
                   {gm && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 2,
+                        rowGap: 3,
+                        marginTop: 10,
+                      }}
+                    >
                       {gm.rounds.map((r, i) => (
                         <div
                           key={i}
                           style={{
                             display: "flex",
-                            width: 9,
-                            height: 9,
+                            width: dot,
+                            height: dot,
                             borderRadius: 2,
                             background: roundColor(r.w),
-                            marginRight: roundBreakAfter(i + 1) && i + 1 < gm.rounds.length ? 6 : 0,
+                            marginRight: roundBreakAfter(i + 1) && i + 1 < gm.rounds.length ? 5 : 0,
                           }}
                         />
                       ))}
@@ -505,83 +621,43 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 </div>
               );
             })}
-            {gcMaps.length > 0 && winner && (
-              <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 13, color: C.muted }}>
-                {(["A", "B"] as const).map((side) => (
-                  <span key={side} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <div
-                      style={{ display: "flex", width: 10, height: 10, borderRadius: 2, background: roundColor(side) }}
-                    />
-                    {`round do ${teamName(side)}`}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
-          <div style={{ ...card, flexDirection: "column", width: 384, padding: "16px 16px" }}>
-            <Section title="Desempenho no mix" display={display} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-              {perf.map(({ r, v }) => {
-                const color = v == null ? NO_AVG : toneColor(v / 100);
-                const w = v == null ? 0 : Math.max((Math.abs(v) / perfScale) * 64, 2);
-                return (
-                  <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 8, height: 23 }}>
-                    <Avatar name={r.name} src={avatar(r)} size={22} />
-                    <span style={{ width: 104, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>
-                      {r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name}
-                    </span>
-                    {/* Barra a partir do centro: à direita acima da média, à esquerda abaixo. */}
-                    <div style={{ display: "flex", width: 130, height: 12, position: "relative" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          position: "absolute",
-                          left: 64,
-                          top: -2,
-                          width: 1,
-                          height: 14,
-                          background: "#3F3F46",
-                        }}
-                      />
-                      {v != null && v !== 0 && (
-                        <div
-                          style={{
-                            display: "flex",
-                            position: "absolute",
-                            top: 0,
-                            height: 12,
-                            width: w,
-                            left: v > 0 ? 65 : 64 - w,
-                            borderRadius: 2,
-                            background: color,
-                          }}
-                        />
-                      )}
-                    </div>
-                    <span
-                      style={{
-                        display: "flex",
-                        justifyContent: "flex-end",
-                        width: 56,
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: v == null ? C.subtle : color,
-                      }}
-                    >
-                      {v == null
-                        ? r.userId
-                          ? "estreia"
-                          : "convidado"
-                        : `${v > 0 ? "+" : v < 0 ? "−" : "±"}${fmt(Math.abs(v))}%`}
-                    </span>
-                  </div>
-                );
-              })}
+          {gcMaps.length > 0 && winner && (
+            <div
+              style={{
+                display: "flex",
+                gap: 16,
+                padding: "8px 18px",
+                fontSize: 13,
+                color: C.muted,
+                borderTop: `1px solid ${C.border}`,
+              }}
+            >
+              {(["A", "B"] as const).map((side) => (
+                <span key={side} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div
+                    style={{ display: "flex", width: 10, height: 10, borderRadius: 2, background: roundColor(side) }}
+                  />
+                  {`round do ${teamName(side)}`}
+                </span>
+              ))}
             </div>
-            <span style={{ fontSize: 11, color: C.subtle, marginTop: 8 }}>
-              comparado com a média de cada um nos outros mixes
-            </span>
+          )}
+        </div>
+
+        {/* Desempenho no mix: largura toda, em duas colunas. */}
+        <div style={{ ...card, flexDirection: "column", marginTop: 16, padding: "16px 18px" }}>
+          <Section title="Desempenho no mix" display={display} />
+          <div style={{ display: "flex", gap: 40 }}>
+            {[perf.slice(0, Math.ceil(perf.length / 2)), perf.slice(Math.ceil(perf.length / 2))].map((col, ci) => (
+              <div key={ci} style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
+                {perfRows(col)}
+              </div>
+            ))}
           </div>
+          <span style={{ fontSize: 11, color: C.subtle, marginTop: 8 }}>
+            comparado com a média de cada um nos outros mixes
+          </span>
         </div>
 
         {/* MVP e lanterna + destaques */}
