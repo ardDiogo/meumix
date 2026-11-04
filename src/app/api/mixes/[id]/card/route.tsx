@@ -11,7 +11,8 @@ import {
 import { getGcMaps } from "@/services/gc-maps";
 import { mapIcon, mapName } from "@/lib/maps";
 import { seriesScore, seriesWinner } from "@/lib/stats";
-import { getMatchReport } from "@/services/match-report";
+import { getMatchReport, playerAverages } from "@/services/match-report";
+import { NO_AVG, overall, toneColor } from "@/lib/performance";
 import { getDataSource } from "@/services";
 
 /**
@@ -274,26 +275,16 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   const hour = when.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
   const display = fonts.some((f) => f.name === "Chakra Petch") ? "Chakra Petch" : "Inter";
 
-  // Resumo: rounds e kills sempre; com a GC, HS% e clutches (sem ela, assistências e first kills).
   const rounds = mix.maps.reduce((s, m) => s + (m.scoreA ?? 0) + (m.scoreB ?? 0), 0);
-  const kills = rows.reduce((s, r) => s + r.k, 0);
-  const gcKills = gcLines.reduce((s, l) => s + l.k, 0);
-  const summary: { value: string; label: string }[] = [
-    { value: String(rounds), label: "rounds jogados" },
-    { value: String(kills), label: "kills na partida" },
-    ...(gcLines.length
-      ? [
-          {
-            value: `${fmt(gcKills ? (gcLines.reduce((s, l) => s + l.hs, 0) / gcKills) * 100 : 0)}%`,
-            label: "headshots da partida",
-          },
-          { value: String(gcLines.reduce((s, l) => s + l.clutch.won, 0)), label: "clutches vencidos" },
-        ]
-      : [
-          { value: String(rows.reduce((s, r) => s + r.a, 0)), label: "assistências" },
-          { value: String(rows.reduce((s, r) => s + r.fk, 0)), label: "first kills" },
-        ]),
-  ];
+  // Desempenho no mix (Geral): cada um comparado com a média dele nos outros mixes, de quem mais passou a quem ficou mais abaixo.
+  const averages = await playerAverages(
+    mix.id,
+    rows.map((r) => r.userId).filter((u): u is string => !!u),
+  ).catch(() => ({}) as Awaited<ReturnType<typeof playerAverages>>);
+  const perf = rows
+    .map((r) => ({ r, v: overall(r, r.userId ? averages[r.userId] : undefined)?.value ?? null }))
+    .sort((a, b) => Number(b.v != null) - Number(a.v != null) || (b.v ?? 0) - (a.v ?? 0) || byMixScore(a.r, b.r));
+  const perfScale = Math.max(...perf.map((p) => Math.abs(p.v ?? 0)), 1);
 
   // Mais de 3 mapas, 10 jogadores ou 12 destaques: a imagem cresce para caber.
   const ROW_H = 44;
@@ -478,10 +469,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                   ) : (
                     <div style={{ width: 30, display: "flex" }} />
                   )}
-                  <span style={{ width: 104, fontSize: 19, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  <span style={{ width: 92, fontSize: 18, fontWeight: 700, whiteSpace: "nowrap" }}>
                     {mapName(mp.mapId)}
                   </span>
-                  <span style={{ display: "flex", width: 64, fontSize: 19, color: C.muted, whiteSpace: "nowrap" }}>
+                  <span style={{ display: "flex", width: 58, fontSize: 18, color: C.muted, whiteSpace: "nowrap" }}>
                     <span style={{ color: mp.winner === "A" ? C.fg : C.muted }}>{mp.scoreA ?? "-"}</span>
                     <span>–</span>
                     <span style={{ color: mp.winner === "B" ? C.fg : C.muted }}>{mp.scoreB ?? "-"}</span>
@@ -493,8 +484,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                           key={i}
                           style={{
                             display: "flex",
-                            width: 10,
-                            height: 10,
+                            width: 9,
+                            height: 9,
                             borderRadius: 2,
                             background: roundColor(r.w),
                             marginRight: roundBreakAfter(i + 1) && i + 1 < gm.rounds.length ? 6 : 0,
@@ -519,27 +510,69 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
               </div>
             )}
           </div>
-          <div style={{ ...card, flexDirection: "column", width: 316, padding: "16px 16px" }}>
-            <Section title="Resumo" display={display} />
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              {summary.map((s) => (
-                <div
-                  key={s.label}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    width: 136,
-                    padding: "12px 12px",
-                    borderRadius: 12,
-                    border: `1px solid ${C.border}`,
-                    background: C.surface,
-                  }}
-                >
-                  <span style={{ fontFamily: display, fontSize: 34, fontWeight: 700, lineHeight: 1 }}>{s.value}</span>
-                  <span style={{ fontSize: 13, color: C.muted, marginTop: 6 }}>{s.label}</span>
-                </div>
-              ))}
+          <div style={{ ...card, flexDirection: "column", width: 384, padding: "16px 16px" }}>
+            <Section title="Desempenho no mix" display={display} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              {perf.map(({ r, v }) => {
+                const color = v == null ? NO_AVG : toneColor(v / 100);
+                const w = v == null ? 0 : Math.max((Math.abs(v) / perfScale) * 74, 2);
+                return (
+                  <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 8, height: 19 }}>
+                    <Avatar name={r.name} src={avatar(r)} size={19} />
+                    <span style={{ width: 96, fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+                      {r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name}
+                    </span>
+                    {/* Barra a partir do centro: à direita acima da média, à esquerda abaixo. */}
+                    <div style={{ display: "flex", width: 150, height: 10, position: "relative" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          position: "absolute",
+                          left: 74,
+                          top: -2,
+                          width: 1,
+                          height: 14,
+                          background: "#3F3F46",
+                        }}
+                      />
+                      {v != null && v !== 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            position: "absolute",
+                            top: 0,
+                            height: 10,
+                            width: w,
+                            left: v > 0 ? 75 : 74 - w,
+                            borderRadius: 2,
+                            background: color,
+                          }}
+                        />
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        display: "flex",
+                        justifyContent: "flex-end",
+                        width: 56,
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: v == null ? C.subtle : color,
+                      }}
+                    >
+                      {v == null
+                        ? r.userId
+                          ? "estreia"
+                          : "convidado"
+                        : `${v > 0 ? "+" : v < 0 ? "−" : "±"}${fmt(Math.abs(v))}%`}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
+            <span style={{ fontSize: 11, color: C.subtle, marginTop: 8 }}>
+              comparado com a média de cada um nos outros mixes
+            </span>
           </div>
         </div>
 
