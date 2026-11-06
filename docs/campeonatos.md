@@ -159,3 +159,12 @@ nada é lido nem gravado nos dados dos mixes.
 - **Visão geral** (portal): campeão, números (equipes, jogadores, partidas realizadas/pendentes),
   progresso, próximos confrontos, últimos resultados, classificação resumida, MVP atual, top 5,
   premiação, formato e organização.
+
+## Tabela de jogos (Calendário)
+
+O Calendário abre na **Tabela de jogos**, no formato de chave de campeonato: a fase classificatória
+em cima (uma coluna por rodada, com a folga embaixo) e os playoffs embaixo, ligados por linhas até o
+**Campeão**. Cada jogo tem número (1, 2, 3…), os dois times e, à direita, a data e a hora (ou o placar
+quando termina); nos playoffs, vaga ainda indefinida mostra "Vencedor do 11". O clique abre a página
+do jogo. As ações (propor data, aceitar, aprovar, marcar direto) ficam na aba **Agendamento**, com um
+contador do que está esperando quem está vendo. A aba Playoffs usa a mesma chave.
