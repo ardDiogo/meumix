@@ -145,3 +145,75 @@ export const getRoster = cache(async (championshipId: string) => {
     })),
   };
 });
+
+export interface AdedonhaRound {
+  round: number;
+  startTeam: string;
+  remaining: string[];
+  played: string[];
+  revealed: Record<string, number> | null;
+  total: number | null;
+  pickedTeam: string | null;
+  resolvedAt: string | null;
+}
+
+export interface PickRow {
+  id: string;
+  pickNo: number;
+  pot: number;
+  teamId: string;
+  userId: string;
+  pickedBy: string | null;
+  createdAt: string;
+  undoneAt: string | null;
+}
+
+/** Draft do campeonato: andamento, rodadas da adedonha e escolhas (com as desfeitas). */
+export const getDraft = cache(async (championshipId: string) => {
+  const supabase = await createSupabaseServerClient();
+  const empty = {
+    status: null as "order" | "picking" | "done" | null,
+    rounds: [] as AdedonhaRound[],
+    picks: [] as PickRow[],
+    missing: false,
+  };
+  if (!supabase) return empty;
+  const [{ data: draft, error }, { data: rounds }, { data: picks }] = await Promise.all([
+    supabase.from("championship_drafts").select("status").eq("championship_id", championshipId).maybeSingle(),
+    supabase
+      .from("championship_adedonha_rounds")
+      .select("round, start_team, remaining, played, revealed, total, picked_team, resolved_at")
+      .eq("championship_id", championshipId)
+      .order("round"),
+    supabase
+      .from("championship_picks")
+      .select("id, pick_no, pot, team_id, user_id, picked_by, created_at, undone_at")
+      .eq("championship_id", championshipId)
+      .order("created_at"),
+  ]);
+  if (error) return { ...empty, missing: error.code === "42P01" || error.code === "PGRST205" };
+  return {
+    status: (draft?.status as "order" | "picking" | "done" | undefined) ?? null,
+    missing: false,
+    rounds: (rounds ?? []).map((r): AdedonhaRound => ({
+      round: r.round as number,
+      startTeam: r.start_team as string,
+      remaining: (r.remaining as string[]) ?? [],
+      played: (r.played as string[]) ?? [],
+      revealed: (r.revealed as Record<string, number> | null) ?? null,
+      total: (r.total as number | null) ?? null,
+      pickedTeam: (r.picked_team as string | null) ?? null,
+      resolvedAt: (r.resolved_at as string | null) ?? null,
+    })),
+    picks: (picks ?? []).map((p): PickRow => ({
+      id: p.id as string,
+      pickNo: p.pick_no as number,
+      pot: p.pot as number,
+      teamId: p.team_id as string,
+      userId: p.user_id as string,
+      pickedBy: (p.picked_by as string | null) ?? null,
+      createdAt: p.created_at as string,
+      undoneAt: (p.undone_at as string | null) ?? null,
+    })),
+  };
+});

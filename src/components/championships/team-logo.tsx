@@ -21,14 +21,15 @@ export function TeamLogo({
         className={cn("shrink-0 rounded-lg border-2 object-cover", className)}
       />
     );
-  const label = team.tag || team.name.slice(0, 2).toUpperCase();
+  // Escudo pequeno: até 3 letras da sigla, para caber.
+  const label = (team.tag || team.name.slice(0, 2).toUpperCase()).slice(0, size >= 36 ? 5 : 3);
   return (
     <span
       aria-hidden
       style={{ ...style, background: `${team.color}26`, borderColor: `${team.color}99`, color: team.color }}
       className={cn(
         "inline-flex shrink-0 items-center justify-center rounded-lg border-2 font-display font-bold",
-        size >= 48 ? "text-base" : "text-xs",
+        size >= 48 ? "text-base" : size >= 36 ? "text-xs" : "text-[8px] leading-none tracking-tighter",
         className,
       )}
     >

@@ -53,3 +53,25 @@ Aba **Equipes** (`/campeonatos/<slug>/equipes`), pública; quem organiza vê os 
   Editar troca o capitão (o antigo volta a ficar sem time); excluir o time não tira a inscrição.
 - Quadro "Para montar os potes": aponta o que falta (inscritos, times, capitães).
 - Depois que o campeonato começa (Em andamento, Playoffs, Finalizado), inscritos e times ficam fechados.
+
+## Etapas 4 e 5 — potes e draft
+
+Aba **Draft** (`/campeonatos/<slug>/draft`), ao vivo (tempo real do Supabase e, por garantia,
+atualização a cada 8 s). Migração `0039_championship_draft.sql`.
+
+1. **Potes** (quem organiza): cada inscrito que não é capitão vai para um pote; cada pote recebe um
+   jogador por time. O quadro diz o que falta; **Começar draft** só libera com tudo completo.
+   Ao começar, inscritos, times e potes ficam fechados.
+2. **Adedonha** (ordem): em cada rodada, os capitães dos times ainda sem posição jogam de 0 a 5
+   sem ver o do outro (as jogadas ficam numa tabela sem leitura pública). Quando todos jogam, o
+   servidor revela, soma e conta em roda a partir do time sorteado ("começa a contagem"): quem o
+   total atingir pega a próxima posição. O último que sobra fecha a ordem. Quem organiza pode
+   jogar por um capitão ausente.
+3. **Escolhas em serpentina**: pote ímpar segue a ordem (1→5), pote par volta (5→1). Só o capitão
+   do time da vez (ou quem organiza) vê o botão **Escolher**, e só no pote da vez. Índices únicos no
+   banco impedem escolher o mesmo jogador ou a mesma vez duas vezes. Cada escolha coloca o jogador no
+   time na hora; a última conclui o draft.
+4. **Correções** (quem organiza): **Desfazer última** (fica no histórico como desfeita) e
+   **Reiniciar** (ordem e escolhas do zero; potes e capitães mantidos).
+
+Regras puras em `src/lib/championship-draft.ts` (serpentina, adedonha, potes), com testes.

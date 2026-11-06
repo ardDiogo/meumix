@@ -12,7 +12,7 @@ import { PlayerLink } from "@/components/players/player-link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { rosterIssues } from "@/lib/championship";
-import { getChampionship, getRoster } from "@/services/championships";
+import { getChampionship, getDraft, getRoster } from "@/services/championships";
 import { getDataSource } from "@/services/index";
 import type { Player } from "@/types/domain";
 
@@ -25,14 +25,15 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
   const data = await getChampionship((await params).slug);
   if (!data) notFound();
   const { championship: c, canManage, players: all } = data;
-  const { teams, players } = await getRoster(c.id);
+  const [{ teams, players }, draft] = await Promise.all([getRoster(c.id), getDraft(c.id)]);
   const byId = new Map(all.map((p) => [p.id, p]));
   const person = (id: string): Person => {
     const p = byId.get(id);
     return { id, nickname: p?.nickname ?? "Jogador", avatarUrl: p?.avatarUrl ?? null };
   };
   const asPlayer = (id: string): Player => byId.get(id) ?? { ...person(id), steamId: null, createdAt: "" };
-  const editable = canManage && !STARTED.has(c.status);
+  // Com o draft em andamento (ou feito), inscritos e times ficam fechados (reiniciar o draft reabre).
+  const editable = canManage && !STARTED.has(c.status) && !draft.status;
   const needed = c.teamCount * c.playersPerTeam;
   const issues = rosterIssues(c, teams, players);
   const registered = new Set(players.map((p) => p.userId));
@@ -46,7 +47,16 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
 
   return (
     <div className="space-y-4">
-      {canManage && (
+      {canManage && draft.status && (
+        <Card>
+          <CardContent className="text-sm text-muted">
+            {draft.status === "done"
+              ? "Draft concluído: os elencos estão formados."
+              : "Draft em andamento: inscritos e times ficam fechados até o fim (ou até reiniciar o draft)."}
+          </CardContent>
+        </Card>
+      )}
+      {canManage && !draft.status && (
         <Card className={issues.length ? "border-brand/40" : "border-win/40"}>
           <CardContent className="flex flex-wrap items-start gap-3 text-sm">
             {issues.length ? (

@@ -20,6 +20,13 @@ async function guard(championshipId: string) {
   const r = await requireOrganizer(championshipId);
   if ("error" in r) return { error: r.error! } as const;
   if (STARTED.has(r.ch.status)) return { error: "O campeonato já começou: inscritos e times estão fechados." } as const;
+  // Com o draft em andamento (ou feito), inscritos, capitães e times ficam fechados.
+  const { data: draft } = await r.admin
+    .from("championship_drafts")
+    .select("status")
+    .eq("championship_id", championshipId)
+    .maybeSingle();
+  if (draft) return { error: "O draft já começou: reinicie o draft para mudar inscritos e times." } as const;
   return r;
 }
 
