@@ -142,3 +142,26 @@ export async function deleteChampionship(id: string): Promise<ChampionshipResult
   refresh();
   return { ok: true, message: "Campeonato excluído." };
 }
+
+/** Número de inscrições pagas (controle manual). Vazio volta a usar o número de inscritos. */
+export async function setPaidPlayers(id: string, paid: number | null): Promise<ChampionshipResult> {
+  const r = await requireOrganizer(id);
+  if ("error" in r) return { ok: false, message: r.error ?? "Não foi possível salvar." };
+  if (paid != null && !(Number.isInteger(paid) && paid >= 0 && paid <= 1000))
+    return { ok: false, message: "Número de pagantes inválido." };
+  const { error } = await r.admin.from("championships").update({ paid_players: paid }).eq("id", id);
+  if (error)
+    return {
+      ok: false,
+      message:
+        error.code === "42703" ? "Rode a migração 0042_championship_paid.sql no Supabase." : "Não foi possível salvar.",
+    };
+  await audit({
+    action: "championship.paid",
+    outcome: "success",
+    actorId: r.session.id,
+    detail: { championshipId: id, paid },
+  });
+  refresh();
+  return { ok: true, message: paid == null ? "Usando o número de inscritos." : `${paid} inscrições pagas.` };
+}

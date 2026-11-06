@@ -15,6 +15,8 @@ export function ChampionshipTabs({ slug, canManage }: { slug: string; canManage:
     { href: `${base}/calendario`, label: "Calendário" },
     { href: `${base}/classificacao`, label: "Classificação" },
     { href: `${base}/playoffs`, label: "Playoffs" },
+    { href: `${base}/estatisticas`, label: "Estatísticas" },
+    { href: `${base}/premiacao`, label: "Premiação" },
     ...(canManage ? [{ href: `${base}/admin`, label: "Administração" }] : []),
   ];
   return (

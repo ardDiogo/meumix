@@ -347,3 +347,40 @@ export async function getMatchGcMaps(matchId: string) {
     .map((r) => r.data as import("@/lib/gc-api").GcMapStored | null)
     .filter((d): d is import("@/lib/gc-api").GcMapStored => !!d && Array.isArray(d.players) && Array.isArray(d.rounds));
 }
+
+export interface ChampionshipGcMap {
+  matchId: string;
+  order: number;
+  data: import("@/lib/gc-api").GcMapStored;
+}
+
+/** Estatísticas da GC de todos os mapas do campeonato (só os importados). */
+export const getChampionshipGc = cache(async (championshipId: string): Promise<ChampionshipGcMap[]> => {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from("championship_match_maps")
+    .select("match_id, map_order, map_id, data")
+    .eq("championship_id", championshipId)
+    .not("data", "is", null)
+    .order("created_at");
+  return (data ?? []).flatMap((r) => {
+    const d = r.data as import("@/lib/gc-api").GcMapStored | null;
+    return d && Array.isArray(d.players) && Array.isArray(d.rounds)
+      ? [{ matchId: r.match_id as string, order: r.map_order as number, data: { ...d, mapId: r.map_id as string } }]
+      : [];
+  });
+});
+
+/** Inscrições pagas informadas pela organização (sem a migração 0042 ou sem valor: null). */
+export async function getPaidPlayers(championshipId: string): Promise<number | null> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("championships")
+    .select("paid_players")
+    .eq("id", championshipId)
+    .maybeSingle();
+  if (error || data?.paid_players == null) return null;
+  return Number(data.paid_players);
+}

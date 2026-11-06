@@ -138,3 +138,24 @@ Sem migração nova: os jogos dos playoffs ficam em `championship_matches` com `
   destaque, com o vice.
 - Os jogos dos playoffs entram no **Calendário** (seções Semifinais e Final) com o mesmo agendamento
   pelos capitães e aprovação da organização.
+
+## Etapa 9 — estatísticas, premiação e visão geral
+
+Migração `0042_championship_paid.sql` (só a coluna de inscrições pagas). Regras em
+`src/lib/championship-stats.ts`, com testes. Tudo sai dos mapas importados da GC **neste campeonato**:
+nada é lido nem gravado nos dados dos mixes.
+
+- **Estatísticas** (aba): MVP do campeonato (maior rating médio), líderes de rating, K/D, ADR, kills,
+  headshots e % de HS (médias exigem metade dos mapas do jogador que mais jogou), melhor jogador por
+  mapa, equipes com mais rounds vencidos e melhor aproveitamento (todos os jogos decididos) e a tabela
+  de todos os jogadores.
+- **Página do jogador no campeonato** (`/campeonatos/<slug>/jogadores/<id>`): equipe (capitão e pote),
+  partidas, vitórias e derrotas do time nas séries que jogou, kills, mortes, K/D, ADR, rating e o
+  histórico mapa a mapa; link para o perfil do MeuMix.
+- **Premiação** (aba): inscrição × inscrições pagas (a organização informa; em branco, usa os inscritos)
+  − custos, dividido pelos percentuais; centavos que sobram vão para o 1º. Mostra quem ocupa cada
+  colocação: campeão e vice pela final; 3º e 4º = eliminados nas semifinais, na ordem da fase
+  classificatória; o resto pela classificação.
+- **Visão geral** (portal): campeão, números (equipes, jogadores, partidas realizadas/pendentes),
+  progresso, próximos confrontos, últimos resultados, classificação resumida, MVP atual, top 5,
+  premiação, formato e organização.
