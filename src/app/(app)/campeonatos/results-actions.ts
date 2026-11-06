@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { aliasKey } from "@/lib/alias";
 import { homeSideOf, sanitizeGcMap } from "@/lib/championship-gc";
+import type { PlayoffFormat } from "@/lib/championship";
+import { nextSlot } from "@/lib/championship-playoffs";
 import { mapScoreProblem, seriesState } from "@/lib/championship-standings";
 import { gcAlias, storeGcMap } from "@/lib/gc-api";
 import { MAPS } from "@/lib/maps";
@@ -28,7 +30,7 @@ async function load(championshipId: string, matchId: string) {
   const [{ data: match }, { data: maps, error }] = await Promise.all([
     r.admin
       .from("championship_matches")
-      .select("id, home_team, away_team, best_of, status, scheduled_at")
+      .select("id, stage, round, leg, home_team, away_team, best_of, status, scheduled_at")
       .eq("id", matchId)
       .eq("championship_id", championshipId)
       .maybeSingle(),
@@ -49,6 +51,9 @@ async function load(championshipId: string, matchId: string) {
       bestOf: match.best_of as number,
       status: match.status as string,
       scheduledAt: (match.scheduled_at as string | null) ?? null,
+      stage: match.stage as string,
+      round: match.round as number,
+      leg: match.leg as number,
     },
     maps: (maps ?? []).map((m) => ({
       id: m.id as string,
@@ -91,7 +96,42 @@ async function settle(r: Loaded, championshipId: string) {
     })
     .eq("id", r.match.id)
     .eq("championship_id", championshipId);
+  if (r.match.stage === "playoff") await advance(r, championshipId, s.winner);
   return s;
+}
+
+/**
+ * Playoffs: o vencedor ocupa o lugar dele no jogo seguinte da chave. Se o
+ * resultado for desfeito, o lugar volta a ficar vazio (enquanto o jogo
+ * seguinte não tiver placar).
+ */
+async function advance(r: Loaded, championshipId: string, winner: "home" | "away" | null) {
+  const { data: ch } = await r.admin
+    .from("championships")
+    .select("playoff_format")
+    .eq("id", championshipId)
+    .maybeSingle();
+  const slot = nextSlot((ch?.playoff_format as PlayoffFormat) ?? "none", r.match.round, r.match.leg);
+  if (!slot) return;
+  const { data: next } = await r.admin
+    .from("championship_matches")
+    .select("id")
+    .eq("championship_id", championshipId)
+    .eq("stage", "playoff")
+    .eq("round", slot.round)
+    .eq("leg", slot.leg)
+    .maybeSingle();
+  if (!next) return;
+  const { count } = await r.admin
+    .from("championship_match_maps")
+    .select("id", { count: "exact", head: true })
+    .eq("match_id", next.id as string);
+  if (count) return;
+  const team = winner === "home" ? r.match.home : winner === "away" ? r.match.away : null;
+  await r.admin
+    .from("championship_matches")
+    .update({ [slot.side === "home" ? "home_team" : "away_team"]: team, updated_at: new Date().toISOString() })
+    .eq("id", next.id as string);
 }
 
 const doneMessage = (s: ReturnType<typeof seriesState>) =>

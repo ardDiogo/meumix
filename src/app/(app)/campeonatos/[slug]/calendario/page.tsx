@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { CalendarBoard } from "@/components/championships/calendar-board";
 import { formatDays } from "@/components/championships/format";
 import { Card } from "@/components/ui/card";
+import { playoffLabel, roundTitle } from "@/lib/championship-playoffs";
 import { seriesState } from "@/lib/championship-standings";
 import { getChampionship, getDraft, getMapResults, getMatches, getRoster } from "@/services/championships";
 
@@ -32,9 +33,10 @@ export default async function CalendarPage({ params }: PageProps<"/campeonatos/[
       </Card>
     );
   const group = matches.filter((m) => m.stage === "group");
+  const playoffs = matches.filter((m) => m.stage === "playoff");
   // Placar em mapas (MD3) ou em rounds (MD1) dos jogos com resultado.
   const scores = Object.fromEntries(
-    group.flatMap((m) => {
+    [...group, ...playoffs].flatMap((m) => {
       const mine = maps.filter((x) => x.matchId === m.id);
       if (!mine.length) return [];
       if (m.bestOf === 1) return [[m.id, { home: mine[0]!.home, away: mine[0]!.away }]];
@@ -46,7 +48,8 @@ export default async function CalendarPage({ params }: PageProps<"/campeonatos/[
     <CalendarBoard
       championshipId={c.id}
       teams={teams}
-      matches={group}
+      matches={[...group, ...playoffs.map((m) => ({ ...m, label: playoffLabel(c.playoffFormat, m.round, m.leg) }))]}
+      playoffTitles={Object.fromEntries(playoffs.map((m) => [m.round, roundTitle(c.playoffFormat, m.round)]))}
       proposals={proposals}
       viewerId={session?.id ?? null}
       isManager={canManage}

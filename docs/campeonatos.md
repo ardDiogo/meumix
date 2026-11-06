@@ -119,3 +119,22 @@ importado). A classificação não é guardada: sai dos placares na hora.
   empatados (3+) → saldo de rounds → rounds vencidos → ordem da lista de times. Os classificados
   para os playoffs ficam em verde e os eliminados em vermelho.
 - Nada disso usa ou altera as tabelas do mix (o importador da GC só lê os apelidos e a Steam).
+
+## Etapa 8 — playoffs
+
+Sem migração nova: os jogos dos playoffs ficam em `championship_matches` com `stage = 'playoff'`
+(`round` = fase, `leg` = posição na fase). Regras em `src/lib/championship-playoffs.ts`, com testes.
+
+- **Gerar playoffs** (quem organiza, aba Playoffs): libera quando todos os jogos da fase
+  classificatória estão finalizados (ou cancelados). Usa a classificação com os desempates: semifinais
+  1º × 4º e 2º × 3º (quartas: 1×8, 4×5, 2×7, 3×6; só final: 1×2), o melhor colocado como mandante, no
+  MD do campeonato. As fases seguintes ficam "A definir". O campeonato passa para **Playoffs**.
+  Dá para refazer a chave enquanto nenhum jogo dos playoffs tiver placar.
+- **Avanço automático**: quando a série fecha (MD3: 2 mapas), o vencedor ocupa o lugar dele no jogo
+  seguinte (vencedor da SF1 é o mandante da final). Se o resultado for desfeito, o lugar volta a ficar
+  vazio enquanto o jogo seguinte não tiver placar.
+- **Chave visual**: fases lado a lado no computador (empilhadas no celular), colocação de cada time,
+  placar em mapas, mapas jogados, data/status e link para a página do jogo. O **campeão** aparece em
+  destaque, com o vice.
+- Os jogos dos playoffs entram no **Calendário** (seções Semifinais e Final) com o mesmo agendamento
+  pelos capitães e aprovação da organização.

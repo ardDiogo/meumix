@@ -27,6 +27,9 @@ import { TeamLogo } from "./team-logo";
 
 export type CalMatch = {
   id: string;
+  stage: "group" | "playoff";
+  /** Nome do jogo nos playoffs ("Semifinal 1", "Final"). */
+  label?: string;
   round: number;
   homeTeam: string | null;
   awayTeam: string | null;
@@ -117,7 +120,10 @@ export function CalendarBoard({
   draftDone,
   slug,
   scores,
+  playoffTitles = {},
 }: {
+  /** Título de cada fase dos playoffs ("Semifinais", "Final"). */
+  playoffTitles?: Record<number, string>;
   slug: string;
   /** Mapas vencidos por cada lado, nos jogos com placar. */
   scores: Record<string, { home: number; away: number }>;
@@ -136,7 +142,10 @@ export function CalendarBoard({
   const teamById = new Map(teams.map((t) => [t.id, t]));
   const myTeams = new Set(teams.filter((t) => viewerId && t.captainId === viewerId).map((t) => t.id));
   const open = new Map(proposals.filter((p) => p.status === "pending").map((p) => [p.matchId, p]));
-  const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
+  const groupMatches = matches.filter((m) => m.stage === "group");
+  const playoffMatches = matches.filter((m) => m.stage === "playoff");
+  const rounds = [...new Set(groupMatches.map((m) => m.round))].sort((a, b) => a - b);
+  const playoffRounds = [...new Set(playoffMatches.map((m) => m.round))].sort((a, b) => a - b);
 
   // Pendências de quem está vendo.
   const toAnswer = matches.filter((m) => {
@@ -207,7 +216,7 @@ export function CalendarBoard({
         </CardContent>
       </Card>
 
-      {!matches.length ? (
+      {!groupMatches.length ? (
         <Card className="p-6 text-center text-sm text-muted">
           {draftDone
             ? isManager
@@ -217,7 +226,7 @@ export function CalendarBoard({
         </Card>
       ) : (
         rounds.map((round) => {
-          const games = matches.filter((m) => m.round === round);
+          const games = groupMatches.filter((m) => m.round === round);
           const playing = new Set(games.flatMap((m) => [m.homeTeam, m.awayTeam]));
           const off = teams.filter((t) => !playing.has(t.id));
           return (
@@ -247,6 +256,34 @@ export function CalendarBoard({
           );
         })
       )}
+
+      {playoffRounds.map((round) => (
+        <Card key={`po-${round}`} className="border-brand/30">
+          <CardHeader
+            title={playoffTitles[round] ?? "Playoffs"}
+            description={`Playoffs · MD${playoffMatches[0]?.bestOf}`}
+          />
+          <ul className="divide-y divide-border">
+            {playoffMatches
+              .filter((m) => m.round === round)
+              .map((m) => (
+                <MatchItem
+                  key={m.id}
+                  championshipId={championshipId}
+                  match={m}
+                  teamById={teamById}
+                  proposal={open.get(m.id) ?? null}
+                  myTeams={myTeams}
+                  isManager={isManager}
+                  servers={servers}
+                  rounds={0}
+                  href={`/campeonatos/${slug}/jogos/${m.id}`}
+                  score={scores[m.id] ?? null}
+                />
+              ))}
+          </ul>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -314,6 +351,11 @@ function MatchItem({
           href={href}
           className="group flex min-w-0 basis-full items-center gap-2 font-semibold sm:flex-1 sm:basis-auto"
         >
+          {m.label && (
+            <span className="shrink-0 rounded-sm bg-brand/12 px-1.5 py-0.5 text-[11px] font-semibold text-brand uppercase">
+              {m.label}
+            </span>
+          )}
           {home && <TeamLogo team={home} size={28} />}
           <span className={cn("truncate group-hover:text-brand", score && score.home < score.away && "text-muted")}>
             {home?.name ?? "A definir"}
@@ -424,9 +466,11 @@ function MatchItem({
               <Button variant="ghost" size="sm" onClick={() => toggle("direct")}>
                 Marcar direto
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => toggle("edit")}>
-                <Pencil /> Editar
-              </Button>
+              {m.stage === "group" && (
+                <Button variant="ghost" size="sm" onClick={() => toggle("edit")}>
+                  <Pencil /> Editar
+                </Button>
+              )}
               {m.status === "postponed" || m.status === "cancelled" ? (
                 <Button
                   variant="ghost"
