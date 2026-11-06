@@ -41,6 +41,9 @@ export default async function DraftPage({ params }: PageProps<"/campeonatos/[slu
       }))}
       rounds={draft.rounds}
       picks={draft.picks}
+      pickerNames={Object.fromEntries(
+        draft.picks.flatMap((p) => (p.pickedBy ? [[p.pickedBy, byId.get(p.pickedBy)?.nickname ?? "Organização"]] : [])),
+      )}
       potCount={c.potCount}
       viewerId={session?.id ?? null}
       isManager={canManage}

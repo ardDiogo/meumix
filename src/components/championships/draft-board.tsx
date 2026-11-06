@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Crown, Hand, History, Loader2, Play, RotateCcw, Undo2 } from "lucide-react";
+import { Check, Crown, Hand, Loader2, Play, RotateCcw, Undo2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
 import { toast } from "sonner";
@@ -54,6 +54,8 @@ export type BoardPick = {
   teamId: string;
   userId: string;
   undoneAt: string | null;
+  /** Quem clicou (o capitão ou alguém da organização). */
+  pickedBy?: string | null;
 };
 
 type Result = { ok: boolean; message: string };
@@ -124,7 +126,10 @@ export function DraftBoard({
   viewerId,
   isManager,
   issues,
+  pickerNames = {},
 }: {
+  /** Nome de quem clicou em cada escolha (inclui quem organiza e não está inscrito). */
+  pickerNames?: Record<string, string>;
   championshipId: string;
   status: "order" | "picking" | "done" | null;
   teams: BoardTeam[];
@@ -480,30 +485,43 @@ export function DraftBoard({
         </section>
       )}
 
-      {/* Histórico */}
+      {/* Log do PICK (como no mix): em ordem de escolha, quem pickou quem. */}
       {picks.length > 0 && (
         <Card>
-          <CardHeader title="Histórico de escolhas" />
-          <ol className="divide-y divide-border text-sm">
-            {[...picks]
-              .sort((a, b) => (a.undoneAt ? 1 : 0) - (b.undoneAt ? 1 : 0) || b.pickNo - a.pickNo)
-              .map((p) => {
-                const t = teamById.get(p.teamId);
-                const pl = playerById.get(p.userId);
-                return (
-                  <li key={p.id} className={cn("flex items-center gap-3 px-4 py-2", p.undoneAt && "text-subtle")}>
-                    <History className="size-3.5 shrink-0 text-subtle" aria-hidden />
-                    <span className="w-14 shrink-0 font-display font-semibold tabular">#{p.pickNo}</span>
-                    <span className={cn("min-w-0 flex-1 truncate", p.undoneAt && "line-through")}>
-                      <span className="font-semibold" style={{ color: p.undoneAt ? undefined : t?.color }}>
-                        {t?.name}
-                      </span>{" "}
-                      escolheu {pl?.nickname ?? "jogador"} · pote {p.pot}
-                    </span>
-                    {p.undoneAt && <span className="text-xs">desfeita</span>}
-                  </li>
-                );
-              })}
+          <CardHeader title="Log do PICK" description="Em ordem de escolha. Escolhas desfeitas ficam riscadas." />
+          <ol className="space-y-1 px-4 py-3 text-sm text-muted" aria-label="Ordem do PICK">
+            {picks.map((p) => {
+              const t = teamById.get(p.teamId);
+              const pl = playerById.get(p.userId);
+              const captain = t?.captainId ? playerById.get(t.captainId) : null;
+              const byCaptain = !p.pickedBy || p.pickedBy === t?.captainId;
+              const who = byCaptain ? captain?.nickname : (pickerNames[p.pickedBy!] ?? "Organização");
+              return (
+                <li key={p.id} className={cn("flex gap-2", p.undoneAt && "text-subtle line-through")}>
+                  <span className="w-6 shrink-0 text-right text-subtle tabular">{p.pickNo}.</span>
+                  <span className="min-w-0">
+                    <span className={cn("font-medium", !p.undoneAt && "text-fg")}>{who ?? "Capitão"}</span>
+                    {byCaptain ? (
+                      <>
+                        {" "}
+                        (<span style={{ color: p.undoneAt ? undefined : t?.color }}>{t?.name}</span>)
+                      </>
+                    ) : (
+                      <span className="text-xs"> (organização)</span>
+                    )}{" "}
+                    pickou <span className={cn(!p.undoneAt && "text-fg")}>{pl?.nickname ?? "jogador"}</span>
+                    {!byCaptain && (
+                      <>
+                        {" "}
+                        para o <span style={{ color: p.undoneAt ? undefined : t?.color }}>{t?.name}</span>
+                      </>
+                    )}
+                    <span className="text-xs text-subtle"> · pote {p.pot}</span>
+                    {p.undoneAt && <span className="ml-1 text-xs no-underline"> (desfeita)</span>}
+                  </span>
+                </li>
+              );
+            })}
           </ol>
         </Card>
       )}
