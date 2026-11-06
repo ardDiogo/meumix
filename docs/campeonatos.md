@@ -75,3 +75,26 @@ atualização a cada 8 s). Migração `0039_championship_draft.sql`.
    **Reiniciar** (ordem e escolhas do zero; potes e capitães mantidos).
 
 Regras puras em `src/lib/championship-draft.ts` (serpentina, adedonha, potes), com testes.
+
+## Etapa 6 — confrontos e agendamento
+
+Aba **Calendário** (`/campeonatos/<slug>/calendario`), ao vivo. Migração `0040_championship_matches.sql`.
+
+- **Gerar confrontos** (quem organiza, depois do draft): todos contra todos. Com 5 times usa o
+  calendário publicado, na ordem de cadastro dos times (Snkk, Beli, Koder, Mald, Marlon):
+  R1 Beli×Marlon, Koder×Mald (folga Snkk) · R2 Snkk×Marlon, Beli×Koder (folga Mald) ·
+  R3 Snkk×Mald, Marlon×Koder (folga Beli) · R4 Snkk×Koder, Mald×Beli (folga Marlon) ·
+  R5 Snkk×Beli, Mald×Marlon (folga Koder). Outros tamanhos: método do círculo; ida e volta inverte o
+  mando. Dá para gerar de novo enquanto nenhum jogo tiver data.
+- **Agendamento pelos capitães**: o capitão de um dos times **propõe** data e hora (com recado
+  opcional) → *Aguardando resposta do adversário*; o capitão adversário **aceita** (→ *Aguardando
+  aprovação da organização*) ou **recusa** (→ *Aguardando agendamento*) e pode propor outra. A
+  organização **aprova** (escolhe o servidor ou pega o primeiro livre) → *Agendada*.
+- **Regras** (servidor e testes): a data precisa cair nos dias e horários do campeonato (fuso de
+  Brasília; janela que passa da meia-noite vale para a madrugada seguinte); nenhum time em dois
+  jogos ao mesmo tempo; no máximo `servidores` jogos simultâneos e cada servidor com um jogo. Cada
+  jogo reserva 75 min por mapa possível (MD1 75 min, MD3 3h45).
+- **Organização**: marcar direto (sem passar pelos capitães, sem exigir a janela), editar rodada e
+  inverter mando (sem pôr um time duas vezes na mesma rodada), adiar, cancelar e reabrir.
+- **Avisos na tela**: propostas esperando a sua resposta, jogos esperando aprovação e jogos do seu
+  time sem data.

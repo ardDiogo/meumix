@@ -217,3 +217,81 @@ export const getDraft = cache(async (championshipId: string) => {
     })),
   };
 });
+
+export interface MatchRow {
+  id: string;
+  stage: "group" | "playoff";
+  round: number;
+  leg: number;
+  homeTeam: string | null;
+  awayTeam: string | null;
+  bestOf: number;
+  scheduledAt: string | null;
+  server: number | null;
+  status: import("@/lib/championship-schedule").MatchStatus;
+  winnerTeam: string | null;
+}
+
+export interface ProposalRow {
+  id: string;
+  matchId: string;
+  proposedByTeam: string;
+  proposedBy: string | null;
+  startsAt: string;
+  note: string;
+  status: "pending" | "accepted" | "declined" | "superseded" | "cancelled";
+  respondedAt: string | null;
+  createdAt: string;
+}
+
+export const toMatch = (m: Record<string, unknown>): MatchRow => ({
+  id: m.id as string,
+  stage: m.stage as MatchRow["stage"],
+  round: m.round as number,
+  leg: m.leg as number,
+  homeTeam: (m.home_team as string | null) ?? null,
+  awayTeam: (m.away_team as string | null) ?? null,
+  bestOf: m.best_of as number,
+  scheduledAt: (m.scheduled_at as string | null) ?? null,
+  server: (m.server as number | null) ?? null,
+  status: m.status as MatchRow["status"],
+  winnerTeam: (m.winner_team as string | null) ?? null,
+});
+
+export const MATCH_COLUMNS =
+  "id, stage, round, leg, home_team, away_team, best_of, scheduled_at, server, status, winner_team";
+
+/** Jogos e propostas de data do campeonato (sem a migração 0040: vazio, `missing`). */
+export const getMatches = cache(async (championshipId: string) => {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { matches: [] as MatchRow[], proposals: [] as ProposalRow[], missing: false };
+  const [{ data: matches, error }, { data: proposals }] = await Promise.all([
+    supabase
+      .from("championship_matches")
+      .select(MATCH_COLUMNS)
+      .eq("championship_id", championshipId)
+      .order("round")
+      .order("created_at"),
+    supabase
+      .from("championship_match_proposals")
+      .select("id, match_id, proposed_by_team, proposed_by, starts_at, note, status, responded_at, created_at")
+      .eq("championship_id", championshipId)
+      .order("created_at", { ascending: false }),
+  ]);
+  if (error) return { matches: [], proposals: [], missing: error.code === "42P01" || error.code === "PGRST205" };
+  return {
+    missing: false,
+    matches: (matches ?? []).map(toMatch),
+    proposals: (proposals ?? []).map((p): ProposalRow => ({
+      id: p.id as string,
+      matchId: p.match_id as string,
+      proposedByTeam: p.proposed_by_team as string,
+      proposedBy: (p.proposed_by as string | null) ?? null,
+      startsAt: p.starts_at as string,
+      note: (p.note as string) ?? "",
+      status: p.status as ProposalRow["status"],
+      respondedAt: (p.responded_at as string | null) ?? null,
+      createdAt: p.created_at as string,
+    })),
+  };
+});
