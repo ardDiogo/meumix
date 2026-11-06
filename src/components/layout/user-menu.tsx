@@ -1,7 +1,8 @@
 "use client";
 
-import { ChevronDown, LogIn, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { ChevronDown, Loader2, LogIn, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
+import { useTransition } from "react";
 import { signOut } from "@/app/entrar/actions";
 import { Avatar } from "../ui/avatar";
 import { Button } from "../ui/button";
@@ -22,6 +23,7 @@ export interface MenuUser {
 }
 
 export function UserMenu({ user, showAdmin }: { user: MenuUser | null; showAdmin: boolean }) {
+  const [leaving, startLeaving] = useTransition();
   if (!user) {
     return (
       <Button variant="primary" size="sm" asChild>
@@ -67,13 +69,19 @@ export function UserMenu({ user, showAdmin }: { user: MenuUser | null; showAdmin
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <form action={signOut}>
-          <DropdownMenuItem asChild>
-            <button type="submit" className="w-full">
-              <LogOut /> Sair
-            </button>
-          </DropdownMenuItem>
-        </form>
+        {/* Chama a saída direto: com um formulário dentro do menu, o menu fechava (e sumia da
+            página) antes de o envio acontecer, e o "Sair" não fazia nada. */}
+        <DropdownMenuItem
+          disabled={leaving}
+          onSelect={(e) => {
+            e.preventDefault();
+            startLeaving(async () => {
+              await signOut();
+            });
+          }}
+        >
+          {leaving ? <Loader2 className="animate-spin" /> : <LogOut />} {leaving ? "Saindo…" : "Sair"}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
