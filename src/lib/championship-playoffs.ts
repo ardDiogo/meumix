@@ -12,6 +12,16 @@ const SEEDS: Record<Exclude<PlayoffFormat, "none">, [number, number][]> = {
     [1, 4],
     [2, 3],
   ],
+  round16_quarters_semis_final: [
+    [1, 16],
+    [8, 9],
+    [4, 13],
+    [5, 12],
+    [2, 15],
+    [7, 10],
+    [3, 14],
+    [6, 11],
+  ],
   quarters_semis_final: [
     [1, 8],
     [4, 5],
@@ -24,6 +34,7 @@ const NAMES: Record<Exclude<PlayoffFormat, "none">, string[]> = {
   final: ["Final"],
   semis_final: ["Semifinal", "Final"],
   quarters_semis_final: ["Quartas de final", "Semifinal", "Final"],
+  round16_quarters_semis_final: ["Oitavas de final", "Quartas de final", "Semifinal", "Final"],
 };
 
 export const playoffRounds = (format: PlayoffFormat) => (format === "none" ? 0 : NAMES[format].length);

@@ -44,5 +44,14 @@ describe("playoffs", () => {
     assert.equal(roundTitle("semis_final", 1), "Semifinais");
     assert.equal(playoffLabel("quarters_semis_final", 1, 3), "Quartas de final 3");
   });
+  it("oitavas (16 times): 1×16, 8×9… e 15 jogos até a final", () => {
+    const sixteen = Array.from({ length: 16 }, (_, i) => `t${i + 1}`);
+    const b = buildBracket("round16_quarters_semis_final", sixteen);
+    assert.equal(b.length, 15);
+    assert.deepEqual(b[0]!.seeds, [1, 16]);
+    assert.equal(playoffRounds("round16_quarters_semis_final"), 4);
+    assert.equal(playoffLabel("round16_quarters_semis_final", 1, 8), "Oitavas de final 8");
+    assert.deepEqual(nextSlot("round16_quarters_semis_final", 1, 8), { round: 2, leg: 4, side: "away" });
+  });
   it("times insuficientes", () => assert.throws(() => buildBracket("semis_final", ["a", "b", "c"])));
 });

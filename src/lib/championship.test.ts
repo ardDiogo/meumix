@@ -26,6 +26,12 @@ describe("validateChampionship", () => {
     assert.match(validateChampionship({ ...ok, potCount: 5 }).join(), /são 4 potes/);
     assert.deepEqual(validateChampionship({ ...ok, playersPerTeam: 6, potCount: 5 }), []);
   });
+  it("de 2 a 25 times", () => {
+    assert.deepEqual(validateChampionship({ ...ok, teamCount: 25 }), []);
+    assert.deepEqual(validateChampionship({ ...ok, teamCount: 2, playoffFormat: "final" }), []);
+    assert.match(validateChampionship({ ...ok, teamCount: 26 }).join(), /de 2 a 25/);
+    assert.deepEqual(validateChampionship({ ...ok, teamCount: 20, playoffFormat: "round16_quarters_semis_final" }), []);
+  });
   it("playoffs precisam de times suficientes", () =>
     assert.match(validateChampionship({ ...ok, playoffFormat: "quarters_semis_final" }).join(), /8 equipes/));
   it("premiação soma 100%", () =>

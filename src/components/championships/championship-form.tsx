@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { createChampionship, updateChampionship } from "@/app/(app)/campeonatos/actions";
 import {
   formatMoney,
+  MAX_TEAMS,
   GROUP_FORMAT_LABEL,
   PLAYOFF_FORMAT_LABEL,
   prizeDistribution,
@@ -193,7 +194,7 @@ export function ChampionshipForm({
               id="ch-teams"
               type="number"
               min={2}
-              max={16}
+              max={MAX_TEAMS}
               value={Number.isNaN(v.teamCount) ? "" : v.teamCount}
               onChange={(e) => set("teamCount", num(e.target.value))}
             />

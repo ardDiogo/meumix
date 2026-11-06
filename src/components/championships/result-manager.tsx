@@ -1,12 +1,13 @@
 "use client";
 
-import { Download, Loader2, Play, Save, Trash2 } from "lucide-react";
+import { Copy, Download, Loader2, Play, Save, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { toast } from "sonner";
 import { deleteMapResult, importGcMap, markLive, saveMapResult } from "@/app/(app)/campeonatos/results-actions";
 import { seriesState } from "@/lib/championship-standings";
 import { findMapName, parseGcPayload, type GcMap } from "@/lib/gc-api";
+import { gcBookmarklet, GC_RETURN_KEY } from "@/lib/gc-bookmarklet";
 import { gcQueueSnapshot, parseGcQueue, subscribeGcQueue } from "@/lib/gc-queue";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
@@ -237,6 +238,50 @@ export function ResultManager({
 
 const EMPTY = "[]";
 
+/**
+ * Botão da GC para os favoritos (o mesmo dos mixes) e a volta para este jogo
+ * depois de enviar. O React não aceita "javascript:" no href: vai direto no DOM.
+ */
+function BookmarkletInstall() {
+  const link = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    link.current?.setAttribute("href", gcBookmarklet(window.location.origin));
+    try {
+      localStorage.setItem(GC_RETURN_KEY, window.location.pathname);
+    } catch {}
+  }, []);
+  return (
+    <details className="text-xs text-muted">
+      <summary className="cursor-pointer">Ainda não tem o botão? Instale nos favoritos</summary>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <a
+          ref={link}
+          onClick={(e) => {
+            e.preventDefault();
+            toast.info("Arraste este botão para a barra de favoritos e use-o na página da partida na GC.");
+          }}
+          className="inline-flex h-8 cursor-grab items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-semibold text-black"
+        >
+          <Download className="size-3.5" /> Enviar ao MeuMix
+        </a>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            navigator.clipboard
+              .writeText(gcBookmarklet(window.location.origin))
+              .then(() => toast.success("Código copiado: crie um favorito e cole no endereço (URL)."))
+              .catch(() => toast.error("Não foi possível copiar."))
+          }
+        >
+          <Copy /> Copiar código
+        </Button>
+        <span className="w-full text-subtle">Arraste para a barra de favoritos (Ctrl+Shift+B mostra a barra).</span>
+      </div>
+    </details>
+  );
+}
+
 /** Importar da GC: partidas da fila do "Enviar ao MeuMix" (neste navegador) ou o JSON colado. */
 function GcImport({
   championshipId,
@@ -281,8 +326,10 @@ function GcImport({
       </div>
       <p className="text-xs text-muted">
         Na página da partida na GC, clique em <span className="text-fg">Enviar ao MeuMix</span> (o mesmo botão dos
-        mixes). Ela aparece aqui; os jogadores são ligados pelo apelido da GC ou pela Steam.
+        mixes). Ela aparece aqui; os jogadores são ligados pelo apelido da GC ou pela Steam. A lista guarda as últimas
+        20 partidas enviadas neste navegador: dá para enviar a rodada inteira e importar depois, jogo a jogo.
       </p>
+      <BookmarkletInstall />
       {queue.length > 0 ? (
         <ul className="space-y-1.5">
           {queue

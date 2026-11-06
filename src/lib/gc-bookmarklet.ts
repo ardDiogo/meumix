@@ -25,4 +25,4 @@ export const GC_QUEUE_KEY = "meumix:gc-queue";
 /** Última página de finalização aberta (para o "voltar" da tela de recebimento). */
 export const GC_RETURN_KEY = "meumix:gc-return";
 /** Máximo de mapas na fila (uma série tem até 5). */
-export const GC_QUEUE_MAX = 6;
+export const GC_QUEUE_MAX = 20;

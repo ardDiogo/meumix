@@ -168,3 +168,13 @@ em cima (uma coluna por rodada, com a folga embaixo) e os playoffs embaixo, liga
 quando termina); nos playoffs, vaga ainda indefinida mostra "Vencedor do 11". O clique abre a página
 do jogo. As ações (propor data, aceitar, aprovar, marcar direto) ficam na aba **Agendamento**, com um
 contador do que está esperando quem está vendo. A aba Playoffs usa a mesma chave.
+
+## Tamanho e envio da GC
+
+- **De 2 a 25 times** (migração `0043_championship_size.sql`). Playoffs: sem playoffs, final (2),
+  semifinais (4), quartas (8) ou **oitavas** (16: 1×16, 8×9, 4×13, 5×12, 2×15, 7×10, 3×14, 6×11).
+  O todos contra todos gera qualquer quantidade (25 times = 25 rodadas, cada time folga uma vez).
+- **Envio da GC**: a fila do "Enviar ao MeuMix" guarda as **20** últimas partidas por navegador (dá
+  para enviar a rodada inteira e importar depois). A aba que recebe (`/admin/importar-gc`) também abre
+  para quem **organiza um campeonato**, e volta para o jogo do campeonato de onde veio. O botão para os
+  favoritos também está na página do jogo ("Ainda não tem o botão?").

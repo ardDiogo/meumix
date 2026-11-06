@@ -44,8 +44,9 @@ export function GcReceiver() {
     try {
       url = localStorage.getItem(GC_RETURN_KEY);
     } catch {}
-    // Só volta para a finalização do próprio site.
-    if (!url?.startsWith("/admin/finalizar?")) url = null;
+    // Só volta para a finalização do mix ou para um jogo de campeonato do próprio site.
+    if (!url?.startsWith("/admin/finalizar?") && !/^\/campeonatos\/[a-z0-9-]+\/jogos\/[0-9a-f-]{36}$/.test(url ?? ""))
+      url = null;
     // Leitura única do endereço e do armazenamento ao abrir a aba.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus(result);
@@ -77,7 +78,12 @@ export function GcReceiver() {
       </p>
       <Button variant="primary" asChild>
         <Link href={back ?? "/admin"}>
-          <ArrowLeft /> {back ? "Voltar para a finalização" : "Ir para o painel"}
+          <ArrowLeft />{" "}
+          {back
+            ? back.startsWith("/campeonatos/")
+              ? "Voltar para o jogo do campeonato"
+              : "Voltar para a finalização"
+            : "Ir para o painel"}
         </Link>
       </Button>
     </div>

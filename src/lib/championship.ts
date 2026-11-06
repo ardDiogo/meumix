@@ -5,7 +5,7 @@
 
 export type ChampionshipStatus = "setup" | "registration" | "teams" | "running" | "playoffs" | "finished" | "cancelled";
 export type GroupFormat = "round_robin" | "double_round_robin";
-export type PlayoffFormat = "none" | "final" | "semis_final" | "quarters_semis_final";
+export type PlayoffFormat = "none" | "final" | "semis_final" | "quarters_semis_final" | "round16_quarters_semis_final";
 
 export interface Championship {
   id: string;
@@ -49,6 +49,9 @@ export type ChampionshipInput = Omit<
   banner?: string | null;
 };
 
+/** Limite de times por campeonato (o banco aceita o mesmo). */
+export const MAX_TEAMS = 25;
+
 export const STATUS_LABEL: Record<ChampionshipStatus, string> = {
   setup: "Em configuração",
   registration: "Aguardando inscrições",
@@ -70,6 +73,7 @@ export const PLAYOFF_FORMAT_LABEL: Record<PlayoffFormat, string> = {
   final: "Final (1º × 2º)",
   semis_final: "Semifinais e final (4 times)",
   quarters_semis_final: "Quartas, semifinais e final (8 times)",
+  round16_quarters_semis_final: "Oitavas, quartas, semifinais e final (16 times)",
 };
 
 /** Times que avançam para os playoffs em cada formato. */
@@ -78,6 +82,7 @@ export const PLAYOFF_TEAMS: Record<PlayoffFormat, number> = {
   final: 2,
   semis_final: 4,
   quarters_semis_final: 8,
+  round16_quarters_semis_final: 16,
 };
 
 export const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
@@ -145,7 +150,7 @@ export function validateChampionship(i: ChampionshipInput): string[] {
   if (i.startsOn && !DATE.test(i.startsOn)) e.push("Data de início inválida.");
   if (i.endsOn && !DATE.test(i.endsOn)) e.push("Data de encerramento inválida.");
   if (i.startsOn && i.endsOn && i.endsOn < i.startsOn) e.push("O encerramento não pode ser antes do início.");
-  if (!int(i.teamCount, 2, 16)) e.push("Quantidade de equipes: de 2 a 16.");
+  if (!int(i.teamCount, 2, MAX_TEAMS)) e.push(`Quantidade de equipes: de 2 a ${MAX_TEAMS}.`);
   if (!int(i.playersPerTeam, 2, 10)) e.push("Jogadores por equipe: de 2 a 10.");
   if (!int(i.potCount, 1, 10)) e.push("Potes: de 1 a 10.");
   // O capitão é um dos jogadores do time: os potes completam o resto.

@@ -384,3 +384,16 @@ export async function getPaidPlayers(championshipId: string): Promise<number | n
   if (error || data?.paid_players == null) return null;
   return Number(data.paid_players);
 }
+
+/** Organiza algum campeonato (criou ou foi liberado)? Sem a migração 0038: não. */
+export async function isChampionshipOrganizer(user: { id: string; isSuperAdmin: boolean } | null) {
+  if (!user) return false;
+  if (user.isSuperAdmin) return true;
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return false;
+  const [{ count: created }, { count: granted }] = await Promise.all([
+    supabase.from("championships").select("id", { count: "exact", head: true }).eq("created_by", user.id),
+    supabase.from("championship_organizers").select("user_id", { count: "exact", head: true }).eq("user_id", user.id),
+  ]);
+  return (created ?? 0) + (granted ?? 0) > 0;
+}

@@ -29,7 +29,7 @@ describe("confrontos", () => {
   };
   it("10 confrontos, 4 por time, ninguém em dois jogos na rodada", () => valid(T, f, 4));
   it("método do círculo para outros tamanhos", () => {
-    for (const n of [2, 3, 4, 6, 7, 8]) {
+    for (const n of [2, 3, 4, 6, 7, 8, 16, 24, 25]) {
       const teams = Array.from({ length: n }, (_, i) => `t${i}`);
       valid(teams, roundRobin(teams), n - 1);
       const b = byes(roundRobin(teams), teams);
