@@ -2,6 +2,7 @@ import {
   BarChart3,
   Clapperboard,
   LayoutDashboard,
+  Medal,
   Settings,
   ShieldCheck,
   Swords,
@@ -22,6 +23,7 @@ export interface NavItem {
 export const NAV_MAIN: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Seu resumo competitivo" },
   { href: "/mixes", label: "Mixes", icon: Swords, description: "Criar e consultar mixes" },
+  { href: "/campeonatos", label: "Campeonatos", icon: Medal, description: "Draft, tabela, playoffs e premiação" },
   { href: "/jogadores", label: "Jogadores", icon: Users, description: "Perfis e desempenho" },
   { href: "/rankings", label: "Rankings", icon: Trophy, description: "Classificação por ELO" },
   { href: "/bolao", label: "Bolão", icon: Target, description: "Palpites e ranking dos palpiteiros" },
