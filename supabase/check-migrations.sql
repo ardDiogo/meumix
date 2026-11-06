@@ -1,0 +1,51 @@
+-- MeuMix: confere quais migrações já foram rodadas (só lê, não altera nada).
+with col(t, c) as (select table_name, column_name from information_schema.columns where table_schema = 'public'),
+fn(f) as (select proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public'),
+regra(def) as (select pg_get_constraintdef(oid) from pg_constraint where conname = 'badges_auto_rule_check'),
+c(migracao, ok) as (values
+  ('0001_init', to_regclass('public.profiles') is not null),
+  ('0002_auth', exists (select 1 from fn where f = 'handle_new_user')),
+  ('0003_registrations', to_regclass('public.mix_registrations') is not null),
+  ('0004_votes_audit_realtime', to_regclass('public.mix_cancellations') is not null),
+  ('0005_draft', to_regclass('public.mix_draft_state') is not null),
+  ('0006_penalties_tiebreaker', to_regclass('public.user_penalties') is not null),
+  ('0007_elo_matches', to_regclass('public.level_configs') is not null),
+  ('0008_full_name', exists (select 1 from col where t = 'profiles' and c = 'full_name')),
+  ('0009_steam', exists (select 1 from col where t = 'profiles' and c = 'steam_id')),
+  ('0010_admin_config', to_regclass('public.app_settings') is not null),
+  ('0011_match_stats', exists (select 1 from col where t = 'player_match_records' and c = 's')),
+  ('0012_link_guests', exists (select 1 from fn where f = 'link_match_record')),
+  ('0013_csrep', to_regclass('public.player_ai_analyses') is not null),
+  ('0014_team_suggestion', to_regclass('public.mix_team_suggestions') is not null),
+  ('0015_badges', to_regclass('public.badges') is not null),
+  ('0016_delete_match', exists (select 1 from fn where f = 'delete_match')),
+  ('0017_confirm_links', to_regclass('public.confirm_links') is not null),
+  ('0018_clips', to_regclass('public.clips') is not null),
+  ('0019_clip_media', exists (select 1 from col where t = 'clips' and c = 'thumbnail_url')),
+  ('0020_badges_seed', case when to_regclass('public.badges') is null then false
+     else query_to_xml('select 1 from public.badges where name = ''Galinha''', false, false, '')::text like '%<row>%' end),
+  ('0021_badges_more', exists (select 1 from col where t = 'badges' and c = 'unlock_rule')),
+  ('0022_twitch', exists (select 1 from col where t = 'profiles' and c = 'twitch_login')),
+  ('0023_profiles_privacy', not has_table_privilege('anon', 'public.profiles', 'select')),
+  ('0024_account_deletion', exists (select 1 from fn where f = 'anonymize_account')),
+  ('0025_badges_auto', to_regclass('public.badge_progress') is not null),
+  ('0026_badges_lanterna', exists (select 1 from regra where def like '%lanterna_streak%')),
+  ('0027_mix_skips', to_regclass('public.mix_skips') is not null),
+  ('0028_badge_progress_detail', exists (select 1 from col where t = 'badge_progress' and c = 'detail')),
+  ('0029_badges_destaques', exists (select 1 from regra where def like '%latest_top_kills%')),
+  ('0030_player_aliases', to_regclass('public.player_aliases') is not null),
+  ('0031_bolao_push', to_regclass('public.mix_predictions') is not null),
+  ('0032_mix_chronicles', to_regclass('public.mix_chronicles') is not null),
+  ('0033_badges_bolao', exists (select 1 from regra where def like '%bolao_leader%')),
+  ('0034_map_cache', case when to_regclass('public.maps') is null then false
+     else query_to_xml('select 1 from public.maps where id = ''de_cache''', false, false, '')::text like '%<row>%' end),
+  ('0035_gc_import', to_regclass('public.match_gc_maps') is not null),
+  ('0036_badges_gc', exists (select 1 from regra where def like '%gc_ace%')),
+  ('0037_mix_analyses', to_regclass('public.mix_analyses') is not null),
+  ('0038_championships', to_regclass('public.championships') is not null),
+  ('0039_championship_draft', to_regclass('public.championship_drafts') is not null),
+  ('0040_championship_matches', to_regclass('public.championship_matches') is not null)
+)
+select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
+from c
+order by (not ok) desc, migracao;
