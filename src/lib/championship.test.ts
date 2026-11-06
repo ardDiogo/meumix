@@ -6,7 +6,10 @@ import {
   championshipSlug,
   DEFAULT_INPUT,
   prizeDistribution,
+  rosterIssues,
+  suggestTag,
   validateChampionship,
+  validateTeam,
 } from "./championship";
 
 describe("championshipSlug", () => {
@@ -68,5 +71,45 @@ describe("canManageChampionship", () => {
   it("outro admin ou jogador, não", () => {
     assert.ok(!canManageChampionship({ id: "c", isSuperAdmin: false }, ch, ["b"]));
     assert.ok(!canManageChampionship(null, ch, []));
+  });
+});
+
+describe("times e inscritos", () => {
+  const team = (id: string, captainId: string | null = null) => ({
+    id,
+    name: `Time ${id}`,
+    tag: "",
+    color: "#FF6A00",
+    hasLogo: false,
+    captainId,
+    draftOrder: null,
+  });
+  const players = (n: number) => Array.from({ length: n }, (_, i) => ({ userId: `u${i}`, pot: null, teamId: null }));
+  const c = { teamCount: 5, playersPerTeam: 5 };
+  it("aponta o que falta", () => {
+    const issues = rosterIssues(c, [team("a", "u0"), team("b")], players(20));
+    assert.deepEqual(issues, [
+      "Faltam 5 inscritos (20 de 25).",
+      "Faltam 3 times (2 de 5).",
+      "Time sem capitão: Time b.",
+    ]);
+  });
+  it("completo: 25 inscritos e 5 times com capitão", () =>
+    assert.deepEqual(
+      rosterIssues(
+        c,
+        ["a", "b", "c", "d", "e"].map((id, i) => team(id, `u${i}`)),
+        players(25),
+      ),
+      [],
+    ));
+  it("sigla sugerida e validação", () => {
+    assert.equal(suggestTag("Time Snkk"), "SNKK");
+    assert.equal(suggestTag("Malditos Ágeis"), "MALD");
+    assert.deepEqual(validateTeam({ name: "Beli", tag: "BELI", color: "#3B82F6", captainId: null }), []);
+    assert.match(
+      validateTeam({ name: " ", tag: "TOOLONG", color: "azul", captainId: null }).join(),
+      /Nome.*Sigla.*Cor/,
+    );
   });
 });

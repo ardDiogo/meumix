@@ -1,6 +1,12 @@
 import "server-only";
 import { cache } from "react";
-import { canCreateChampionship, canManageChampionship, type Championship } from "@/lib/championship";
+import {
+  canCreateChampionship,
+  canManageChampionship,
+  type Championship,
+  type ChampionshipPlayer,
+  type ChampionshipTeam,
+} from "@/lib/championship";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSession } from "./auth";
 import { getDataSource } from "./index";
@@ -104,3 +110,38 @@ export const getChampionship = cache(async (slug: string) => {
 export async function canCreate() {
   return canCreateChampionship(await getSession());
 }
+
+/** Times e inscritos do campeonato (sem a migração 0038: vazio). */
+export const getRoster = cache(async (championshipId: string) => {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { teams: [] as ChampionshipTeam[], players: [] as ChampionshipPlayer[] };
+  const [{ data: teams }, { data: players }] = await Promise.all([
+    supabase
+      .from("championship_teams")
+      .select("id, name, tag, color, has_logo, captain_id, draft_order, created_at")
+      .eq("championship_id", championshipId)
+      .order("draft_order", { nullsFirst: false })
+      .order("created_at"),
+    supabase
+      .from("championship_players")
+      .select("user_id, pot, team_id, created_at")
+      .eq("championship_id", championshipId)
+      .order("created_at"),
+  ]);
+  return {
+    teams: (teams ?? []).map((t): ChampionshipTeam => ({
+      id: t.id as string,
+      name: t.name as string,
+      tag: (t.tag as string) ?? "",
+      color: t.color as string,
+      hasLogo: !!t.has_logo,
+      captainId: (t.captain_id as string | null) ?? null,
+      draftOrder: (t.draft_order as number | null) ?? null,
+    })),
+    players: (players ?? []).map((p): ChampionshipPlayer => ({
+      userId: p.user_id as string,
+      pot: (p.pot as number | null) ?? null,
+      teamId: (p.team_id as string | null) ?? null,
+    })),
+  };
+});

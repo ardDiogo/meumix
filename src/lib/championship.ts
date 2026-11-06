@@ -204,3 +204,88 @@ export function prizeDistribution(entryFee: number, players: number, split: numb
 }
 
 export const formatMoney = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+export const MIGRATION = "Rode a migração 0038_championships.sql no Supabase.";
+/** Tabela ou coluna inexistente (migração não rodada). */
+export const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703";
+
+/* --------------------------- Inscritos e times --------------------------- */
+
+export interface ChampionshipTeam {
+  id: string;
+  name: string;
+  tag: string;
+  color: string;
+  hasLogo: boolean;
+  captainId: string | null;
+  draftOrder: number | null;
+}
+
+export interface ChampionshipPlayer {
+  userId: string;
+  pot: number | null;
+  teamId: string | null;
+}
+
+export interface TeamInput {
+  name: string;
+  tag: string;
+  color: string;
+  captainId: string | null;
+  /** Escudo novo (JPEG base64), null para remover, undefined para manter. */
+  logo?: string | null;
+}
+
+/** Cores sugeridas para os times (contraste bom no tema escuro). */
+export const TEAM_COLORS = ["#FF6A00", "#3B82F6", "#22C55E", "#EAB308", "#A855F7", "#EF4444", "#06B6D4", "#EC4899"];
+
+export function validateTeam(t: TeamInput): string[] {
+  const e: string[] = [];
+  if (!t.name.trim() || t.name.trim().length > 40) e.push("Nome do time: de 1 a 40 caracteres.");
+  if (t.tag.trim().length > 5) e.push("Sigla: até 5 caracteres.");
+  if (!/^#[0-9A-Fa-f]{6}$/.test(t.color)) e.push("Cor inválida.");
+  return e;
+}
+
+/** Sigla sugerida a partir do nome: "Time Snkk" → "SNKK". */
+export const suggestTag = (name: string) =>
+  name
+    .replace(/^time\s+/i, "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z0-9]/g, "")
+    .slice(0, 4)
+    .toUpperCase();
+
+/**
+ * O que falta para o draft: inscritos (equipes × jogadores), times e um
+ * capitão por time. Vazio = pronto para montar os potes.
+ */
+export function rosterIssues(
+  c: { teamCount: number; playersPerTeam: number },
+  teams: ChampionshipTeam[],
+  players: ChampionshipPlayer[],
+) {
+  const issues: string[] = [];
+  const needed = c.teamCount * c.playersPerTeam;
+  const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
+  const lack = needed - players.length;
+  if (lack > 0)
+    issues.push(`${plural(lack, "Falta 1 inscrito", `Faltam ${lack} inscritos`)} (${players.length} de ${needed}).`);
+  if (lack < 0)
+    issues.push(
+      `${plural(-lack, "Há 1 inscrito a mais", `Há ${-lack} inscritos a mais`)} (${players.length} para ${needed} vagas).`,
+    );
+  const lackTeams = c.teamCount - teams.length;
+  if (lackTeams > 0)
+    issues.push(
+      `${plural(lackTeams, "Falta 1 time", `Faltam ${lackTeams} times`)} (${teams.length} de ${c.teamCount}).`,
+    );
+  if (lackTeams < 0) issues.push(plural(-lackTeams, "Há 1 time a mais.", `Há ${-lackTeams} times a mais.`));
+  const noCaptain = teams.filter((t) => !t.captainId);
+  if (noCaptain.length)
+    issues.push(
+      `${noCaptain.length === 1 ? "Time sem capitão" : "Times sem capitão"}: ${noCaptain.map((t) => t.name).join(", ")}.`,
+    );
+  return issues;
+}
