@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, CalendarClock, Check, Loader2, Pencil, Server, Shuffle, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -114,7 +115,12 @@ export function CalendarBoard({
   windowText,
   canGenerate,
   draftDone,
+  slug,
+  scores,
 }: {
+  slug: string;
+  /** Mapas vencidos por cada lado, nos jogos com placar. */
+  scores: Record<string, { home: number; away: number }>;
   championshipId: string;
   teams: BoardTeam[];
   matches: CalMatch[];
@@ -232,6 +238,8 @@ export function CalendarBoard({
                     isManager={isManager}
                     servers={servers}
                     rounds={Math.max(...rounds)}
+                    href={`/campeonatos/${slug}/jogos/${m.id}`}
+                    score={scores[m.id] ?? null}
                   />
                 ))}
               </ul>
@@ -254,7 +262,11 @@ function MatchItem({
   isManager,
   servers,
   rounds,
+  href,
+  score,
 }: {
+  href: string;
+  score: { home: number; away: number } | null;
   championshipId: string;
   match: CalMatch;
   teamById: Map<string, BoardTeam>;
@@ -298,13 +310,28 @@ function MatchItem({
   return (
     <li className="space-y-2.5 px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex min-w-0 basis-full items-center gap-2 font-semibold sm:flex-1 sm:basis-auto">
+        <Link
+          href={href}
+          className="group flex min-w-0 basis-full items-center gap-2 font-semibold sm:flex-1 sm:basis-auto"
+        >
           {home && <TeamLogo team={home} size={28} />}
-          <span className="truncate">{home?.name ?? "A definir"}</span>
-          <span className="px-1 text-xs font-normal text-subtle">×</span>
-          <span className="truncate">{away?.name ?? "A definir"}</span>
+          <span className={cn("truncate group-hover:text-brand", score && score.home < score.away && "text-muted")}>
+            {home?.name ?? "A definir"}
+          </span>
+          {score ? (
+            <span className="px-1 font-display text-base tabular">
+              {score.home}
+              <span className="mx-1 text-subtle">:</span>
+              {score.away}
+            </span>
+          ) : (
+            <span className="px-1 text-xs font-normal text-subtle">×</span>
+          )}
+          <span className={cn("truncate group-hover:text-brand", score && score.away < score.home && "text-muted")}>
+            {away?.name ?? "A definir"}
+          </span>
           {away && <TeamLogo team={away} size={28} />}
-        </div>
+        </Link>
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Badge variant={STATUS_VARIANT[m.status]}>{MATCH_STATUS_LABEL[m.status]}</Badge>
           <span className="text-muted">MD{m.bestOf}</span>

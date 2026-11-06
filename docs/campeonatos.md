@@ -98,3 +98,24 @@ Aba **Calendário** (`/campeonatos/<slug>/calendario`), ao vivo. Migração `004
   inverter mando (sem pôr um time duas vezes na mesma rodada), adiar, cancelar e reabrir.
 - **Avisos na tela**: propostas esperando a sua resposta, jogos esperando aprovação e jogos do seu
   time sem data.
+
+## Etapa 7 — resultados e classificação
+
+Migração `0041_championship_results.sql` (placar de cada mapa; com os dados completos da GC quando
+importado). A classificação não é guardada: sai dos placares na hora.
+
+- **Página do jogo** (`/campeonatos/<slug>/jogos/<id>`, link no calendário): times, placar (rounds no
+  MD1, mapas no MD3), mapas, data, servidor, capitães, status e os elencos (com K/A/D, ADR e rating
+  quando veio da GC).
+- **Resultado** (quem organiza): digitar o mapa (placar sem empate, vencedor com 13+; W.O. 13×0) ou
+  **Importar da GC**: a partida enviada pelo "Enviar ao MeuMix" aparece na lista (ou cole o JSON). Os
+  jogadores são ligados pelo apelido `gc:<id>` ou pela Steam; o lado do mandante é descoberto pelo
+  elenco (ou escolhido à mão). Uma partida da GC entra uma vez só no campeonato.
+- **MD3**: os mapas entram em ordem; quem fizer 2 vence e o jogo finaliza sozinho (não cabe mapa
+  depois de decidido). Corrigir mapa digitado, apagar o último mapa (recalcula) e marcar
+  "Em andamento".
+- **Classificação** (aba própria): posição, PJ, V, D, pontos, rounds vencidos/perdidos, saldo e
+  aproveitamento. Desempate: pontos → confronto direto (2 empatados) ou mini-classificação entre os
+  empatados (3+) → saldo de rounds → rounds vencidos → ordem da lista de times. Os classificados
+  para os playoffs ficam em verde e os eliminados em vermelho.
+- Nada disso usa ou altera as tabelas do mix (o importador da GC só lê os apelidos e a Steam).

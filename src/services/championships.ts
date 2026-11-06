@@ -295,3 +295,55 @@ export const getMatches = cache(async (championshipId: string) => {
     })),
   };
 });
+
+export interface MapResultRow {
+  id: string;
+  matchId: string;
+  order: number;
+  mapId: string;
+  home: number;
+  away: number;
+  gcMatchId: string | null;
+  hasStats: boolean;
+}
+
+/** Placares de todos os mapas do campeonato (sem a migração 0041: vazio). */
+export const getMapResults = cache(async (championshipId: string) => {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return { maps: [] as MapResultRow[], missing: false };
+  const { data, error } = await supabase
+    .from("championship_match_maps")
+    .select("id, match_id, map_order, map_id, score_home, score_away, gc_match_id")
+    .eq("championship_id", championshipId)
+    .order("map_order");
+  if (error) return { maps: [], missing: error.code === "42P01" || error.code === "PGRST205" };
+  return {
+    missing: false,
+    maps: (data ?? []).map((m): MapResultRow => ({
+      id: m.id as string,
+      matchId: m.match_id as string,
+      order: m.map_order as number,
+      mapId: m.map_id as string,
+      home: m.score_home as number,
+      away: m.score_away as number,
+      gcMatchId: (m.gc_match_id as string | null) ?? null,
+      hasStats: !!m.gc_match_id,
+    })),
+  };
+});
+
+/** Estatísticas da GC dos mapas de um jogo (mandante = time A). */
+export async function getMatchGcMaps(matchId: string) {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase || !/^[0-9a-f-]{36}$/i.test(matchId)) return [];
+  const { data } = await supabase
+    .from("championship_match_maps")
+    .select("map_order, data")
+    .eq("match_id", matchId)
+    .not("data", "is", null)
+    .order("map_order");
+  // Só os mapas com estatísticas completas (mapa digitado à mão não tem).
+  return (data ?? [])
+    .map((r) => r.data as import("@/lib/gc-api").GcMapStored | null)
+    .filter((d): d is import("@/lib/gc-api").GcMapStored => !!d && Array.isArray(d.players) && Array.isArray(d.rounds));
+}

@@ -15,7 +15,7 @@
     "test:cronica": "tsx --test src/lib/chronicle.test.ts",
     "test:gc": "tsx --test src/lib/gc-api.test.ts",
     "test:analise": "tsx --test src/lib/match-analysis.test.ts",
-    "test:campeonato": "tsx --test src/lib/championship.test.ts src/lib/championship-draft.test.ts src/lib/championship-schedule.test.ts"
+    "test:campeonato": "tsx --test src/lib/championship.test.ts src/lib/championship-draft.test.ts src/lib/championship-schedule.test.ts src/lib/championship-standings.test.ts"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.3.1",

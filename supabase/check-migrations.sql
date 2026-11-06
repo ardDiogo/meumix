@@ -44,7 +44,8 @@ c(migracao, ok) as (values
   ('0037_mix_analyses', to_regclass('public.mix_analyses') is not null),
   ('0038_championships', to_regclass('public.championships') is not null),
   ('0039_championship_draft', to_regclass('public.championship_drafts') is not null),
-  ('0040_championship_matches', to_regclass('public.championship_matches') is not null)
+  ('0040_championship_matches', to_regclass('public.championship_matches') is not null),
+  ('0041_championship_results', to_regclass('public.championship_match_maps') is not null)
 )
 select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
 from c
