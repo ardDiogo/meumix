@@ -48,7 +48,7 @@ async function load(championshipId: string) {
       .order("round"),
     admin
       .from("championship_picks")
-      .select("id, pick_no, pot, team_id, user_id")
+      .select("id, pick_no, pot, team_id, user_id, picked_by")
       .eq("championship_id", championshipId)
       .is("undone_at", null)
       .order("pick_no"),
@@ -107,6 +107,8 @@ async function load(championshipId: string) {
       pot: p.pot as number,
       teamId: p.team_id as string,
       userId: p.user_id as string,
+      /** null = escolha automática (último do pote). */
+      pickedBy: (p.picked_by as string | null) ?? null,
     })),
   } as const;
 }
@@ -314,20 +316,57 @@ export async function pickPlayer(championshipId: string, userId: string): Promis
     .update({ team_id: team.id })
     .eq("championship_id", championshipId)
     .eq("user_id", userId);
-  const last = next.pickNo === total;
-  if (last)
-    await r.admin
-      .from("championship_drafts")
-      .update({ status: "done", updated_at: new Date().toISOString() })
-      .eq("championship_id", championshipId);
   await audit({
     action: "championship.draft_pick",
     outcome: "success",
     actorId: r.session.id,
     detail: { championshipId, pickNo: next.pickNo, teamId: team.id, userId },
   });
+
+  // Último do pote: quando sobra um só jogador no pote da vez, ele vai sozinho para o time da vez.
+  const picks: { pickNo: number; pot: number; teamId: string; userId: string }[] = [
+    ...r.picks,
+    { pickNo: next.pickNo, pot: next.pot, teamId: team.id, userId },
+  ];
+  const taken = new Set(picks.map((p) => p.userId));
+  const auto: string[] = [];
+  for (;;) {
+    const { next: n } = draftProgress(order, r.ch.potCount, picks);
+    if (!n) break;
+    const left = r.players.filter((p) => p.pot === n.pot && !taken.has(p.userId));
+    if (left.length !== 1) break;
+    const only = left[0]!;
+    const { error: autoError } = await r.admin.from("championship_picks").insert({
+      championship_id: championshipId,
+      pick_no: n.pickNo,
+      pot: n.pot,
+      team_id: n.teamId,
+      user_id: only.userId,
+      picked_by: null,
+    });
+    if (autoError) break;
+    await r.admin
+      .from("championship_players")
+      .update({ team_id: n.teamId })
+      .eq("championship_id", championshipId)
+      .eq("user_id", only.userId);
+    picks.push({ pickNo: n.pickNo, pot: n.pot, teamId: n.teamId, userId: only.userId });
+    taken.add(only.userId);
+    const { data: prof } = await r.admin.from("profiles").select("display_name").eq("id", only.userId).maybeSingle();
+    auto.push(
+      `${(prof?.display_name as string) ?? "o último"} foi para o ${r.teams.find((t) => t.id === n.teamId)?.name}`,
+    );
+  }
+
+  const last = picks.length === total;
+  if (last)
+    await r.admin
+      .from("championship_drafts")
+      .update({ status: "done", updated_at: new Date().toISOString() })
+      .eq("championship_id", championshipId);
   refresh();
-  return { ok: true, message: last ? "Draft concluído: elencos formados!" : "Escolha feita." };
+  const autoText = auto.length ? ` Último do pote: ${auto.join("; ")}.` : "";
+  return { ok: true, message: last ? `Draft concluído: elencos formados!${autoText}` : `Escolha feita.${autoText}` };
 }
 
 /** Desfaz a última escolha (quem organiza). Fica no histórico como desfeita. */
@@ -338,18 +377,23 @@ export async function undoLastPick(championshipId: string): Promise<DraftResult>
   if (r.draftStatus !== "picking" && r.draftStatus !== "done") return { ok: false, message: "Não há escolhas." };
   const last = r.picks.at(-1);
   if (!last) return { ok: false, message: "Nenhuma escolha para desfazer." };
-  const { data: undone } = await r.admin
-    .from("championship_picks")
-    .update({ undone_at: new Date().toISOString(), undone_by: r.session.id })
-    .eq("id", last.id)
-    .is("undone_at", null)
-    .select("id");
-  if (!undone?.length) return { ok: false, message: "Essa escolha já foi desfeita." };
-  await r.admin
-    .from("championship_players")
-    .update({ team_id: null })
-    .eq("championship_id", championshipId)
-    .eq("user_id", last.userId);
+  // Escolha automática (último do pote) sai junto com a escolha que a provocou.
+  const prev = r.picks.at(-2);
+  const batch = last.pickedBy == null && prev ? [last, prev] : [last];
+  for (const pick of batch) {
+    const { data: undone } = await r.admin
+      .from("championship_picks")
+      .update({ undone_at: new Date().toISOString(), undone_by: r.session.id })
+      .eq("id", pick.id)
+      .is("undone_at", null)
+      .select("id");
+    if (!undone?.length) return { ok: false, message: "Essa escolha já foi desfeita." };
+    await r.admin
+      .from("championship_players")
+      .update({ team_id: null })
+      .eq("championship_id", championshipId)
+      .eq("user_id", pick.userId);
+  }
   if (r.draftStatus === "done")
     await r.admin
       .from("championship_drafts")
@@ -362,7 +406,13 @@ export async function undoLastPick(championshipId: string): Promise<DraftResult>
     detail: { championshipId, pickNo: last.pickNo, userId: last.userId },
   });
   refresh();
-  return { ok: true, message: `Escolha ${last.pickNo} desfeita.` };
+  return {
+    ok: true,
+    message:
+      batch.length > 1
+        ? `Escolhas ${prev!.pickNo} e ${last.pickNo} (automática) desfeitas.`
+        : `Escolha ${last.pickNo} desfeita.`,
+  };
 }
 
 /**

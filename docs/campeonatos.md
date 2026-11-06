@@ -73,7 +73,10 @@ atualização a cada 8 s). Migração `0039_championship_draft.sql`.
    time na hora; a última conclui o draft.
 4. **Correções** (quem organiza): **Desfazer última** (fica no histórico como desfeita) e
    **Reiniciar** (ordem e escolhas do zero; potes e capitães mantidos).
-5. **Log do PICK** (como no mix): em ordem de escolha, "Capitão (Time) pickou Fulano · pote N"; quando a
+5. **Último do pote automático**: quando sobra um só jogador no pote da vez, ele vai sozinho para o
+   time da vez (aparece no log como "foi automaticamente para o Time · último do pote"). Desfazer uma
+   escolha automática desfaz também a escolha que a provocou.
+6. **Log do PICK** (como no mix): em ordem de escolha, "Capitão (Time) pickou Fulano · pote N"; quando a
    organização escolhe por um capitão ausente, aparece "Fulano (organização) pickou X para o Time"; escolha
    desfeita fica riscada.
 

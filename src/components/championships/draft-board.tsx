@@ -494,7 +494,20 @@ export function DraftBoard({
               const t = teamById.get(p.teamId);
               const pl = playerById.get(p.userId);
               const captain = t?.captainId ? playerById.get(t.captainId) : null;
-              const byCaptain = !p.pickedBy || p.pickedBy === t?.captainId;
+              // Sem quem clicou = automática (último jogador do pote).
+              if (!p.pickedBy)
+                return (
+                  <li key={p.id} className={cn("flex gap-2", p.undoneAt && "text-subtle line-through")}>
+                    <span className="w-6 shrink-0 text-right text-subtle tabular">{p.pickNo}.</span>
+                    <span className="min-w-0">
+                      <span className={cn(!p.undoneAt && "text-fg")}>{pl?.nickname ?? "jogador"}</span> foi
+                      automaticamente para o <span style={{ color: p.undoneAt ? undefined : t?.color }}>{t?.name}</span>
+                      <span className="text-xs text-subtle"> · último do pote {p.pot}</span>
+                      {p.undoneAt && <span className="ml-1 text-xs"> (desfeita)</span>}
+                    </span>
+                  </li>
+                );
+              const byCaptain = p.pickedBy === t?.captainId;
               const who = byCaptain ? captain?.nickname : (pickerNames[p.pickedBy!] ?? "Organização");
               return (
                 <li key={p.id} className={cn("flex gap-2", p.undoneAt && "text-subtle line-through")}>
