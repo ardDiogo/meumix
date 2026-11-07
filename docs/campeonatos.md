@@ -184,3 +184,11 @@ contador do que está esperando quem está vendo. A aba Playoffs usa a mesma cha
   para enviar a rodada inteira e importar depois). A aba que recebe (`/admin/importar-gc`) também abre
   para quem **organiza um campeonato**, e volta para o jogo do campeonato de onde veio. O botão para os
   favoritos também está na página do jogo ("Ainda não tem o botão?").
+
+## Como funciona (aba)
+
+Cada campeonato tem a aba **Como funciona** (`/campeonatos/<slug>/como-funciona`): o passo a passo, quem
+faz o quê, inscrições e times, potes/adedonha/draft (com exemplo da serpentina), fase classificatória,
+agendamento (todos os status), resultados pela GC, classificação e desempate, playoffs (todos os
+formatos), estatísticas, premiação e dúvidas comuns. Os quadros "Neste campeonato" usam a configuração
+do próprio campeonato (times, potes, jogos e rodadas, dias e horários, playoffs e valores da premiação).
