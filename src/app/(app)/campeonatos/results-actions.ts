@@ -14,7 +14,7 @@ import { requireOrganizer, syncChampionshipStatus } from "@/services/championshi
 export type ResultResult = { ok: boolean; message: string };
 
 const MIGRATION = "Rode a migração 0041_championship_results.sql no Supabase.";
-const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703";
+const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703" || code === "PGRST204";
 const validId = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 const validMap = (id: string) => id in MAPS || /^de_[a-z0-9_]{2,28}$/.test(id);
 

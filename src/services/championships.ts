@@ -20,7 +20,7 @@ type Row = Record<string, unknown>;
 
 /** Com a coluna team_mode (migração 0044); sem ela, as colunas de antes. */
 const WITH_MODE = `${CHAMPIONSHIP_COLUMNS}, team_mode`;
-const noColumn = (e: { code?: string } | null) => e?.code === "42703";
+const noColumn = (e: { code?: string } | null) => e?.code === "42703" || e?.code === "PGRST204";
 
 export function toChampionship(r: Row): Championship {
   return {

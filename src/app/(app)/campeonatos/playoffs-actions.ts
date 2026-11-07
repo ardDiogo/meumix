@@ -9,7 +9,7 @@ import { requireOrganizer } from "@/services/championship-guard";
 
 export type PlayoffResult = { ok: boolean; message: string };
 
-const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703";
+const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703" || code === "PGRST204";
 
 /**
  * Gera a chave dos playoffs pela classificação final (todos os jogos da fase

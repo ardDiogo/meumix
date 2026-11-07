@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { randomInt } from "node:crypto";
-import { generateJoinCode, MIGRATION, missing, validateTeam, type TeamInput } from "@/lib/championship";
+import { generateJoinCode, MIGRATION, missing, validateTeam, type TeamInput, missingColumn } from "@/lib/championship";
 import { audit } from "@/services/audit";
 import { requireOrganizer, teamModeOf } from "@/services/championship-guard";
 
@@ -159,7 +159,7 @@ export async function saveTeam(championshipId: string, teamId: string | null, in
         .single();
     let { data, error: e } = await insert(true);
     if (e?.code === "23505" && /code/.test(e.message ?? "")) ({ data, error: e } = await insert(true));
-    if (e?.code === "42703") ({ data, error: e } = await insert(false));
+    if (missingColumn(e?.code)) ({ data, error: e } = await insert(false));
     if (e || !data) return { ok: false, message: "Não foi possível criar o time." };
     id = data.id as string;
   }

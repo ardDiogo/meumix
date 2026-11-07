@@ -222,3 +222,15 @@ A formação só muda antes do draft e dos confrontos. Sem a migração 0044, tu
 `/campeonatos/como-funciona` (botão na lista de campeonatos): a mesma explicação da aba de cada
 campeonato, em versão geral com as duas formações e todas as possibilidades, sem os quadros
 "Neste campeonato". Componente: `src/components/championships/how-it-works.tsx`.
+
+### Link de convite
+
+O botão de link (no card do time, para a organização e o capitão) copia
+`/campeonatos/<slug>/equipes?codigo=XXXXXX`. Quem abre logado **entra no time sozinho** (o código sai do
+endereço em seguida). Sem login, a tela pede para entrar na conta e volta para o link, que completa a
+entrada. Quem já está em outro time recebe o aviso para sair dele antes.
+
+### Sem a migração 0044
+
+Criar campeonato por draft funciona; "Times já definidos" avisa para rodar a 0044. (O PostgREST responde
+`PGRST204` quando a gravação usa uma coluna que ainda não existe; tratado em `missingColumn`.)

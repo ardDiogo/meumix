@@ -6,6 +6,7 @@ import {
   championshipSlug,
   validateChampionship,
   type ChampionshipInput,
+  missingColumn,
 } from "@/lib/championship";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
@@ -77,11 +78,19 @@ export async function createChampionship(input: ChampionshipInput): Promise<Cham
     .from("championships")
     .insert({ ...toRow(input), team_mode: input.teamMode, slug, created_by: session!.id });
   // Sem a migração 0044: campeonato de draft ainda pode ser criado; por código, não.
-  if (error?.code === "42703") {
+  if (missingColumn(error?.code)) {
     if (input.teamMode === "code") return { ok: false, message: MODE_MIGRATION };
     ({ error } = await admin.from("championships").insert({ ...toRow(input), slug, created_by: session!.id }));
   }
-  if (error) return { ok: false, message: missing(error.code) ? MIGRATION : "Não foi possível criar o campeonato." };
+  if (error) {
+    console.error("[campeonato] criar:", error.code, error.message);
+    return {
+      ok: false,
+      message: missing(error.code)
+        ? MIGRATION
+        : `Não foi possível criar o campeonato (erro ${error.code ?? "desconhecido"}).`,
+    };
+  }
   await audit({ action: "championship.create", outcome: "success", actorId: session!.id, detail: { slug } });
   refresh();
   return { ok: true, message: "Campeonato criado.", slug };
@@ -109,14 +118,17 @@ export async function updateChampionship(id: string, input: ChampionshipInput): 
     .from("championships")
     .update({ ...toRow(input), team_mode: input.teamMode, updated_at: new Date().toISOString() })
     .eq("id", id);
-  if (error?.code === "42703") {
+  if (missingColumn(error?.code)) {
     if (input.teamMode === "code") return { ok: false, message: MODE_MIGRATION };
     ({ error } = await r.admin
       .from("championships")
       .update({ ...toRow(input), updated_at: new Date().toISOString() })
       .eq("id", id));
   }
-  if (error) return { ok: false, message: "Não foi possível salvar." };
+  if (error) {
+    console.error("[campeonato] salvar:", error.code, error.message);
+    return { ok: false, message: `Não foi possível salvar (erro ${error.code ?? "desconhecido"}).` };
+  }
   await audit({
     action: "championship.update",
     outcome: "success",
@@ -180,8 +192,9 @@ export async function setPaidPlayers(id: string, paid: number | null): Promise<C
   if (error)
     return {
       ok: false,
-      message:
-        error.code === "42703" ? "Rode a migração 0042_championship_paid.sql no Supabase." : "Não foi possível salvar.",
+      message: missingColumn(error.code)
+        ? "Rode a migração 0042_championship_paid.sql no Supabase."
+        : "Não foi possível salvar.",
     };
   await audit({
     action: "championship.paid",

@@ -13,7 +13,7 @@ import { TeamLogo } from "@/components/championships/team-logo";
 import { PlayerLink } from "@/components/players/player-link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { codeRosterIssues, rosterIssues } from "@/lib/championship";
+import { codeRosterIssues, normalizeCode, rosterIssues } from "@/lib/championship";
 import { getChampionship, getDraft, getRoster, getTeamCodes } from "@/services/championships";
 import { getDataSource } from "@/services/index";
 import type { Player } from "@/types/domain";
@@ -26,6 +26,8 @@ const STARTED = new Set(["running", "playoffs", "finished"]);
 export default async function TeamsPage({ params, searchParams }: PageProps<"/campeonatos/[slug]/equipes">) {
   const data = await getChampionship((await params).slug);
   const { codigo } = await searchParams;
+  // Link de convite: /campeonatos/<slug>/equipes?codigo=XXXXXX (logado, entra direto no time).
+  const invite = typeof codigo === "string" ? normalizeCode(codigo) : "";
   if (!data) notFound();
   const { championship: c, canManage, players: all, session } = data;
   // Por código: cada time tem um código e quem entra já está no time (sem potes nem draft).
@@ -105,11 +107,14 @@ export default async function TeamsPage({ params, searchParams }: PageProps<"/ca
           <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
             {!session ? (
               <span className="text-muted">
-                Tem o código do seu time?{" "}
-                <Link href="/entrar" className="text-brand hover:underline">
+                {invite ? "Você recebeu um convite para um time. " : "Tem o código do seu time? "}
+                <Link
+                  href={`/entrar?next=${encodeURIComponent(`/campeonatos/${c.slug}/equipes${invite ? `?codigo=${invite}` : ""}`)}`}
+                  className="font-semibold text-brand hover:underline"
+                >
                   Entre na sua conta
                 </Link>{" "}
-                para entrar no time.
+                {invite ? "e você já entra no time." : "para entrar no time."}
               </span>
             ) : myTeam ? (
               <>
@@ -122,6 +127,11 @@ export default async function TeamsPage({ params, searchParams }: PageProps<"/ca
                     </span>
                   )}
                 </span>
+                {invite && (
+                  <span className="w-full text-xs text-subtle">
+                    Você abriu um convite (código {invite}). Para entrar em outro time, saia deste primeiro.
+                  </span>
+                )}
                 <LeaveTeam championshipId={c.id} teamName={myTeam.name} />
               </>
             ) : (
@@ -129,7 +139,7 @@ export default async function TeamsPage({ params, searchParams }: PageProps<"/ca
                 <span className="text-muted">
                   <b className="text-fg">Entrar num time:</b> digite o código que o capitão ou a organização passou.
                 </span>
-                <JoinByCode championshipId={c.id} initial={typeof codigo === "string" ? codigo : ""} />
+                <JoinByCode championshipId={c.id} initial={invite} auto={!!invite} />
               </>
             )}
           </CardContent>

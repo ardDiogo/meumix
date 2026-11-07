@@ -222,7 +222,12 @@ export const formatMoney = (n: number) => n.toLocaleString("pt-BR", { style: "cu
 
 export const MIGRATION = "Rode a migração 0038_championships.sql no Supabase.";
 /** Tabela ou coluna inexistente (migração não rodada). */
-export const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703";
+export const missing = (code?: string) => code === "42P01" || code === "PGRST205" || missingColumn(code);
+/**
+ * Coluna inexistente: 42703 vem do Postgres (leitura); PGRST204 vem do PostgREST quando a gravação
+ * usa uma coluna que ainda não existe (ex.: migração nova não rodada).
+ */
+export const missingColumn = (code?: string) => code === "42703" || code === "PGRST204";
 
 /* --------------------------- Inscritos e times --------------------------- */
 

@@ -2,7 +2,7 @@
 
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { generateJoinCode, normalizeCode } from "@/lib/championship";
+import { generateJoinCode, normalizeCode, missingColumn } from "@/lib/championship";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
@@ -50,7 +50,7 @@ export async function joinTeamByCode(championshipId: string, rawCode: string): P
     .eq("championship_id", championshipId)
     .eq("join_code", code)
     .maybeSingle();
-  if (error) return { ok: false, message: error.code === "42703" ? MODE_MIGRATION : "Não foi possível entrar." };
+  if (error) return { ok: false, message: missingColumn(error.code) ? MODE_MIGRATION : "Não foi possível entrar." };
   if (!team) return { ok: false, message: "Código não encontrado neste campeonato." };
 
   const { data: rows } = await admin
@@ -133,7 +133,7 @@ export async function regenerateTeamCode(championshipId: string, teamId: string)
       refresh();
       return { ok: true, message: "Código novo gerado. O anterior não vale mais." };
     }
-    if (error.code === "42703") return { ok: false, message: MODE_MIGRATION };
+    if (missingColumn(error.code)) return { ok: false, message: MODE_MIGRATION };
   }
   return { ok: false, message: "Não foi possível gerar o código." };
 }

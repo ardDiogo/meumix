@@ -2,7 +2,7 @@
 
 import { Copy, KeyRound, Link2, Loader2, LogIn, LogOut, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { joinTeamByCode, leaveTeam, regenerateTeamCode, setPlayerTeam } from "@/app/(app)/campeonatos/code-actions";
 import { Button } from "../ui/button";
@@ -27,10 +27,30 @@ function useRun() {
   return [pending, run] as const;
 }
 
-/** Entrar no time com o código (o link de convite já preenche). */
-export function JoinByCode({ championshipId, initial = "" }: { championshipId: string; initial?: string }) {
+/**
+ * Entrar no time com o código. Com `auto` (link de convite com o código), entra
+ * sozinho ao abrir a página, uma vez, e limpa o código do endereço.
+ */
+export function JoinByCode({
+  championshipId,
+  initial = "",
+  auto = false,
+}: {
+  championshipId: string;
+  initial?: string;
+  auto?: boolean;
+}) {
   const [code, setCode] = useState(initial.toUpperCase());
   const [pending, run] = useRun();
+  const router = useRouter();
+  const tried = useRef(false);
+  useEffect(() => {
+    if (!auto || tried.current || initial.replace(/[^A-Z0-9]/gi, "").length < 6) return;
+    tried.current = true;
+    run(() => joinTeamByCode(championshipId, initial), {
+      after: () => router.replace(window.location.pathname),
+    });
+  }, [auto, initial, championshipId, run, router]);
   return (
     <form
       className="flex flex-wrap items-center gap-2"
@@ -51,7 +71,7 @@ export function JoinByCode({ championshipId, initial = "" }: { championshipId: s
         />
       </div>
       <Button type="submit" variant="primary" disabled={pending || code.replace(/[^A-Z0-9]/gi, "").length < 6}>
-        {pending ? <Loader2 className="animate-spin" /> : <LogIn />} Entrar no time
+        {pending ? <Loader2 className="animate-spin" /> : <LogIn />} {pending ? "Entrando…" : "Entrar no time"}
       </Button>
     </form>
   );
@@ -118,7 +138,7 @@ export function TeamCode({
           onClick={() =>
             copy(
               `${window.location.origin}/campeonatos/${slug}/equipes?codigo=${code}`,
-              "Link de convite copiado: quem abrir já vê o código preenchido.",
+              "Link de convite copiado: quem abrir (logado) já entra no time.",
             )
           }
         >

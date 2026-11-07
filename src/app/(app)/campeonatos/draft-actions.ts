@@ -11,7 +11,7 @@ import { getSession } from "@/services/auth";
 export type DraftResult = { ok: boolean; message: string };
 
 const MIGRATION = "Rode a migração 0039_championship_draft.sql no Supabase.";
-const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703";
+const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703" || code === "PGRST204";
 const validId = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
 function refresh() {

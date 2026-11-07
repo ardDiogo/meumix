@@ -20,7 +20,7 @@ import { MATCH_COLUMNS, toMatch, type MatchRow } from "@/services/championships"
 export type ScheduleResult = { ok: boolean; message: string };
 
 const MIGRATION = "Rode a migração 0040_championship_matches.sql no Supabase.";
-const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703";
+const missing = (code?: string) => code === "42P01" || code === "PGRST205" || code === "42703" || code === "PGRST204";
 const validId = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 /** Jogos que ocupam horário e servidor. */
 const FIRM = new Set(["approval", "scheduled", "live"]);
