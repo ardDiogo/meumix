@@ -413,6 +413,10 @@ export default async function HowItWorksPage({ params }: PageProps<"/campeonatos
               resultado for desfeito, a vaga volta a ficar em aberto.
             </li>
             <li>Os jogos dos playoffs entram no Calendário e são agendados do mesmo jeito.</li>
+            <li>
+              Quando a <b>final tem vencedor</b>, o campeonato passa sozinho para <b>Finalizado</b> (sem playoffs:
+              quando termina o último jogo da classificatória). Se o resultado for desfeito, volta para Playoffs.
+            </li>
           </ul>
           <Here>
             {PLAYOFF_FORMAT_LABEL[c.playoffFormat]}

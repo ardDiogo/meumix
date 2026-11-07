@@ -9,7 +9,7 @@ import { mapScoreProblem, seriesState } from "@/lib/championship-standings";
 import { gcAlias, storeGcMap } from "@/lib/gc-api";
 import { MAPS } from "@/lib/maps";
 import { audit } from "@/services/audit";
-import { requireOrganizer } from "@/services/championship-guard";
+import { requireOrganizer, syncChampionshipStatus } from "@/services/championship-guard";
 
 export type ResultResult = { ok: boolean; message: string };
 
@@ -97,6 +97,8 @@ async function settle(r: Loaded, championshipId: string) {
     .eq("id", r.match.id)
     .eq("championship_id", championshipId);
   if (r.match.stage === "playoff") await advance(r, championshipId, s.winner);
+  // Campeão definido (ou desfeito): o status do campeonato acompanha.
+  await syncChampionshipStatus(r.admin, championshipId);
   return s;
 }
 

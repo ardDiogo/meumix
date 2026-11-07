@@ -14,6 +14,7 @@ import {
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { syncChampionshipStatus } from "@/services/championship-guard";
 import { MATCH_COLUMNS, toMatch, type MatchRow } from "@/services/championships";
 
 export type ScheduleResult = { ok: boolean; message: string };
@@ -287,6 +288,8 @@ export async function setMatchStatus(
     .eq("status", "pending");
   const { error } = await setMatch(r, matchId, { status, scheduled_at: null, server: null });
   if (error) return { ok: false, message: "Não foi possível salvar." };
+  // Cancelar o último jogo de um campeonato sem playoffs também pode encerrá-lo.
+  await syncChampionshipStatus(r.admin, championshipId);
   await audit({
     action: "championship.match_status",
     outcome: "success",

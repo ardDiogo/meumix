@@ -1,5 +1,6 @@
 import "server-only";
-import { canManageChampionship, MIGRATION, missing } from "@/lib/championship";
+import { canManageChampionship, MIGRATION, missing, type PlayoffFormat } from "@/lib/championship";
+import { autoStatus } from "@/lib/championship-playoffs";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSession } from "./auth";
 
@@ -41,4 +42,42 @@ export async function requireOrganizer(id: string) {
       status: ch.status as string,
     },
   } as const;
+}
+
+/**
+ * Atualiza o status do campeonato pelo andamento dos jogos (Finalizado quando
+ * sai o campeão; volta se o resultado for desfeito). Nunca lança erro.
+ */
+export async function syncChampionshipStatus(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  championshipId: string,
+) {
+  try {
+    const [{ data: ch }, { data: matches }] = await Promise.all([
+      admin.from("championships").select("status, playoff_format").eq("id", championshipId).maybeSingle(),
+      admin
+        .from("championship_matches")
+        .select("stage, round, status, winner_team")
+        .eq("championship_id", championshipId),
+    ]);
+    if (!ch) return null;
+    const next = autoStatus(
+      ch.status as string,
+      ch.playoff_format as PlayoffFormat,
+      (matches ?? []).map((m) => ({
+        stage: m.stage as "group" | "playoff",
+        round: m.round as number,
+        status: m.status as string,
+        winnerTeam: (m.winner_team as string | null) ?? null,
+      })),
+    );
+    if (next)
+      await admin
+        .from("championships")
+        .update({ status: next, updated_at: new Date().toISOString() })
+        .eq("id", championshipId);
+    return next;
+  } catch {
+    return null;
+  }
 }

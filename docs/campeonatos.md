@@ -192,3 +192,11 @@ faz o quê, inscrições e times, potes/adedonha/draft (com exemplo da serpentin
 agendamento (todos os status), resultados pela GC, classificação e desempate, playoffs (todos os
 formatos), estatísticas, premiação e dúvidas comuns. Os quadros "Neste campeonato" usam a configuração
 do próprio campeonato (times, potes, jogos e rodadas, dias e horários, playoffs e valores da premiação).
+
+## Status automático
+
+Quando a **final tem vencedor**, o campeonato passa sozinho para **Finalizado** (sem playoffs: quando o
+último jogo da fase classificatória termina ou é cancelado). Se o resultado decisivo for desfeito, volta
+para **Playoffs** (ou **Em andamento**). Campeonato **Cancelado** nunca muda sozinho. Regra em
+`autoStatus` (`src/lib/championship-playoffs.ts`), aplicada depois de cada resultado e de cada mudança de
+status de jogo.

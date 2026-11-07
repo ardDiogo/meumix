@@ -88,3 +88,31 @@ export function nextSlot(format: PlayoffFormat, round: number, leg: number) {
   if (round >= playoffRounds(format)) return null;
   return { round: round + 1, leg: Math.ceil(leg / 2), side: leg % 2 === 1 ? ("home" as const) : ("away" as const) };
 }
+
+/**
+ * Status automático do campeonato pelo andamento dos jogos: "Finalizado"
+ * quando a final tem vencedor (sem playoffs: quando todos os jogos da fase
+ * classificatória terminaram); volta a "Playoffs"/"Em andamento" se o
+ * resultado decisivo for desfeito. Cancelado nunca muda. Null = não mexe.
+ */
+export function autoStatus(
+  current: string,
+  format: PlayoffFormat,
+  matches: { stage: "group" | "playoff"; round: number; status: string; winnerTeam: string | null }[],
+): "finished" | "playoffs" | "running" | null {
+  if (current === "cancelled") return null;
+  let done: boolean;
+  if (format === "none") {
+    const group = matches.filter((m) => m.stage === "group");
+    done =
+      group.length > 0 &&
+      group.some((m) => m.status === "finished") &&
+      group.every((m) => m.status === "finished" || m.status === "cancelled");
+  } else {
+    const final = matches.find((m) => m.stage === "playoff" && m.round === playoffRounds(format));
+    done = !!final?.winnerTeam;
+  }
+  if (done) return current === "finished" ? null : "finished";
+  if (current !== "finished") return null;
+  return matches.some((m) => m.stage === "playoff") ? "playoffs" : "running";
+}

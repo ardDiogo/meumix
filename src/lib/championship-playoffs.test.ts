@@ -1,7 +1,7 @@
 /** Testes dos playoffs: `npm run test:campeonato`. */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { buildBracket, nextSlot, playoffLabel, playoffRounds, roundTitle } from "./championship-playoffs";
+import { autoStatus, buildBracket, nextSlot, playoffLabel, playoffRounds, roundTitle } from "./championship-playoffs";
 
 const RANK = ["Snkk", "Beli", "Koder", "Mald", "Marlon"];
 
@@ -54,4 +54,37 @@ describe("playoffs", () => {
     assert.deepEqual(nextSlot("round16_quarters_semis_final", 1, 8), { round: 2, leg: 4, side: "away" });
   });
   it("times insuficientes", () => assert.throws(() => buildBracket("semis_final", ["a", "b", "c"])));
+});
+
+describe("status automático do campeonato", () => {
+  const sf = (winner: string | null) => ({
+    stage: "playoff" as const,
+    round: 1,
+    status: winner ? "finished" : "pending",
+    winnerTeam: winner,
+  });
+  const final = (winner: string | null) => ({
+    stage: "playoff" as const,
+    round: 2,
+    status: winner ? "finished" : "pending",
+    winnerTeam: winner,
+  });
+  it("final com vencedor finaliza; desfeita volta para Playoffs", () => {
+    assert.equal(autoStatus("playoffs", "semis_final", [sf("a"), sf("b"), final("a")]), "finished");
+    assert.equal(autoStatus("finished", "semis_final", [sf("a"), sf("b"), final("a")]), null);
+    assert.equal(autoStatus("finished", "semis_final", [sf("a"), sf("b"), final(null)]), "playoffs");
+    assert.equal(autoStatus("playoffs", "semis_final", [sf("a"), sf(null), final(null)]), null);
+  });
+  it("sem playoffs: finaliza quando a classificatória termina", () => {
+    const g = (status: string) => ({
+      stage: "group" as const,
+      round: 1,
+      status,
+      winnerTeam: status === "finished" ? "a" : null,
+    });
+    assert.equal(autoStatus("running", "none", [g("finished"), g("cancelled")]), "finished");
+    assert.equal(autoStatus("running", "none", [g("finished"), g("scheduled")]), null);
+    assert.equal(autoStatus("finished", "none", [g("finished"), g("live")]), "running");
+  });
+  it("cancelado não muda", () => assert.equal(autoStatus("cancelled", "semis_final", [final("a")]), null));
 });
