@@ -1,4 +1,4 @@
-import { CalendarDays, Plus, Trophy, Users } from "lucide-react";
+import { CalendarDays, HelpCircle, Plus, Trophy, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/page-header";
@@ -18,15 +18,22 @@ export default async function ChampionshipsPage() {
       <PageHeader
         eyebrow="MeuMix Championship"
         title="Campeonatos"
-        description="Equipes formadas por draft, fase classificatória, playoffs e premiação."
+        description="Times definidos por código ou formados por draft, fase classificatória, playoffs e premiação."
         actions={
-          admin && !missing ? (
-            <Button variant="primary" asChild>
-              <Link href="/campeonatos/novo">
-                <Plus /> Novo campeonato
+          <>
+            <Button variant="outline" asChild>
+              <Link href="/campeonatos/como-funciona">
+                <HelpCircle /> Como funciona
               </Link>
             </Button>
-          ) : undefined
+            {admin && !missing && (
+              <Button variant="primary" asChild>
+                <Link href="/campeonatos/novo">
+                  <Plus /> Novo campeonato
+                </Link>
+              </Button>
+            )}
+          </>
         }
       />
       {missing && admin && (
@@ -42,6 +49,11 @@ export default async function ChampionshipsPage() {
             title="Nenhum campeonato ainda"
             description={
               admin ? "Crie o primeiro campeonato da comunidade." : "Quando houver um campeonato, ele aparece aqui."
+            }
+            action={
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/campeonatos/como-funciona">Entenda como funciona</Link>
+              </Button>
             }
           />
         </Card>

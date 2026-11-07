@@ -200,7 +200,7 @@ export function CalendarBoard({
               variant="primary"
               size="sm"
               disabled={pending || !draftDone}
-              title={draftDone ? undefined : "Conclua o draft primeiro"}
+              title={draftDone ? undefined : "Conclua a formação dos times primeiro"}
               onClick={() =>
                 run(() => generateMatches(championshipId), {
                   confirm: matches.length
@@ -222,7 +222,7 @@ export function CalendarBoard({
             ? isManager
               ? "Gere os confrontos da fase classificatória."
               : "Os confrontos aparecem aqui quando a organização gerar o calendário."
-            : "Os confrontos são gerados depois do draft."}
+            : "Os confrontos são gerados quando os times estiverem prontos."}
         </Card>
       ) : (
         rounds.map((round) => {

@@ -15,6 +15,8 @@ import { requireOrganizer } from "@/services/championship-guard";
 export type ChampionshipResult = { ok: boolean; message: string; slug?: string };
 
 import { MIGRATION, missing } from "@/lib/championship";
+
+const MODE_MIGRATION = "Para times por código, rode a migração 0044_championship_codes.sql no Supabase.";
 const validId = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 
 function refresh() {
@@ -71,7 +73,14 @@ export async function createChampionship(input: ChampionshipInput): Promise<Cham
   let slug = base;
   for (let n = 2; used.has(slug); n++) slug = `${base}-${n}`;
 
-  const { error } = await admin.from("championships").insert({ ...toRow(input), slug, created_by: session!.id });
+  let { error } = await admin
+    .from("championships")
+    .insert({ ...toRow(input), team_mode: input.teamMode, slug, created_by: session!.id });
+  // Sem a migração 0044: campeonato de draft ainda pode ser criado; por código, não.
+  if (error?.code === "42703") {
+    if (input.teamMode === "code") return { ok: false, message: MODE_MIGRATION };
+    ({ error } = await admin.from("championships").insert({ ...toRow(input), slug, created_by: session!.id }));
+  }
   if (error) return { ok: false, message: missing(error.code) ? MIGRATION : "Não foi possível criar o campeonato." };
   await audit({ action: "championship.create", outcome: "success", actorId: session!.id, detail: { slug } });
   refresh();
@@ -85,10 +94,28 @@ export async function updateChampionship(id: string, input: ChampionshipInput): 
   if (errors.length) return { ok: false, message: errors[0]! };
   if (input.banner && !bannerOk(input.banner))
     return { ok: false, message: "Imagem de capa inválida ou grande demais." };
-  const { error } = await r.admin
+  // Trocar a formação das equipes só antes de começar (sem draft e sem confrontos).
+  const { data: current } = await r.admin.from("championships").select("*").eq("id", id).maybeSingle();
+  const currentMode = (current as { team_mode?: string } | null)?.team_mode ?? "draft";
+  if (currentMode !== input.teamMode) {
+    const [{ data: draft }, { count: games }] = await Promise.all([
+      r.admin.from("championship_drafts").select("status").eq("championship_id", id).maybeSingle(),
+      r.admin.from("championship_matches").select("id", { count: "exact", head: true }).eq("championship_id", id),
+    ]);
+    if (draft || games)
+      return { ok: false, message: "A formação das equipes só muda antes do draft e dos confrontos." };
+  }
+  let { error } = await r.admin
     .from("championships")
-    .update({ ...toRow(input), updated_at: new Date().toISOString() })
+    .update({ ...toRow(input), team_mode: input.teamMode, updated_at: new Date().toISOString() })
     .eq("id", id);
+  if (error?.code === "42703") {
+    if (input.teamMode === "code") return { ok: false, message: MODE_MIGRATION };
+    ({ error } = await r.admin
+      .from("championships")
+      .update({ ...toRow(input), updated_at: new Date().toISOString() })
+      .eq("id", id));
+  }
   if (error) return { ok: false, message: "Não foi possível salvar." };
   await audit({
     action: "championship.update",

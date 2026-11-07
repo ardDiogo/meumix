@@ -5,6 +5,13 @@
 
 export type ChampionshipStatus = "setup" | "registration" | "teams" | "running" | "playoffs" | "finished" | "cancelled";
 export type GroupFormat = "round_robin" | "double_round_robin";
+/** Como os times são formados: draft entre capitães ou times definidos com entrada por código. */
+export type TeamMode = "draft" | "code";
+
+export const TEAM_MODE_LABEL: Record<TeamMode, string> = {
+  code: "Times definidos (entrada por código)",
+  draft: "Draft (capitães escolhem em potes)",
+};
 export type PlayoffFormat = "none" | "final" | "semis_final" | "quarters_semis_final" | "round16_quarters_semis_final";
 
 export interface Championship {
@@ -19,6 +26,7 @@ export interface Championship {
   teamCount: number;
   playersPerTeam: number;
   potCount: number;
+  teamMode: TeamMode;
   groupFormat: GroupFormat;
   groupBestOf: number;
   pointsWin: number;
@@ -98,6 +106,7 @@ export const DEFAULT_INPUT: ChampionshipInput = {
   teamCount: 5,
   playersPerTeam: 5,
   potCount: 4,
+  teamMode: "code",
   groupFormat: "round_robin",
   groupBestOf: 1,
   pointsWin: 3,
@@ -158,6 +167,7 @@ export function validateChampionship(i: ChampionshipInput): string[] {
     e.push(
       `Com ${i.playersPerTeam} jogadores por equipe (capitão + ${i.playersPerTeam - 1}), são ${i.playersPerTeam - 1} potes.`,
     );
+  if (!(i.teamMode in TEAM_MODE_LABEL)) e.push("Formação das equipes inválida.");
   if (!(i.groupFormat in GROUP_FORMAT_LABEL)) e.push("Formato da fase classificatória inválido.");
   if (![1, 3].includes(i.groupBestOf)) e.push("Partidas da classificatória: MD1 ou MD3.");
   if (!int(i.pointsWin, 0, 10) || !int(i.pointsLoss, 0, 10)) e.push("Pontos por vitória/derrota: de 0 a 10.");
@@ -224,6 +234,8 @@ export interface ChampionshipTeam {
   hasLogo: boolean;
   captainId: string | null;
   draftOrder: number | null;
+  /** Código para entrar no time (campeonato por código). */
+  joinCode?: string | null;
 }
 
 export interface ChampionshipPlayer {
@@ -292,5 +304,38 @@ export function rosterIssues(
     issues.push(
       `${noCaptain.length === 1 ? "Time sem capitão" : "Times sem capitão"}: ${noCaptain.map((t) => t.name).join(", ")}.`,
     );
+  return issues;
+}
+
+/* ------------------------------ Times por código ------------------------------ */
+
+/** Sem letras e números que se confundem (O/0, I/1). */
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** Código de 6 caracteres para entrar no time (ex.: "K7QX2M"). */
+export const generateJoinCode = (random: () => number = Math.random) =>
+  Array.from({ length: 6 }, () => CODE_ALPHABET[Math.floor(random() * CODE_ALPHABET.length)]!).join("");
+
+/** O que a pessoa digitou → código ("k7q-x2m " → "K7QX2M"). */
+export const normalizeCode = (s: string) =>
+  s
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6);
+
+/** O que falta no campeonato por código: times, capitães e jogadores em cada time. */
+export function codeRosterIssues(
+  c: { teamCount: number; playersPerTeam: number },
+  teams: ChampionshipTeam[],
+  players: ChampionshipPlayer[],
+) {
+  const issues: string[] = [];
+  const lack = c.teamCount - teams.length;
+  if (lack > 0) issues.push(lack === 1 ? "Falta criar 1 time." : `Faltam criar ${lack} times.`);
+  for (const t of teams) {
+    const n = players.filter((p) => p.teamId === t.id).length;
+    if (n < c.playersPerTeam) issues.push(`${t.name}: ${n} de ${c.playersPerTeam} jogadores.`);
+    if (!t.captainId) issues.push(`${t.name}: sem capitão.`);
+  }
   return issues;
 }

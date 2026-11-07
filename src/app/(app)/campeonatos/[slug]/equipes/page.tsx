@@ -1,4 +1,5 @@
 import { CheckCircle2, Crown, Shield, Users } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   AddPlayersDialog,
@@ -7,12 +8,13 @@ import {
   TeamDialog,
   type Person,
 } from "@/components/championships/roster-manager";
+import { JoinByCode, LeaveTeam, PlayerTeamSelect, TeamCode } from "@/components/championships/code-teams";
 import { TeamLogo } from "@/components/championships/team-logo";
 import { PlayerLink } from "@/components/players/player-link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { rosterIssues } from "@/lib/championship";
-import { getChampionship, getDraft, getRoster } from "@/services/championships";
+import { codeRosterIssues, rosterIssues } from "@/lib/championship";
+import { getChampionship, getDraft, getRoster, getTeamCodes } from "@/services/championships";
 import { getDataSource } from "@/services/index";
 import type { Player } from "@/types/domain";
 
@@ -21,10 +23,13 @@ export const metadata = { title: "Equipes do campeonato" };
 const STARTED = new Set(["running", "playoffs", "finished"]);
 
 /** Equipes: times com capitão e elenco, e os inscritos. Quem organiza gerencia tudo aqui. */
-export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slug]/equipes">) {
+export default async function TeamsPage({ params, searchParams }: PageProps<"/campeonatos/[slug]/equipes">) {
   const data = await getChampionship((await params).slug);
+  const { codigo } = await searchParams;
   if (!data) notFound();
-  const { championship: c, canManage, players: all } = data;
+  const { championship: c, canManage, players: all, session } = data;
+  // Por código: cada time tem um código e quem entra já está no time (sem potes nem draft).
+  const byCode = c.teamMode === "code";
   const [{ teams, players }, draft] = await Promise.all([getRoster(c.id), getDraft(c.id)]);
   const byId = new Map(all.map((p) => [p.id, p]));
   const person = (id: string): Person => {
@@ -35,7 +40,12 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
   // Com o draft em andamento (ou feito), inscritos e times ficam fechados (reiniciar o draft reabre).
   const editable = canManage && !STARTED.has(c.status) && !draft.status;
   const needed = c.teamCount * c.playersPerTeam;
-  const issues = rosterIssues(c, teams, players);
+  const issues = byCode ? codeRosterIssues(c, teams, players) : rosterIssues(c, teams, players);
+  const myEntry = session ? players.find((p) => p.userId === session.id) : undefined;
+  const myTeam = myEntry?.teamId ? teams.find((t) => t.id === myEntry.teamId) : undefined;
+  // Códigos: a organização vê todos; o capitão, o do próprio time.
+  const codes = byCode && (canManage || teams.some((t) => t.captainId === session?.id)) ? await getTeamCodes(c.id) : {};
+  const closed = STARTED.has(c.status) || c.status === "cancelled";
   const registered = new Set(players.map((p) => p.userId));
   const candidates = all.filter((p) => !registered.has(p.id)).map((p) => person(p.id));
   const captains = new Set(teams.map((t) => t.captainId).filter(Boolean));
@@ -63,7 +73,9 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
               <>
                 <Shield className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold">Para montar os potes do draft</div>
+                  <div className="font-semibold">
+                    {byCode ? "Para fechar os times" : "Para montar os potes do draft"}
+                  </div>
                   <ul className="mt-1 list-disc space-y-0.5 pl-4 text-muted">
                     {issues.map((i) => (
                       <li key={i}>{i}</li>
@@ -75,9 +87,49 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
               <>
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-win" aria-hidden />
                 <div className="flex-1">
-                  <div className="font-semibold">Inscritos e capitães completos</div>
-                  <p className="text-muted">Próximo passo: montar os potes do draft.</p>
+                  <div className="font-semibold">{byCode ? "Times completos" : "Inscritos e capitães completos"}</div>
+                  <p className="text-muted">
+                    {byCode
+                      ? "Próximo passo: gerar os confrontos (aba Calendário → Agendamento)."
+                      : "Próximo passo: montar os potes do draft."}
+                  </p>
                 </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {byCode && !closed && (
+        <Card className="border-brand/40">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            {!session ? (
+              <span className="text-muted">
+                Tem o código do seu time?{" "}
+                <Link href="/entrar" className="text-brand hover:underline">
+                  Entre na sua conta
+                </Link>{" "}
+                para entrar no time.
+              </span>
+            ) : myTeam ? (
+              <>
+                <span className="flex items-center gap-2">
+                  <TeamLogo team={{ ...myTeam, logoVersion: version }} size={28} />
+                  Você está no <b className="text-fg">{myTeam.name}</b>
+                  {myTeam.captainId === session.id && (
+                    <span className="flex items-center gap-1 text-xs font-semibold text-brand">
+                      <Crown className="size-3.5" aria-hidden /> capitão
+                    </span>
+                  )}
+                </span>
+                <LeaveTeam championshipId={c.id} teamName={myTeam.name} />
+              </>
+            ) : (
+              <>
+                <span className="text-muted">
+                  <b className="text-fg">Entrar num time:</b> digite o código que o capitão ou a organização passou.
+                </span>
+                <JoinByCode championshipId={c.id} initial={typeof codigo === "string" ? codigo : ""} />
               </>
             )}
           </CardContent>
@@ -95,7 +147,7 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
           {editable && teams.length < c.teamCount && (
             <TeamDialog
               championshipId={c.id}
-              captainOptions={sortedPlayers.filter((p) => !p.teamId).map((p) => person(p.userId))}
+              captainOptions={byCode ? [] : sortedPlayers.filter((p) => !p.teamId).map((p) => person(p.userId))}
             />
           )}
         </div>
@@ -104,7 +156,13 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
             <EmptyState
               icon={Users}
               title="Nenhum time ainda"
-              description={editable ? "Crie os times e escolha o capitão de cada um." : "Os times aparecem aqui."}
+              description={
+                editable
+                  ? byCode
+                    ? "Crie os times: cada um ganha um código para os jogadores entrarem."
+                    : "Crie os times e escolha o capitão de cada um."
+                  : "Os times aparecem aqui."
+              }
             />
           </Card>
         ) : (
@@ -129,7 +187,7 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
                             team={t}
                             logoVersion={version}
                             captainOptions={sortedPlayers
-                              .filter((p) => !p.teamId || p.userId === t.captainId)
+                              .filter((p) => (byCode ? p.teamId === t.id : !p.teamId || p.userId === t.captainId))
                               .map((p) => person(p.userId))}
                           />
                           <DeleteTeamButton championshipId={c.id} team={t} />
@@ -155,10 +213,19 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
                       ))}
                       {Array.from({ length: Math.max(0, slots - roster.length) }, (_, i) => (
                         <li key={`vaga-${i}`} className="px-4 py-2 text-sm text-subtle">
-                          Vaga do draft
+                          {byCode ? "Vaga" : "Vaga do draft"}
                         </li>
                       ))}
                     </ul>
+                    {codes[t.id] && (canManage || t.captainId === session?.id) && (
+                      <TeamCode
+                        championshipId={c.id}
+                        teamId={t.id}
+                        code={codes[t.id]!}
+                        slug={c.slug}
+                        canRegenerate={canManage}
+                      />
+                    )}
                   </Card>
                 </li>
               );
@@ -170,7 +237,11 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
       <Card>
         <CardHeader
           title={`Inscritos · ${players.length} de ${needed}`}
-          description="Jogadores cadastrados no MeuMix. Os capitães fazem parte dos inscritos."
+          description={
+            byCode
+              ? "Quem entrou pelo código já está no time. A organização também pode inscrever e escolher o time."
+              : "Jogadores cadastrados no MeuMix. Os capitães fazem parte dos inscritos."
+          }
           action={
             editable ? (
               <AddPlayersDialog championshipId={c.id} candidates={candidates} vagas={needed - players.length} />
@@ -186,7 +257,15 @@ export default async function TeamsPage({ params }: PageProps<"/campeonatos/[slu
               return (
                 <li key={p.userId} className="flex items-center gap-2 border-border px-4 py-2 text-sm sm:border-b">
                   <PlayerLink player={asPlayer(p.userId)} className="min-w-0 flex-1" />
-                  {captains.has(p.userId) ? (
+                  {byCode && canManage && !closed ? (
+                    <PlayerTeamSelect
+                      championshipId={c.id}
+                      userId={p.userId}
+                      name={person(p.userId).nickname}
+                      teamId={p.teamId}
+                      teams={teams.map((t) => ({ id: t.id, name: t.name }))}
+                    />
+                  ) : captains.has(p.userId) ? (
                     <span
                       className="flex items-center gap-1 text-xs font-semibold text-brand"
                       title={`Capitão do ${team?.name}`}

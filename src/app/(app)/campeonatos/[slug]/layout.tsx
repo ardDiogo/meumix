@@ -39,7 +39,7 @@ export default async function ChampionshipLayout({ children, params }: LayoutPro
           )}
         </div>
       </div>
-      <ChampionshipTabs slug={c.slug} canManage={canManage} />
+      <ChampionshipTabs slug={c.slug} canManage={canManage} teamMode={c.teamMode} />
       <div className="mt-4">{children}</div>
     </>
   );

@@ -50,6 +50,8 @@ export const AUDIT_LABELS: Record<string, string> = {
   "championship.result_gc": "Importou da GC um jogo do campeonato",
   "championship.playoffs_generate": "Gerou a chave dos playoffs",
   "championship.paid": "Atualizou as inscrições pagas do campeonato",
+  "championship.team_join": "Entrou num time pelo código",
+  "championship.team_leave": "Saiu do time do campeonato",
   "admin.schedule_create": "Criou mix",
   "admin.schedule_end": "Encerrou mix",
   "admin.set_role": "Alterou papel (admin)",

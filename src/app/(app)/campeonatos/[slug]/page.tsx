@@ -249,7 +249,11 @@ export default async function ChampionshipOverview({ params }: PageProps<"/campe
               <Item
                 icon={Shield}
                 label="Formação das equipes"
-                value={`Capitão + draft em ${c.potCount} ${c.potCount === 1 ? "pote" : "potes"} (serpentina)`}
+                value={
+                  c.teamMode === "code"
+                    ? "Times definidos: entrada por código"
+                    : `Capitão + draft em ${c.potCount} ${c.potCount === 1 ? "pote" : "potes"} (serpentina)`
+                }
               />
               <Item
                 icon={Swords}

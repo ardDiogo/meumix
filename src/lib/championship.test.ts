@@ -3,6 +3,9 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   canManageChampionship,
+  codeRosterIssues,
+  generateJoinCode,
+  normalizeCode,
   championshipSlug,
   DEFAULT_INPUT,
   prizeDistribution,
@@ -117,5 +120,22 @@ describe("times e inscritos", () => {
       validateTeam({ name: " ", tag: "TOOLONG", color: "azul", captainId: null }).join(),
       /Nome.*Sigla.*Cor/,
     );
+  });
+});
+
+describe("times por código", () => {
+  it("código de 6 caracteres sem letras confusas", () => {
+    const c = generateJoinCode();
+    assert.match(c, /^[A-HJ-NP-Z2-9]{6}$/);
+    assert.equal(normalizeCode(" k7q-x2m "), "K7QX2M");
+  });
+  it("aponta times faltando, incompletos e sem capitão", () => {
+    const t = { id: "a", name: "Alfa", tag: "", color: "#FF6A00", hasLogo: false, captainId: null, draftOrder: null };
+    const issues = codeRosterIssues(
+      { teamCount: 2, playersPerTeam: 2 },
+      [t],
+      [{ userId: "u1", pot: null, teamId: "a" }],
+    );
+    assert.deepEqual(issues, ["Falta criar 1 time.", "Alfa: 1 de 2 jogadores.", "Alfa: sem capitão."]);
   });
 });

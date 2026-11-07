@@ -1,15 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { MIGRATION, missing, validateTeam, type TeamInput } from "@/lib/championship";
+import { randomInt } from "node:crypto";
+import { generateJoinCode, MIGRATION, missing, validateTeam, type TeamInput } from "@/lib/championship";
 import { audit } from "@/services/audit";
-import { requireOrganizer } from "@/services/championship-guard";
+import { requireOrganizer, teamModeOf } from "@/services/championship-guard";
 
 export type TeamResult = { ok: boolean; message: string };
 
 const validId = (id: string) => /^[0-9a-f-]{36}$/i.test(id);
 const STARTED = new Set(["running", "playoffs", "finished"]);
 const logoOk = (b: string) => /^[A-Za-z0-9+/=]+$/.test(b) && b.length <= 380_000;
+
+/** Sorteio seguro para o código (0 ≤ n < 1). */
+const randomUnit = () => randomInt(1_000_000) / 1_000_000;
 
 function refresh() {
   revalidatePath("/campeonatos", "layout");
@@ -103,6 +107,7 @@ export async function saveTeam(championshipId: string, teamId: string | null, in
   const errors = validateTeam(input);
   if (errors.length) return { ok: false, message: errors[0]! };
   if (teamId && !validId(teamId)) return { ok: false, message: "Time inválido." };
+  const mode = await teamModeOf(r.admin, championshipId);
   if (input.logo && !logoOk(input.logo)) return { ok: false, message: "Escudo inválido ou grande demais." };
   const captain = input.captainId && validId(input.captainId) ? input.captainId : null;
 
@@ -125,6 +130,8 @@ export async function saveTeam(championshipId: string, teamId: string | null, in
     if (other) return { ok: false, message: `Esse jogador já é capitão do ${other.name}.` };
     const elsewhere = players?.find((p) => p.user_id === captain && p.team_id && p.team_id !== teamId);
     if (elsewhere) return { ok: false, message: "Esse jogador já está em outro time." };
+    if (mode === "code" && !players?.some((p) => p.user_id === captain && p.team_id === teamId))
+      return { ok: false, message: "O capitão precisa estar no time (entrou pelo código)." };
   }
 
   const row = {
@@ -139,17 +146,26 @@ export async function saveTeam(championshipId: string, teamId: string | null, in
     const { error: e } = await r.admin.from("championship_teams").update(row).eq("id", teamId);
     if (e) return { ok: false, message: "Não foi possível salvar o time." };
   } else {
-    const { data, error: e } = await r.admin
-      .from("championship_teams")
-      .insert({ ...row, championship_id: championshipId })
-      .select("id")
-      .single();
+    // Todo time nasce com o código de entrada (sem a migração 0044, sem código).
+    const insert = (withCode: boolean) =>
+      r.admin
+        .from("championship_teams")
+        .insert({
+          ...row,
+          championship_id: championshipId,
+          ...(withCode ? { join_code: generateJoinCode(randomUnit) } : {}),
+        })
+        .select("id")
+        .single();
+    let { data, error: e } = await insert(true);
+    if (e?.code === "23505" && /code/.test(e.message ?? "")) ({ data, error: e } = await insert(true));
+    if (e?.code === "42703") ({ data, error: e } = await insert(false));
     if (e || !data) return { ok: false, message: "Não foi possível criar o time." };
     id = data.id as string;
   }
-  // Capitão antigo sai do time; o novo entra.
+  // Capitão antigo sai do time; o novo entra. (Por código, o antigo continua jogando no time.)
   const oldCaptain = (current?.captain_id as string | null) ?? null;
-  if (oldCaptain && oldCaptain !== captain)
+  if (oldCaptain && oldCaptain !== captain && mode !== "code")
     await r.admin
       .from("championship_players")
       .update({ team_id: null })

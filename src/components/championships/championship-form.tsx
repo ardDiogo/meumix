@@ -1,6 +1,6 @@
 "use client";
 
-import { ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
+import { ImagePlus, KeyRound, Loader2, Plus, Shuffle, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -18,6 +18,7 @@ import {
   type ChampionshipInput,
   type GroupFormat,
   type PlayoffFormat,
+  type TeamMode,
 } from "@/lib/championship";
 import { compressImage } from "@/lib/image-client";
 import { cn } from "@/lib/utils";
@@ -84,6 +85,62 @@ export function ChampionshipForm({
         submit();
       }}
     >
+      <Card>
+        <CardHeader
+          title="1. Como os times serão formados?"
+          description="Defina primeiro: com os times já completos, o campeonato pula potes, adedonha e draft."
+        />
+        <CardContent className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Formação das equipes">
+          {(
+            [
+              {
+                mode: "code",
+                icon: KeyRound,
+                title: "Times já definidos",
+                text: "Cada time recebe um código. Quem entra pelo código já está no time — sem potes, sem adedonha e sem draft.",
+              },
+              {
+                mode: "draft",
+                icon: Shuffle,
+                title: "Times formados por draft",
+                text: "Inscrições, capitães e potes; os capitães jogam a adedonha e escolhem os jogadores em serpentina.",
+              },
+            ] as const
+          ).map((o) => {
+            const on = v.teamMode === o.mode;
+            const Icon = o.icon;
+            return (
+              <button
+                key={o.mode}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => set("teamMode", o.mode as TeamMode)}
+                className={cn(
+                  "flex items-start gap-3 rounded-lg border p-4 text-left transition-colors",
+                  on ? "border-brand bg-brand/10" : "border-border hover:border-border-strong",
+                )}
+              >
+                <span
+                  className={cn(
+                    "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2",
+                    on ? "border-brand" : "border-border-strong",
+                  )}
+                >
+                  {on && <span className="size-2.5 rounded-full bg-brand" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 font-semibold text-fg">
+                    <Icon className="size-4 text-brand" aria-hidden /> {o.title}
+                  </span>
+                  <span className="mt-1 block text-sm text-muted">{o.text}</span>
+                </span>
+              </button>
+            );
+          })}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader title="Informações" />
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -213,12 +270,16 @@ export function ChampionshipForm({
               }}
             />
           </div>
-          <div>
-            <Label>Potes do draft</Label>
-            <div className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-sm text-muted">
-              {Number.isNaN(v.playersPerTeam) ? "-" : `${v.potCount} (capitão + ${v.potCount} escolhidos)`}
+          {v.teamMode === "draft" ? (
+            <div>
+              <Label>Potes do draft</Label>
+              <div className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-sm text-muted">
+                {Number.isNaN(v.playersPerTeam) ? "-" : `${v.potCount} (capitão + ${v.potCount} escolhidos)`}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="hidden sm:block" />
+          )}
           <div className="sm:col-span-2">
             <Label htmlFor="ch-group">Fase classificatória</Label>
             <Select

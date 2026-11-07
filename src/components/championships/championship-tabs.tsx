@@ -5,13 +5,22 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 /** Abas do campeonato (as próximas etapas acrescentam Equipes, Draft, Calendário…). */
-export function ChampionshipTabs({ slug, canManage }: { slug: string; canManage: boolean }) {
+export function ChampionshipTabs({
+  slug,
+  canManage,
+  teamMode = "draft",
+}: {
+  slug: string;
+  canManage: boolean;
+  /** Por código não há draft: a aba some. */
+  teamMode?: "draft" | "code";
+}) {
   const path = usePathname();
   const base = `/campeonatos/${slug}`;
   const tabs = [
     { href: base, label: "Visão geral" },
     { href: `${base}/equipes`, label: "Equipes" },
-    { href: `${base}/draft`, label: "Draft" },
+    ...(teamMode === "draft" ? [{ href: `${base}/draft`, label: "Draft" }] : []),
     { href: `${base}/calendario`, label: "Calendário" },
     { href: `${base}/classificacao`, label: "Classificação" },
     { href: `${base}/playoffs`, label: "Playoffs" },

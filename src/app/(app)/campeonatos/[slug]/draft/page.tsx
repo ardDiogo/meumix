@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DraftBoard } from "@/components/championships/draft-board";
 import { Card } from "@/components/ui/card";
@@ -12,6 +13,17 @@ export default async function DraftPage({ params }: PageProps<"/campeonatos/[slu
   const data = await getChampionship((await params).slug);
   if (!data) notFound();
   const { championship: c, canManage, players: all, session } = data;
+  if (c.teamMode === "code")
+    return (
+      <Card className="p-6 text-center text-sm text-muted">
+        Neste campeonato os times já são definidos: cada time tem um código e quem entra pelo código já está no time.
+        Não há potes nem draft — veja a aba{" "}
+        <Link href={`/campeonatos/${c.slug}/equipes`} className="text-brand hover:underline">
+          Equipes
+        </Link>
+        .
+      </Card>
+    );
   const [{ teams, players }, draft] = await Promise.all([getRoster(c.id), getDraft(c.id)]);
   if (draft.missing)
     return (

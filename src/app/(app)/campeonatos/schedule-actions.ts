@@ -120,7 +120,17 @@ export async function generateMatches(championshipId: string): Promise<ScheduleR
   const r = await load(championshipId);
   if ("error" in r) return { ok: false, message: r.error ?? "" };
   if (!r.isManager) return { ok: false, message: "Só quem organiza gera os confrontos." };
-  if (r.draftStatus !== "done") return { ok: false, message: "Conclua o draft antes de gerar os confrontos." };
+  // Por código não há draft: basta ter todos os times criados.
+  const { data: full } = await r.admin.from("championships").select("*").eq("id", championshipId).maybeSingle();
+  const byCode = (full as { team_mode?: string } | null)?.team_mode === "code";
+  if (!byCode && r.draftStatus !== "done")
+    return { ok: false, message: "Conclua o draft antes de gerar os confrontos." };
+  const teamCount = Number((full as { team_count?: number } | null)?.team_count ?? r.teams.length);
+  if (byCode && r.teams.length < teamCount)
+    return {
+      ok: false,
+      message: `Crie os ${teamCount} times antes de gerar os confrontos (${r.teams.length} de ${teamCount}).`,
+    };
   if (r.teams.length < 2) return { ok: false, message: "São precisos ao menos 2 times." };
   const group = r.matches.filter((m) => m.stage === "group");
   if (group.some((m) => m.status !== "pending"))

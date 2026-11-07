@@ -81,3 +81,12 @@ export async function syncChampionshipStatus(
     return null;
   }
 }
+
+/** Formação das equipes do campeonato (sem a migração 0044: draft). */
+export async function teamModeOf(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  championshipId: string,
+): Promise<"draft" | "code"> {
+  const { data } = await admin.from("championships").select("*").eq("id", championshipId).maybeSingle();
+  return (data as { team_mode?: string } | null)?.team_mode === "code" ? "code" : "draft";
+}

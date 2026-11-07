@@ -200,3 +200,25 @@ Quando a **final tem vencedor**, o campeonato passa sozinho para **Finalizado** 
 para **Playoffs** (ou **Em andamento**). Campeonato **Cancelado** nunca muda sozinho. Regra em
 `autoStatus` (`src/lib/championship-playoffs.ts`), aplicada depois de cada resultado e de cada mudança de
 status de jogo.
+
+## Formação dos times: por código ou por draft
+
+Primeiro passo do cadastro (migração `0044_championship_codes.sql`):
+
+- **Times já definidos (padrão)**: a organização cria os times; cada um recebe um **código de 6
+  caracteres** (sem letras/números que se confundem). O jogador digita o código na aba **Equipes** (ou
+  abre o link de convite, que já preenche) e já está no time; o primeiro a entrar num time sem capitão
+  vira o capitão. Time cheio, código errado e jogador já em outro time são recusados. Dá para sair do
+  time antes de começar; a organização move jogadores entre times, inscreve, tira e gera outro código
+  (o antigo deixa de valer). O código só aparece para a organização e para o capitão do time — a coluna
+  não tem leitura pública no banco. Sem potes, adedonha e draft: a aba Draft some e os confrontos são
+  gerados quando os times estão criados.
+- **Times formados por draft**: o fluxo de inscrições, capitães, potes, adedonha e serpentina.
+
+A formação só muda antes do draft e dos confrontos. Sem a migração 0044, tudo segue no modo draft.
+
+## Como funciona (página geral)
+
+`/campeonatos/como-funciona` (botão na lista de campeonatos): a mesma explicação da aba de cada
+campeonato, em versão geral com as duas formações e todas as possibilidades, sem os quadros
+"Neste campeonato". Componente: `src/components/championships/how-it-works.tsx`.

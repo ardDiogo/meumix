@@ -106,7 +106,7 @@ export default async function CalendarPage({ params, searchParams }: PageProps<"
           servers={c.servers}
           windowText={`Jogos ${formatDays(c.matchDays).toLowerCase()}, das ${c.windowStart} às ${c.windowEnd}`}
           canGenerate={group.every((m) => m.status === "pending")}
-          draftDone={draft.status === "done"}
+          draftDone={draft.status === "done" || c.teamMode === "code"}
           slug={c.slug}
           scores={scores}
         />
@@ -116,7 +116,7 @@ export default async function CalendarPage({ params, searchParams }: PageProps<"
         </Card>
       ) : (
         <Card className="p-6 text-center text-sm text-muted">
-          {draft.status === "done"
+          {draft.status === "done" || c.teamMode === "code"
             ? canManage
               ? "Gere os confrontos na aba Agendamento."
               : "A tabela aparece quando a organização gerar os confrontos."

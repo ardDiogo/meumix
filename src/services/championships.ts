@@ -7,6 +7,7 @@ import {
   type ChampionshipPlayer,
   type ChampionshipTeam,
 } from "@/lib/championship";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSession } from "./auth";
 import { getDataSource } from "./index";
@@ -16,6 +17,10 @@ export const CHAMPIONSHIP_COLUMNS =
   "id, slug, name, description, edition, has_banner, starts_on, ends_on, team_count, players_per_team, pot_count, group_format, group_best_of, points_win, points_loss, playoff_format, playoff_best_of, match_days, window_start, window_end, servers, entry_fee, prize_split, costs, status, created_by, created_at, updated_at";
 
 type Row = Record<string, unknown>;
+
+/** Com a coluna team_mode (migração 0044); sem ela, as colunas de antes. */
+const WITH_MODE = `${CHAMPIONSHIP_COLUMNS}, team_mode`;
+const noColumn = (e: { code?: string } | null) => e?.code === "42703";
 
 export function toChampionship(r: Row): Championship {
   return {
@@ -30,6 +35,8 @@ export function toChampionship(r: Row): Championship {
     teamCount: Number(r.team_count),
     playersPerTeam: Number(r.players_per_team),
     potCount: Number(r.pot_count),
+    // Sem a migração 0044, todo campeonato é de draft.
+    teamMode: r.team_mode === "code" ? "code" : "draft",
     groupFormat: r.group_format as Championship["groupFormat"],
     groupBestOf: Number(r.group_best_of),
     pointsWin: Number(r.points_win),
@@ -54,13 +61,16 @@ export function toChampionship(r: Row): Championship {
 export async function listChampionships(): Promise<{ list: Championship[]; missing: boolean }> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { list: [], missing: false };
-  const { data, error } = await supabase
-    .from("championships")
-    .select(CHAMPIONSHIP_COLUMNS)
-    .order("starts_on", { ascending: false, nullsFirst: true })
-    .order("created_at", { ascending: false });
+  const query = (cols: string) =>
+    supabase
+      .from("championships")
+      .select(cols)
+      .order("starts_on", { ascending: false, nullsFirst: true })
+      .order("created_at", { ascending: false });
+  let { data, error } = await query(WITH_MODE);
+  if (noColumn(error)) ({ data, error } = await query(CHAMPIONSHIP_COLUMNS));
   if (error) return { list: [], missing: error.code === "42P01" || error.code === "PGRST205" };
-  return { list: (data ?? []).map(toChampionship), missing: false };
+  return { list: ((data ?? []) as unknown as Row[]).map(toChampionship), missing: false };
 }
 
 export interface Organizer {
@@ -74,13 +84,11 @@ export const getChampionship = cache(async (slug: string) => {
   if (!/^[a-z0-9-]{1,80}$/.test(slug)) return null;
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
-  const { data, error } = await supabase
-    .from("championships")
-    .select(CHAMPIONSHIP_COLUMNS)
-    .eq("slug", slug)
-    .maybeSingle();
+  const query = (cols: string) => supabase.from("championships").select(cols).eq("slug", slug).maybeSingle();
+  let { data, error } = await query(WITH_MODE);
+  if (noColumn(error)) ({ data, error } = await query(CHAMPIONSHIP_COLUMNS));
   if (error || !data) return null;
-  const championship = toChampionship(data);
+  const championship = toChampionship(data as unknown as Row);
   const [{ data: orgs }, session, players] = await Promise.all([
     supabase.from("championship_organizers").select("user_id").eq("championship_id", championship.id),
     getSession(),
@@ -129,7 +137,7 @@ export const getRoster = cache(async (championshipId: string) => {
       .order("created_at"),
   ]);
   return {
-    teams: (teams ?? []).map((t): ChampionshipTeam => ({
+    teams: ((teams ?? []) as unknown as Row[]).map((t): ChampionshipTeam => ({
       id: t.id as string,
       name: t.name as string,
       tag: (t.tag as string) ?? "",
@@ -396,4 +404,21 @@ export async function isChampionshipOrganizer(user: { id: string; isSuperAdmin: 
     supabase.from("championship_organizers").select("user_id", { count: "exact", head: true }).eq("user_id", user.id),
   ]);
   return (created ?? 0) + (granted ?? 0) > 0;
+}
+
+/**
+ * Códigos dos times (só pelo servidor: a coluna não tem leitura pública).
+ * Sem a migração 0044: vazio.
+ */
+export async function getTeamCodes(championshipId: string): Promise<Record<string, string>> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return {};
+  const { data, error } = await admin
+    .from("championship_teams")
+    .select("id, join_code")
+    .eq("championship_id", championshipId);
+  if (error) return {};
+  return Object.fromEntries(
+    (data ?? []).filter((t) => t.join_code).map((t) => [t.id as string, t.join_code as string]),
+  );
 }
