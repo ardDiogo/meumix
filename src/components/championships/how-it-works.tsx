@@ -6,6 +6,7 @@ import {
   Download,
   GitBranch,
   Hand,
+  Activity,
   HelpCircle,
   KeyRound,
   ListOrdered,
@@ -104,6 +105,7 @@ export function HowItWorks({ c, general = false }: { c: ChampionshipInput; gener
     ["playoffs", "Playoffs"],
     ["estatisticas", "Estatísticas e MVP"],
     ["premiacao", "Premiação"],
+    ["status", "Status do campeonato"],
     ["duvidas", "Dúvidas comuns"],
   ];
 
@@ -195,12 +197,14 @@ export function HowItWorks({ c, general = false }: { c: ChampionshipInput; gener
               pagas.
             </li>
             <li>
-              <b>Capitão</b>: joga a adedonha, escolhe os jogadores do seu time no draft, propõe datas e aceita ou
-              recusa as propostas do adversário. Não altera resultados nem elencos.
+              <b>Capitão</b>: no campeonato por código, vê o código e o link de convite do seu time para chamar os
+              jogadores; no draft, joga a adedonha e escolhe os jogadores do seu time. Em ambos, propõe datas e aceita
+              ou recusa as propostas do adversário. Não altera resultados nem elencos.
             </li>
             <li>
-              <b>Jogadores e visitantes</b>: acompanham tudo — times, draft ao vivo, calendário, classificação, chave,
-              estatísticas e premiação.
+              <b>Jogadores</b>: no campeonato por código, entram no time pelo link ou pelo código e podem sair antes de
+              começar. <b>Todos</b> (inclusive visitantes) acompanham tudo — times, draft ao vivo, calendário,
+              classificação, chave, estatísticas e premiação.
             </li>
           </ul>
         </Section>
@@ -239,12 +243,22 @@ export function HowItWorks({ c, general = false }: { c: ChampionshipInput; gener
               .
             </li>
             <li>
-              A organização e o capitão veem o código na aba Equipes e podem copiar o código ou um{" "}
-              <b>link de convite</b> (quem abre o link já encontra o código preenchido).
+              A organização e o capitão veem o código no card do time (aba Equipes) e podem copiar o <b>código</b> ou o{" "}
+              <b>link de convite</b> para mandar aos jogadores.
             </li>
             <li>
-              O jogador entra na aba Equipes, digita o código e <b>já está no time</b>. O primeiro a entrar num time sem
-              capitão vira o <b>capitão</b>; a organização pode trocar.
+              <b>Link de convite</b>: quem abre o link logado <b>entra no time na hora</b>, sem digitar nada. Sem login,
+              a tela pede para entrar na conta e, depois do login, volta para o link e completa a entrada. Quem ainda
+              não tem conta cria a conta, confirma o e-mail e abre o link de novo.
+            </li>
+            <li>
+              <b>Pelo código</b>: o jogador entra na aba Equipes, digita o código (maiúsculas ou minúsculas) e{" "}
+              <b>já está no time</b>. O primeiro a entrar num time sem capitão vira o <b>capitão</b>; a organização pode
+              trocar.
+            </li>
+            <li>
+              O site recusa <b>time cheio</b>, <b>código errado</b> e quem <b>já está em outro time</b> (é preciso sair
+              do atual antes).
             </li>
             <li>
               Cada time aceita até o número de jogadores por time. Dá para <b>sair do time</b> antes do campeonato
@@ -407,8 +421,10 @@ export function HowItWorks({ c, general = false }: { c: ChampionshipInput; gener
               <b>Enviar ao MeuMix</b> (o mesmo dos mixes; dá para instalar na página do jogo).
             </li>
             <li>
-              A partida vai para uma <b>fila no navegador</b> (até 20 partidas). Na página do jogo, em{" "}
-              <b>Importar da GC</b>, escolhe-se a partida e o mapa. Dá para enviar a rodada inteira e importar depois.
+              A partida vai para uma <b>fila no navegador</b> de quem clicou (até 20 partidas). Na página do jogo, em{" "}
+              <b>Importar da GC</b>, escolhe-se a partida e o mapa. Dá para enviar a rodada inteira e importar depois,
+              jogo a jogo, no mesmo navegador. Administradores e <b>organizadores do campeonato</b> podem enviar; o
+              botão para os favoritos também está na página do jogo (“Ainda não tem o botão?”).
             </li>
             <li>
               Os jogadores são reconhecidos pelo <b>ID da GC</b> já ligado ou pela <b>Steam</b>; o site descobre sozinho
@@ -535,6 +551,27 @@ export function HowItWorks({ c, general = false }: { c: ChampionshipInput; gener
           )}
         </Section>
 
+        <Section id="status" icon={Activity} title="Status do campeonato">
+          <p>O status aparece no topo do campeonato. Alguns mudam sozinhos:</p>
+          <ul>
+            <li>
+              <b>Em configuração</b>, <b>Aguardando inscrições</b>, <b>Em formação de equipes</b> e <b>Em andamento</b>:
+              a organização escolhe na Administração. Com o campeonato <b>Em andamento</b>, times e inscrições ficam
+              fechados.
+            </li>
+            <li>
+              <b>Playoffs</b>: <b>automático</b> quando a organização gera a chave dos playoffs.
+            </li>
+            <li>
+              <b>Finalizado</b>: <b>automático</b> quando a final tem vencedor (sem playoffs, quando termina o último
+              jogo da classificatória). Se o resultado decisivo for desfeito, volta para Playoffs (ou Em andamento).
+            </li>
+            <li>
+              <b>Cancelado</b>: só a organização; nunca muda sozinho.
+            </li>
+          </ul>
+        </Section>
+
         <Section id="duvidas" icon={HelpCircle} title="Dúvidas comuns">
           <ul>
             <li>
@@ -556,6 +593,18 @@ export function HowItWorks({ c, general = false }: { c: ChampionshipInput; gener
             </li>
             <li>
               <b>O campeonato mexe no meu ELO?</b> Não. Nada do campeonato altera os mixes.
+            </li>
+            <li>
+              <b>O código do time vazou.</b> A organização gera outro: o antigo deixa de valer e quem já entrou
+              continua.
+            </li>
+            <li>
+              <b>Entrei no time errado.</b> Antes de o campeonato começar, saia do time e entre no certo com o outro
+              código (ou peça para a organização mover você).
+            </li>
+            <li>
+              <b>Abri o link e não entrei.</b> Confira se está logado; se já estiver em outro time, saia dele antes.
+              Time cheio também recusa.
             </li>
           </ul>
           <p className="flex items-center gap-2 text-xs text-subtle">
