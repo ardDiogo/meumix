@@ -177,7 +177,7 @@ contador do que está esperando quem está vendo. A aba Playoffs usa a mesma cha
 
 ## Tamanho e envio da GC
 
-- **De 2 a 25 times** (migração `0043_championship_size.sql`). Playoffs: sem playoffs, final (2),
+- **De 2 a 25 times**, sempre **5x5** (5 jogadores por time: o capitão e mais 4; no draft, 4 potes) (migração `0043_championship_size.sql`). Playoffs: sem playoffs, final (2),
   semifinais (4), quartas (8) ou **oitavas** (16: 1×16, 8×9, 4×13, 5×12, 2×15, 7×10, 3×14, 6×11).
   O todos contra todos gera qualquer quantidade (25 times = 25 rodadas, cada time folga uma vez).
 - **Envio da GC**: a fila do "Enviar ao MeuMix" guarda as **20** últimas partidas por navegador (dá

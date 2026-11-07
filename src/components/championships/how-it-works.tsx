@@ -212,7 +212,7 @@ export function HowItWorks({ c, general = false }: { c: ChampionshipInput; gener
         <Section id="times" icon={Users} title="Inscrições e times">
           <ul>
             <li>
-              De <b>2 a {MAX_TEAMS} times</b>, com <b>2 a 10 jogadores</b> por time.
+              De <b>2 a {MAX_TEAMS} times</b>, sempre com <b>5 jogadores</b> por time (<b>5x5</b>: o capitão e mais 4).
             </li>
             <li>
               Só entra quem tem <b>conta no MeuMix</b> (o capitão precisa entrar para agendar, e as estatísticas ficam

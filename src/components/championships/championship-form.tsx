@@ -8,6 +8,7 @@ import { createChampionship, updateChampionship } from "@/app/(app)/campeonatos/
 import {
   formatMoney,
   MAX_TEAMS,
+  PLAYERS_PER_TEAM,
   GROUP_FORMAT_LABEL,
   PLAYOFF_FORMAT_LABEL,
   prizeDistribution,
@@ -257,18 +258,10 @@ export function ChampionshipForm({
             />
           </div>
           <div>
-            <Label htmlFor="ch-ppt">Jogadores por equipe</Label>
-            <Input
-              id="ch-ppt"
-              type="number"
-              min={2}
-              max={10}
-              value={Number.isNaN(v.playersPerTeam) ? "" : v.playersPerTeam}
-              onChange={(e) => {
-                const n = num(e.target.value);
-                setV((old) => ({ ...old, playersPerTeam: n, potCount: Number.isNaN(n) ? old.potCount : n - 1 }));
-              }}
-            />
+            <Label>Jogadores por equipe</Label>
+            <div className="flex h-9 items-center rounded-md border border-border bg-surface px-3 text-sm text-muted">
+              {PLAYERS_PER_TEAM} (5x5)
+            </div>
           </div>
           {v.teamMode === "draft" ? (
             <div>

@@ -27,7 +27,7 @@ describe("validateChampionship", () => {
   it("o padrão do 1º campeonato é válido", () => assert.deepEqual(validateChampionship(ok), []));
   it("potes = jogadores por equipe − 1 (o capitão não sai de pote)", () => {
     assert.match(validateChampionship({ ...ok, potCount: 5 }).join(), /são 4 potes/);
-    assert.deepEqual(validateChampionship({ ...ok, playersPerTeam: 6, potCount: 5 }), []);
+    assert.match(validateChampionship({ ...ok, playersPerTeam: 6, potCount: 5 }).join(), /sempre de 5 jogadores/);
   });
   it("de 2 a 25 times", () => {
     assert.deepEqual(validateChampionship({ ...ok, teamCount: 25 }), []);

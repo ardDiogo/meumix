@@ -57,6 +57,9 @@ export type ChampionshipInput = Omit<
   banner?: string | null;
 };
 
+/** Todo campeonato é 5x5: capitão + 4 jogadores (no draft, 4 potes). */
+export const PLAYERS_PER_TEAM = 5;
+
 /** Limite de times por campeonato (o banco aceita o mesmo). */
 export const MAX_TEAMS = 25;
 
@@ -160,7 +163,7 @@ export function validateChampionship(i: ChampionshipInput): string[] {
   if (i.endsOn && !DATE.test(i.endsOn)) e.push("Data de encerramento inválida.");
   if (i.startsOn && i.endsOn && i.endsOn < i.startsOn) e.push("O encerramento não pode ser antes do início.");
   if (!int(i.teamCount, 2, MAX_TEAMS)) e.push(`Quantidade de equipes: de 2 a ${MAX_TEAMS}.`);
-  if (!int(i.playersPerTeam, 2, 10)) e.push("Jogadores por equipe: de 2 a 10.");
+  if (i.playersPerTeam !== PLAYERS_PER_TEAM) e.push(`Os times são sempre de ${PLAYERS_PER_TEAM} jogadores (5x5).`);
   if (!int(i.potCount, 1, 10)) e.push("Potes: de 1 a 10.");
   // O capitão é um dos jogadores do time: os potes completam o resto.
   if (int(i.playersPerTeam, 2, 10) && int(i.potCount, 1, 10) && i.potCount !== i.playersPerTeam - 1)
