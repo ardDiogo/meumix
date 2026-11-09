@@ -49,7 +49,8 @@ c(migracao, ok) as (values
   ('0042_championship_paid', exists (select 1 from col where t = 'championships' and c = 'paid_players')),
   ('0043_championship_size', exists (select 1 from pg_constraint where conname = 'championships_team_count_check'
      and pg_get_constraintdef(oid) like '%25%')),
-  ('0044_championship_codes', exists (select 1 from col where t = 'championship_teams' and c = 'join_code'))
+  ('0044_championship_codes', exists (select 1 from col where t = 'championship_teams' and c = 'join_code')),
+  ('0045_leagues', to_regclass('public.league_members') is not null)
 )
 select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
 from c
