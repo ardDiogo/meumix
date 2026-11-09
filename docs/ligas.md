@@ -1,4 +1,8 @@
-# Ligas (Mix de Segunda e Mix de Terça)
+# Ligas (Mix da Lanterna e Mix do Jantinha)
+
+O mix de segunda é o **Mix da Lanterna** (slug `principal`) e o de terça, o **Mix do Jantinha** (slug
+`terca`), nomes da migração `0048_league_names.sql`. Abaixo, "Mix de Segunda" e "Mix de Terça" são
+esses dois.
 
 Cada mix semanal vira uma **liga**, com dados separados: mixes, ELO, nível, ranking, estatísticas,
 insígnias, bolão e crônicas. Conta, perfil, Steam, vínculo com a GC e campeonatos continuam gerais.

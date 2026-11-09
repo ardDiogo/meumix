@@ -4,16 +4,20 @@
 -- Mostra como fica a separação pela data ANTES de aplicar:
 --   agenda      → as agendas de mix e o dia da semana de cada uma
 --   mixes       → quantos mixes finalizados vão para cada liga
---   atencao     → mixes fora de segunda/terça (vão para o Mix de Segunda)
+--   atencao     → mixes fora de segunda/terça (vão para o Mix da Lanterna)
 --   jogador     → ELO de cada um em cada liga (começa no ELO inicial do nível GC e soma o RP dos mixes da liga)
 --   duas ligas  → quem jogou nas duas
 
 with dias(n, nome) as (
   values (0, 'domingo'), (1, 'segunda'), (2, 'terça'), (3, 'quarta'), (4, 'quinta'), (5, 'sexta'), (6, 'sábado')
 ),
-prev as (select * from public.league_split_preview()),
+prev as (
+  select p.*, coalesce(c.name, p.liga) nome_liga
+  from public.league_split_preview() p
+  left join public.communities c on c.slug = 'principal' and p.liga = 'Mix de Segunda'
+),
 liga_nome as (
-  select slug, case when slug = 'principal' then 'Mix de Segunda' else name end name from public.communities
+  select slug, name name from public.communities
 )
 select * from (
   select 1 ordem, 'agenda' secao,
@@ -36,18 +40,18 @@ select * from (
   union all
   select 3, 'atencao', d.nome, m.event_date::text,
     null, null, null, null,
-    'mix fora de segunda/terça: vai para o Mix de Segunda (' || m.id::text || ')'
+    'mix fora de segunda/terça: vai para o Mix da Lanterna (' || m.id::text || ')'
   from public.mix_matches m
   join dias d on d.n = extract(dow from m.event_date)
   where extract(isodow from m.event_date) not in (1, 2)
 
   union all
-  select 4, 'jogador', p.liga, p.jogador, p.mixes, p.elo_atual, p.elo_liga, p.nivel_liga, null
+  select 4, 'jogador', p.nome_liga, p.jogador, p.mixes, p.elo_atual, p.elo_liga, p.nivel_liga, null
   from prev p
 
   union all
   select 5, 'duas ligas', null, p.jogador, sum(p.mixes), max(p.elo_atual), null, null,
-    string_agg(p.liga || ': ' || p.elo_liga, ' · ' order by p.liga)
+    string_agg(p.nome_liga || ': ' || p.elo_liga, ' · ' order by p.nome_liga)
   from prev p
   group by p.user_id, p.jogador
   having count(*) > 1

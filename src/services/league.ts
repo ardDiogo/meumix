@@ -9,7 +9,7 @@ import { getSession } from "./auth";
 import { getLevels } from "./levels";
 
 /**
- * Ligas (Mix de Segunda, Mix de Terça…). Cada uma tem seus mixes, ELO, ranking e
+ * Ligas (Mix da Lanterna às segundas, Mix do Jantinha às terças…). Cada uma tem seus mixes, ELO, ranking e
  * estatísticas. A liga atual vem do cookie (seletor do topo), de `?liga=` em páginas
  * que aceitam (perfil) ou, na falta, da liga em que a pessoa joga.
  * Sem as migrações 0045/0046, `null`: o site funciona como antes (uma comunidade só).

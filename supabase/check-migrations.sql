@@ -52,7 +52,9 @@ c(migracao, ok) as (values
   ('0044_championship_codes', exists (select 1 from col where t = 'championship_teams' and c = 'join_code')),
   ('0045_leagues', to_regclass('public.league_members') is not null),
   ('0046_leagues_split', to_regclass('public.league_elo_history') is not null),
-  ('0047_leagues_badges', exists (select 1 from col where t = 'league_members' and c = 'elo_offset'))
+  ('0047_leagues_badges', exists (select 1 from col where t = 'league_members' and c = 'elo_offset')),
+  ('0048_league_names', case when to_regclass('public.communities') is null then false
+     else query_to_xml('select 1 from public.communities where slug = ''terca'' and name = ''Mix do Jantinha''', false, false, '')::text like '%<row>%' end)
 )
 select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
 from c

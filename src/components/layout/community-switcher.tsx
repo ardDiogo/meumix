@@ -16,7 +16,7 @@ import {
 } from "../ui/dropdown-menu";
 
 /**
- * Liga atual (Mix de Segunda, Mix de Terça…). Com mais de uma liga visível, vira
+ * Liga atual (Mix da Lanterna, Mix do Jantinha…). Com mais de uma liga visível, vira
  * um seletor: mixes, ranking, estatísticas e perfis passam a mostrar só a escolhida.
  */
 export function LeagueSwitcher({
@@ -35,8 +35,8 @@ export function LeagueSwitcher({
   const [pending, start] = useTransition();
   if (!current) return null;
 
-  // No topo, só o dia ("Segunda"); o nome inteiro no menu do celular e no título.
-  const short = current.name.replace(/^Mix d[eo] /i, "");
+  // No topo, o nome curto ("Lanterna"); o inteiro no menu do celular e no título.
+  const short = current.name.replace(/^Mix d[aeo] /i, "");
   const label = (
     <span className="min-w-0 text-left">
       {block && <span className="block text-[10px] font-semibold tracking-wider text-subtle uppercase">Liga</span>}
