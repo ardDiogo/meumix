@@ -238,7 +238,8 @@ Criar campeonato por draft funciona; "Times já definidos" avisa para rodar a 00
 ## Inscrição pelo próprio jogador (Dashboard)
 
 O Dashboard mostra até 2 campeonatos: primeiro os com inscrições abertas, depois os em formação de
-equipes e os em andamento. Cada card traz capa, status, formato, datas, valor da inscrição e o
+equipes, os em andamento e, por último, os em configuração ("Inscrições em breve"; quem organiza vê
+o botão **Abrir inscrições**, que muda o status com um clique). Cada card traz capa, status, formato, datas, valor da inscrição e o
 prêmio do 1º lugar (com as vagas cheias), a barra de inscritos e o botão:
 
 - **Draft, "Aguardando inscrições"**: **Inscrever-se** (até completar as vagas) e **Cancelar

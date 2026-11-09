@@ -1,10 +1,10 @@
 "use client";
 
-import { CheckCircle2, Loader2, UserPlus, X } from "lucide-react";
+import { CheckCircle2, DoorOpen, Loader2, UserPlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
-import { registerSelf, unregisterSelf } from "@/app/(app)/campeonatos/register-actions";
+import { openRegistrations, registerSelf, unregisterSelf } from "@/app/(app)/campeonatos/register-actions";
 import { Button } from "../ui/button";
 
 /** Inscrever-se no campeonato (draft) ou cancelar a própria inscrição. */
@@ -47,6 +47,29 @@ export function RegisterButton({
   return (
     <Button variant="primary" disabled={pending || full} onClick={() => run(() => registerSelf(championshipId))}>
       {pending ? <Loader2 className="animate-spin" /> : <UserPlus />} {full ? "Vagas preenchidas" : "Inscrever-se"}
+    </Button>
+  );
+}
+
+/** Organização: abre as inscrições do campeonato em configuração. */
+export function OpenRegistrationsButton({ championshipId }: { championshipId: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  return (
+    <Button
+      variant="primary"
+      disabled={pending}
+      onClick={() =>
+        confirm("Abrir as inscrições? O status passa para “Aguardando inscrições”.") &&
+        start(async () => {
+          const r = await openRegistrations(championshipId);
+          if (r.ok) toast.success(r.message);
+          else toast.error(r.message);
+          router.refresh();
+        })
+      }
+    >
+      {pending ? <Loader2 className="animate-spin" /> : <DoorOpen />} Abrir inscrições
     </Button>
   );
 }

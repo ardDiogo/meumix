@@ -4,8 +4,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSession } from "./auth";
 import { listChampionships } from "./championships";
 
-/** Campeonatos em destaque no Dashboard: inscrições abertas primeiro, depois os em andamento. */
-const SHOWN: Championship["status"][] = ["registration", "teams", "running", "playoffs"];
+/**
+ * Campeonatos em destaque no Dashboard: inscrições abertas primeiro, depois os em
+ * andamento e, por último, os ainda em configuração ("inscrições em breve").
+ */
+const SHOWN: Championship["status"][] = ["registration", "teams", "running", "playoffs", "setup"];
 
 export interface HomeChampionship {
   championship: Championship;
@@ -14,6 +17,8 @@ export interface HomeChampionship {
   teams: number;
   /** A pessoa logada: inscrita? em qual time? */
   mine: { registered: boolean; team: string | null } | null;
+  /** Quem cria/organiza (ou o super admin): vê o atalho para abrir as inscrições. */
+  canManage: boolean;
 }
 
 export async function dashboardChampionships(limit = 2): Promise<HomeChampionship[]> {
@@ -27,9 +32,16 @@ export async function dashboardChampionships(limit = 2): Promise<HomeChampionshi
   const session = await getSession();
   if (!supabase) return [];
   const ids = shown.map((c) => c.id);
-  const [{ data: players }, { data: teams }] = await Promise.all([
+  const [{ data: players }, { data: teams }, { data: orgs }] = await Promise.all([
     supabase.from("championship_players").select("championship_id, user_id, team_id").in("championship_id", ids),
     supabase.from("championship_teams").select("id, championship_id, name").in("championship_id", ids),
+    session
+      ? supabase
+          .from("championship_organizers")
+          .select("championship_id")
+          .eq("user_id", session.id)
+          .in("championship_id", ids)
+      : Promise.resolve({ data: [] as { championship_id: string }[] }),
   ]);
   return shown.map((c) => {
     const ps = (players ?? []).filter((p) => p.championship_id === c.id);
@@ -39,6 +51,9 @@ export async function dashboardChampionships(limit = 2): Promise<HomeChampionshi
       registered: ps.length,
       vagas: c.teamCount * c.playersPerTeam,
       teams: (teams ?? []).filter((t) => t.championship_id === c.id).length,
+      canManage:
+        !!session &&
+        (session.isSuperAdmin || c.createdBy === session.id || (orgs ?? []).some((o) => o.championship_id === c.id)),
       mine: session
         ? {
             registered: !!me,

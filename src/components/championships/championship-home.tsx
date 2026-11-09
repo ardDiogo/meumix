@@ -4,7 +4,7 @@ import { formatMoney, PLAYOFF_TEAMS, prizeDistribution } from "@/lib/championshi
 import type { HomeChampionship } from "@/services/championship-home";
 import { Button } from "../ui/button";
 import { formatDateRange } from "./format";
-import { RegisterButton } from "./register-button";
+import { OpenRegistrationsButton, RegisterButton } from "./register-button";
 import { ChampionshipStatusBadge } from "./status-badge";
 
 /** Campeonatos em destaque no Dashboard, com o botão de inscrição. */
@@ -20,7 +20,8 @@ export function ChampionshipHome({ items, loggedIn }: { items: HomeChampionship[
 }
 
 function ChampionshipCard({ item, loggedIn }: { item: HomeChampionship; loggedIn: boolean }) {
-  const { championship: c, registered, vagas, mine } = item;
+  const { championship: c, registered, vagas, mine, canManage } = item;
+  const soon = c.status === "setup";
   const href = `/campeonatos/${c.slug}`;
   const dates = formatDateRange(c.startsOn, c.endsOn);
   const prize = c.entryFee > 0 ? prizeDistribution(c.entryFee, vagas, c.prizeSplit, c.costs) : null;
@@ -92,7 +93,17 @@ function ChampionshipCard({ item, loggedIn }: { item: HomeChampionship; loggedIn
             </div>
           )}
 
+          {soon && (
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-fg">Inscrições em breve.</span>{" "}
+              {canManage
+                ? "Abra as inscrições para o botão Inscrever-se aparecer para todos."
+                : "Fique de olho: o botão de inscrição aparece aqui quando abrir."}
+            </p>
+          )}
+
           <div className="mt-auto flex flex-wrap items-center gap-2">
+            {soon && canManage && <OpenRegistrationsButton championshipId={c.id} />}
             {!loggedIn ? (
               open && (
                 <Button variant="primary" asChild>

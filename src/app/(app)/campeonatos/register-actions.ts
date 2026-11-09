@@ -5,6 +5,7 @@ import { missing, MIGRATION } from "@/lib/championship";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { requireOrganizer } from "@/services/championship-guard";
 
 /**
  * Inscrição feita pelo próprio jogador (botão "Inscrever-se" do Dashboard e da
@@ -103,4 +104,24 @@ export async function unregisterSelf(championshipId: string): Promise<RegisterRe
   });
   refresh();
   return { ok: true, message: "Inscrição cancelada." };
+}
+
+/** Organização: abre as inscrições (status "Aguardando inscrições") com um clique, do Dashboard. */
+export async function openRegistrations(championshipId: string): Promise<RegisterResult> {
+  const r = await requireOrganizer(championshipId);
+  if ("error" in r) return { ok: false, message: r.error ?? "Não foi possível abrir as inscrições." };
+  if (r.ch.status !== "setup") return { ok: false, message: "O campeonato já saiu da configuração." };
+  const { error } = await r.admin
+    .from("championships")
+    .update({ status: "registration", updated_at: new Date().toISOString() })
+    .eq("id", championshipId);
+  if (error) return { ok: false, message: "Não foi possível abrir as inscrições." };
+  await audit({
+    action: "championship.update",
+    outcome: "success",
+    actorId: r.session.id,
+    detail: { slug: r.ch.slug, status: "registration" },
+  });
+  refresh();
+  return { ok: true, message: "Inscrições abertas! O botão Inscrever-se já aparece para todos." };
 }
