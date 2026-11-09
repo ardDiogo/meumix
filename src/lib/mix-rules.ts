@@ -13,6 +13,18 @@ export function tally(ids: string[]) {
 }
 
 /**
+ * Todos os classificados já votaram nos capitães (1 ou 2 votos cada). Votos de
+ * reservas, ou em reservas, não contam.
+ */
+export function allClassifiedVoted(classified: string[], votes: { voter: string; candidate: string }[]) {
+  if (!classified.length) return false;
+  const voters = new Set(
+    votes.filter((v) => classified.includes(v.voter) && classified.includes(v.candidate)).map((v) => v.voter),
+  );
+  return classified.every((id) => voters.has(id));
+}
+
+/**
  * Capitães já garantidos antes de todos votarem (seção 4): o 2º colocado não
  * pode mais ser alcançado pelo 3º. Cada classificado vota em até 2 jogadores,
  * no máximo 1 voto por jogador, então o 3º ganha no máximo 1 voto de cada

@@ -2,7 +2,9 @@ import "server-only";
 import { currentOccurrence, describeRecurrence, type Occurrence } from "@/lib/mix-schedule";
 import { isAuthConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { tally } from "@/lib/mix-rules";
+import { allClassifiedVoted, captainsDecided, tally } from "@/lib/mix-rules";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { after } from "next/server";
 import { getFeatures } from "./features";
 import { activePenalties } from "./penalties";
 import { finalMaps, type RoundRow } from "./tiebreaker";
@@ -111,8 +113,10 @@ export interface VoteSummary {
   /** Apuração dos mapas (só votos de classificados), do mais votado ao menos. */
   mapTally: { id: string; name: string; votes: number }[];
   captainTally: { userId: string; displayName: string; votes: number }[];
-  /** Votos de capitão dados pelos classificados (meta: classificados × 2). */
+  /** Votos de capitão dados pelos classificados. */
   captainVotesCast: number;
+  /** Classificados que já votaram nos capitães (meta: todos os classificados). */
+  captainVoters: number;
   mine: { maps: string[]; captains: string[] };
 }
 
@@ -197,7 +201,14 @@ export async function listRegistrations(
   viewerId: string | null = null,
 ): Promise<{ registrations: Registration[]; departures: Departure[]; votes: VoteSummary }> {
   const supabase = await createSupabaseServerClient();
-  const empty = { maps: [], mapTally: [], captainTally: [], captainVotesCast: 0, mine: { maps: [], captains: [] } };
+  const empty = {
+    maps: [],
+    mapTally: [],
+    captainTally: [],
+    captainVotesCast: 0,
+    captainVoters: 0,
+    mine: { maps: [], captains: [] },
+  };
   if (!supabase) return { registrations: [], departures: [], votes: empty };
   const match = { schedule_id: scheduleId, event_date: date };
 
@@ -279,6 +290,7 @@ export async function listRegistrations(
         votes,
       })),
       captainVotesCast: capRows.length,
+      captainVoters: new Set(capRows.map((v) => v.voter_id as string)).size,
       mine: {
         maps: (mapVotes.data ?? []).filter((v) => v.user_id === viewerId).map((v) => v.map_id as string),
         captains: (captainVotes.data ?? []).filter((v) => v.voter_id === viewerId).map((v) => v.candidate_id as string),
@@ -294,6 +306,28 @@ async function cancelledOccurrences(): Promise<Set<string>> {
   const { data, error } = await supabase.from("mix_skips").select("schedule_id, event_date");
   if (error) return new Set();
   return new Set((data ?? []).map((c) => `${c.schedule_id}|${c.event_date}`));
+}
+
+/**
+ * Começa a seleção de equipes se a lista está fechada e todos os classificados votaram
+ * nos capitães (1 ou 2 votos cada; reservas não contam) ou os 2 capitães já estão
+ * garantidos, e não há sugestão de times em votação. Devolve true se começou.
+ */
+export async function startDraftIfReady(scheduleId: string, date: string, classified: string[]) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return false;
+  const occurrence = { schedule_id: scheduleId, event_date: date };
+  const [{ data: votes, error }, { data: pending }] = await Promise.all([
+    admin.from("captain_votes").select("voter_id, candidate_id").match(occurrence),
+    admin.from("mix_team_suggestions").select("status").match(occurrence).eq("status", "pending").maybeSingle(),
+  ]);
+  if (error || pending) return false;
+  const list = (votes ?? []).map((x) => ({ voter: x.voter_id as string, candidate: x.candidate_id as string }));
+  if (!allClassifiedVoted(classified, list) && !captainsDecided(classified, list)) return false;
+  const { error: startError } = await admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
+  if (startError) return false;
+  after(() => import("./notify").then((m) => m.notifyCaptains(scheduleId, date)));
+  return true;
 }
 
 /** Próximo mix (a ocorrência atual mais próxima entre as agendas ativas). */
@@ -317,7 +351,7 @@ export async function getNextMix(
   const next = upcoming[0];
   if (!next) return { status: "none" };
 
-  const [{ registrations, departures, votes }, organizers, draft, features] = await Promise.all([
+  const [{ registrations, departures, votes }, organizers, firstDraft, features] = await Promise.all([
     listRegistrations(next.schedule.id, next.occurrence.date, next.schedule.maxPlayers, viewerId),
     displayNames(next.schedule.createdBy ? [next.schedule.createdBy] : []),
     loadDraft(next.schedule.id, next.occurrence.date),
@@ -331,8 +365,16 @@ export async function getNextMix(
     classified,
     maxPlayers: next.schedule.maxPlayers,
     enabled: features.team_suggestion,
-    draftStarted: !!draft,
+    draftStarted: !!firstDraft,
   });
+  // Lista fechada e todos os classificados já votaram (ou capitães garantidos), mas a
+  // seleção não começou (ex.: um reserva subiu depois dos votos): começa agora.
+  const draft =
+    !firstDraft &&
+    classified.length >= next.schedule.maxPlayers &&
+    (await startDraftIfReady(next.schedule.id, next.occurrence.date, classified))
+      ? await loadDraft(next.schedule.id, next.occurrence.date)
+      : firstDraft;
   const ids = [...new Set([...registrations.map((r) => r.userId), ...(viewerId ? [viewerId] : [])])];
   const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA] = await Promise.all([
     activePenalties(ids),

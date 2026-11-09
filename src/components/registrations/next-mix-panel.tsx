@@ -140,7 +140,6 @@ export async function NextMixPanel() {
   const classifiedList = registrations.filter((r) => r.status === "classified");
   const classified = classifiedList.length;
   const full = classified >= schedule.maxPlayers;
-  const votesNeeded = schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER;
   const message = inviteMessage({
     eventAt: occurrence.eventAt,
     opensAt: occurrence.opensAt,
@@ -527,9 +526,10 @@ export async function NextMixPanel() {
           Necessário <span className="font-semibold text-fg">{schedule.maxPlayers} jogadores classificados</span> (
           {classified}/{schedule.maxPlayers}) e{" "}
           <span className="font-semibold text-fg">
-            {votes.captainVotesCast}/{votesNeeded} votações
+            todos os classificados votando nos capitães ({votes.captainVoters}/{schedule.maxPlayers})
           </span>{" "}
-          para iniciar a seleção de equipes (começa antes se os 2 capitães já estiverem garantidos).
+          para iniciar a seleção de equipes (começa antes se os 2 capitães já estiverem garantidos). Reservas não
+          contam.
         </div>
       </Card>
     </section>

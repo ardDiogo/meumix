@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { currentOccurrence, registrationWindow } from "@/lib/mix-schedule";
-import { captainsDecided, CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
+import { allClassifiedVoted, captainsDecided, CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
@@ -414,7 +414,6 @@ export async function submitCaptainVotes(
   // Todos os classificados votaram nos 2 capitães: a disputa começa sozinha.
   if (v.classified.length >= v.ctx.schedule.maxPlayers) {
     const { data: votes } = await v.ctx.admin.from("captain_votes").select("voter_id, candidate_id").match(occurrence);
-    const cast = (votes ?? []).filter((x) => v.classified.includes(x.voter_id as string)).length;
     // Começa antes se o 2º colocado já não pode ser alcançado (seção 4).
     const decided = captainsDecided(
       v.classified,
@@ -427,7 +426,12 @@ export async function submitCaptainVotes(
       .match(occurrence)
       .eq("status", "pending")
       .maybeSingle();
-    if ((cast >= v.ctx.schedule.maxPlayers * CAPTAIN_VOTES_PER_PLAYER || decided) && !pending) {
+    // Todos os classificados votaram (1 ou 2 capitães cada): reservas não contam.
+    const everyone = allClassifiedVoted(
+      v.classified,
+      (votes ?? []).map((x) => ({ voter: x.voter_id as string, candidate: x.candidate_id as string })),
+    );
+    if ((everyone || decided) && !pending) {
       const { error } = await v.ctx.admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
       if (!error) after(() => notifyCaptains(scheduleId, date));
     }
