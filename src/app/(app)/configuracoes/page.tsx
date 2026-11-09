@@ -1,7 +1,8 @@
 import { Bell, Database, Link2, Plug, UserRound, Users } from "lucide-react";
 import type { Metadata } from "next";
-import { NotImplementedButton } from "@/components/not-implemented";
 import { PageHeader } from "@/components/page-header";
+import { LeagueNamesForm } from "@/components/settings/league-names-form";
+import { listLeagues, myLeagueIds } from "@/services/league";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
@@ -23,7 +24,14 @@ export const metadata: Metadata = { title: "Configurações" };
 export default async function SettingsPage() {
   const ds = getDataSource();
   const [community, playerId] = await Promise.all([ds.getCommunity(), ds.getCurrentPlayerId()]);
-  const [player, session] = await Promise.all([playerId ? ds.getPlayer(playerId) : null, getSession()]);
+  const [player, session, leagues] = await Promise.all([
+    playerId ? ds.getPlayer(playerId) : null,
+    getSession(),
+    ds.kind === "supabase" ? listLeagues() : null,
+  ]);
+  const allLeagues = leagues ?? [];
+  const mine = await myLeagueIds();
+  const myLeagues = allLeagues.filter((l) => mine.has(l.id));
   const [steam, twitch] = session
     ? await Promise.all([
         profileAvatars([session.id]).then((m) => m.get(session.id)),
@@ -117,12 +125,18 @@ export default async function SettingsPage() {
                 <Users className="size-4 text-muted" /> Comunidade
               </span>
             }
-            description="Cada comunidade terá seus próprios mixes, membros e rankings."
+            description="Cada liga tem seus próprios mixes, ELO, ranking e insígnias. Troque de liga no topo da página."
           />
           <CardContent className="space-y-3 text-sm">
-            <Row label="Comunidade ativa" value={community.name} />
-            <Row label="ELO inicial" value={String(community.startingElo)} />
-            <NotImplementedButton feature="Gestão de comunidades">Gerenciar comunidades</NotImplementedButton>
+            <Row label="Liga ativa" value={community.name} />
+            {myLeagues.length > 0 && <Row label="Você joga em" value={myLeagues.map((l) => l.name).join(" · ")} />}
+            <Row label="ELO inicial" value="Pelo nível da GC, em cada liga" />
+            {session?.isSuperAdmin && allLeagues.length > 0 && (
+              <div className="border-t border-border pt-3">
+                <div className="mb-2 text-xs font-semibold tracking-wider text-muted uppercase">Nomes das ligas</div>
+                <LeagueNamesForm leagues={allLeagues} />
+              </div>
+            )}
           </CardContent>
         </Card>
 

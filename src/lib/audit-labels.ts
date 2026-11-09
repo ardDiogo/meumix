@@ -23,6 +23,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.match_date": "Alterou a data do mix",
   "admin.chronicle": "Gerou ou editou a crônica do mix",
   "admin.analysis": "Gerou a análise da partida pela IA",
+  "league.rename": "Renomeou uma liga",
   "championship.create": "Criou um campeonato",
   "championship.update": "Editou um campeonato",
   "championship.delete": "Excluiu um campeonato",
