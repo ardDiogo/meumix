@@ -1,4 +1,5 @@
 import "server-only";
+import { setRequestLeagueOfMatch } from "./league";
 import {
   checkAiChronicle,
   chronicleFacts,
@@ -38,11 +39,13 @@ interface MatchRow {
 }
 
 /** Sequências (vitórias, derrotas, lanterna, MVP) de cada jogador até este mix. */
-async function histories(admin: Admin, matchId: string, ids: string[]) {
+async function histories(admin: Admin, matchId: string, ids: string[], leagueId: string | null) {
   const result: Record<string, PlayerHistory> = {};
   if (!ids.length) return result;
+  // Sequências dentro da liga do mix.
+  const matchQuery = admin.from("mix_matches").select("id, event_date, finalized_at, maps");
   const [{ data: matches }, { data: records }] = await Promise.all([
-    admin.from("mix_matches").select("id, event_date, finalized_at, maps"),
+    leagueId ? matchQuery.eq("league_id", leagueId) : matchQuery,
     admin
       .from("player_match_records")
       .select("match_id, user_id, team, is_mvp, is_lanterna")
@@ -102,8 +105,10 @@ export async function chronicleInput(matchId: string): Promise<ChronicleInput | 
   if (!mix || mix.status !== "finished" || !report?.rows.length) return null;
 
   const ids = report.rows.map((r) => r.userId).filter((id): id is string => !!id);
+  // Ranking e sequências da liga do mix.
+  const league = await setRequestLeagueOfMatch(matchId);
   const [history, ranking, bolao] = await Promise.all([
-    histories(admin, matchId, ids),
+    histories(admin, matchId, ids, league?.id ?? null),
     getRanking({ period: "all" }).catch(() => null),
     bolaoForMatch(matchId).catch(() => null),
   ]);

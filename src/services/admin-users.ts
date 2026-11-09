@@ -1,6 +1,7 @@
 import "server-only";
 import { isSuperAdminEmail, type PlatformRole } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { eloInLeague, getCurrentLeague } from "./league";
 
 export interface ManagedUser {
   id: string;
@@ -36,6 +37,15 @@ export async function listManagedUsers(): Promise<ListUsersResult> {
     admin.from("profiles").select("id, twitch_login"),
   ]);
   if (error) return { status: "error", message: "Não foi possível carregar os usuários." };
+  // ELO na liga do topo (sem ligas: o de profiles).
+  const league = await getCurrentLeague();
+  const leagueElo = league
+    ? await eloInLeague(
+        admin,
+        league.id,
+        data.users.map((u) => u.id),
+      )
+    : null;
 
   const byId = new Map((profiles.data ?? []).map((p) => [p.id as string, p]));
   const steamById = new Map((steam.error ? [] : (steam.data ?? [])).map((p) => [p.id as string, p]));
@@ -55,7 +65,7 @@ export async function listManagedUsers(): Promise<ListUsersResult> {
       role: profile?.role === "admin" ? "admin" : "user",
       isSuperAdmin: isSuperAdminEmail(email, !!u.email_confirmed_at),
       fullName: (profile?.full_name as string | null) ?? null,
-      elo: (profile?.elo as number | undefined) ?? 0,
+      elo: leagueElo?.get(u.id)?.elo ?? (profile?.elo as number | undefined) ?? 0,
       gcLevel: (profile?.gc_level as number | null | undefined) ?? null,
       mixesPlayed: (profile?.mixes_played as number | undefined) ?? 0,
       avatarUrl: (steamById.get(u.id)?.avatar_url as string | null | undefined) ?? null,

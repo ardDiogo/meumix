@@ -11,6 +11,7 @@ import { getLevels } from "@/services/levels";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { DEFAULT_COMMUNITY_SLUG } from "@/services/mix-events";
+import { getCurrentLeague, listLeagues } from "@/services/league";
 
 export type CreateMixState =
   | { status: "idle" }
@@ -40,11 +41,11 @@ export async function createMixSchedule(_prev: CreateMixState, formData: FormDat
   const admin = createSupabaseAdminClient();
   if (!admin) return { status: "error", message: "O banco de dados não está configurado no servidor." };
 
-  const { data: community } = await admin
-    .from("communities")
-    .select("id")
-    .eq("slug", DEFAULT_COMMUNITY_SLUG)
-    .maybeSingle();
+  // A agenda nasce na liga escolhida no topo (sem ligas: a comunidade padrão).
+  const league = await getCurrentLeague();
+  const { data: community } = league
+    ? { data: { id: league.id } }
+    : await admin.from("communities").select("id").eq("slug", DEFAULT_COMMUNITY_SLUG).maybeSingle();
   if (!community) return { status: "error", message: "Comunidade padrão não encontrada. Rode a migração 0003." };
 
   const { error } = await admin.from("mix_schedules").insert({
@@ -61,12 +62,15 @@ export async function createMixSchedule(_prev: CreateMixState, formData: FormDat
     action: "admin.schedule_create",
     outcome: "success",
     actorId: session!.id,
-    detail: { recorrencia: describeRecurrence(recurrence), horario: input.eventTime },
+    detail: { recorrencia: describeRecurrence(recurrence), horario: input.eventTime, liga: league?.slug ?? null },
   });
 
   revalidatePath("/admin");
   revalidatePath("/dashboard");
-  return { status: "saved", message: `Mix criado: ${describeRecurrence(recurrence)} às ${input.eventTime}.` };
+  return {
+    status: "saved",
+    message: `Mix criado${league ? ` no ${league.name}` : ""}: ${describeRecurrence(recurrence)} às ${input.eventTime}.`,
+  };
 }
 
 /** Desativa uma agenda de mix (deixa de aparecer para inscrições). */
@@ -280,6 +284,8 @@ export async function setGcLevel(userId: string, gcLevel: number): Promise<RoleC
   const level = levelForElo(elo, await getLevels()).level;
   const { error } = await admin.from("profiles").update({ gc_level: gcLevel, elo, level }).eq("id", userId);
   if (error) return { ok: false, message: "Não foi possível salvar." };
+  // O nível GC define o ELO inicial em cada liga.
+  for (const l of (await listLeagues()) ?? []) await admin.rpc("recompute_league_elo", { p_league: l.id });
   await admin.from("elo_change_logs").insert({
     user_id: userId,
     old_elo: profile.elo,

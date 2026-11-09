@@ -27,6 +27,16 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
     ids.length ? supabase.from("profiles").select("id, display_name").in("id", ids) : Promise.resolve({ data: [] }),
   ]);
   const nickOf = new Map((nicks ?? []).map((p) => [p.id as string, p.display_name as string]));
+  // ELO na liga do mix (sem a migração 0046: o ELO gravado no registro).
+  const { data: leagueRows, error: leagueError } = await supabase
+    .from("league_elo_history")
+    .select("record_id, elo_before, elo_after")
+    .eq("match_id", matchId);
+  const leagueElo = leagueError ? null : new Map((leagueRows ?? []).map((h) => [h.record_id as string, h]));
+  const before = (r: Record<string, unknown>) =>
+    leagueElo ? num(leagueElo.get(r.id as string)?.elo_before) : num(r.elo_before);
+  const after = (r: Record<string, unknown>) =>
+    leagueElo ? num(leagueElo.get(r.id as string)?.elo_after) : num(r.elo_after);
   return {
     platform: (match.platform as MatchReport["platform"]) ?? "manual",
     rows: (records ?? []).map((r, i) => ({
@@ -34,11 +44,8 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
       userId: (r.user_id as string | null) ?? null,
       name: r.player_name as string,
       team: r.team as "A" | "B",
-      elo: num(r.elo_after) ?? num(r.elo_before),
-      eloDelta:
-        r.calculate_elo !== false && r.elo_after != null && r.elo_before != null
-          ? Number(r.elo_after) - Number(r.elo_before)
-          : null,
+      elo: after(r) ?? before(r),
+      eloDelta: r.calculate_elo !== false && after(r) != null && before(r) != null ? after(r)! - before(r)! : null,
       profileNick: r.user_id ? (nickOf.get(r.user_id as string) ?? null) : null,
       avatarUrl: r.user_id ? (avatars.get(r.user_id as string)?.avatarUrl ?? null) : null,
       k: r.kills ?? 0,

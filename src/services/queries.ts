@@ -8,6 +8,8 @@ import { getDataSource } from "./index";
 import type { GcMapStored } from "@/lib/gc-api";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { playerSlug } from "@/lib/player-slug";
+import type { League } from "@/lib/league";
+import { getCurrentLeague, playerLeagues, setRequestLeague, setRequestLeagueOfMatch } from "./league";
 
 export const RANKING_PERIODS: Record<RankingPeriod, { label: string; days: number | null }> = {
   "7d": { label: "7 dias", days: 7 },
@@ -75,8 +77,9 @@ export async function searchPlayers(query: string) {
   const ds = getDataSource();
   const [players, elos] = await Promise.all([ds.listPlayers(), ds.getElos()]);
   const q = normalize(query);
+  // Só quem joga na liga atual (quem tem ELO nela).
   return players
-    .filter((p) => !q || normalize(p.nickname).includes(q))
+    .filter((p) => elos.has(p.id) && (!q || normalize(p.nickname).includes(q)))
     .map((player) => ({ player, elo: elos.get(player.id) ?? 0 }))
     .sort((a, b) => b.elo - a.elo);
 }
@@ -154,9 +157,17 @@ export async function listMixes() {
 export async function getMixDetail(idOrSlug: ID) {
   const ds = getDataSource();
   const param = decodeURIComponent(idOrSlug);
-  const all = await ds.listMixes();
-  const mix = (await ds.getMix(param)) ?? findMixBySlug(param, all);
+  let all = await ds.listMixes();
+  let mix = (await ds.getMix(param)) ?? findMixBySlug(param, all);
+  // Mix de outra liga pelo endereço amigável (ex.: link da aba Geral do perfil).
+  if (!mix && ds.kind === "supabase") {
+    setRequestLeague("geral");
+    all = await ds.listMixes();
+    mix = findMixBySlug(param, all);
+  }
   if (!mix) return null;
+  // Endereço amigável calculado entre os mixes da liga do mix.
+  if (ds.kind === "supabase" && (await setRequestLeagueOfMatch(mix.id))) all = await ds.listMixes();
   const id = mix.id;
   const [players, highlights] = await Promise.all([ds.listPlayers(), ds.listHighlights()]);
   const byId = new Map(players.map((p) => [p.id, p]));
@@ -252,9 +263,11 @@ export async function getCommunityStats() {
 export async function getHighlightsFeed() {
   const ds = getDataSource();
   const [highlights, mixes, players] = await Promise.all([ds.listHighlights(), ds.listMixes(), ds.listPlayers()]);
+  const ids = new Set(mixes.map((m) => m.id));
   return {
     kind: ds.kind,
-    highlights,
+    // Clipes dos mixes da liga atual (e os que não são de nenhum mix).
+    highlights: highlights.filter((h) => !h.mixId || ids.has(h.mixId)),
     mixes: new Map(mixes.map((m) => [m.id, m])),
     players: new Map(players.map((p) => [p.id, p])),
   };
@@ -268,4 +281,36 @@ export async function resolvePlayerProfile(idOrSlug: string): Promise<PlayerProf
   const slug = playerSlug(param);
   const match = (await getDataSource().listPlayers()).find((p) => playerSlug(p.nickname) === slug || p.id === param);
   return match ? getPlayerProfile(match.id) : null;
+}
+
+/** Id do jogador pelo id ou pelo nick do endereço. */
+export async function resolvePlayerId(idOrSlug: string): Promise<ID | null> {
+  const param = decodeURIComponent(idOrSlug);
+  const players = await getDataSource().listPlayers();
+  if (players.some((p) => p.id === param)) return param;
+  const slug = playerSlug(param);
+  return players.find((p) => playerSlug(p.nickname) === slug)?.id ?? null;
+}
+
+/**
+ * Abas de liga do perfil: as ligas em que o jogador joga e, com mais de uma, "Geral"
+ * (todos os mixes, sem ELO). Escolhe a aba das consultas desta página: a pedida em
+ * `?liga=`, senão a liga do topo (se ele joga nela), senão a primeira dele.
+ */
+export async function chooseProfileLeague(
+  playerId: ID | null,
+  wanted: unknown,
+): Promise<{ tabs: League[]; active: string | null }> {
+  if (!playerId || getDataSource().kind !== "supabase") return { tabs: [], active: null };
+  const leagues = await playerLeagues(playerId);
+  if (!leagues.length) return { tabs: [], active: null };
+  const current = await getCurrentLeague();
+  const active =
+    wanted === "geral" && leagues.length > 1
+      ? "geral"
+      : typeof wanted === "string" && leagues.some((l) => l.slug === wanted)
+        ? wanted
+        : (leagues.find((l) => l.id === current?.id) ?? leagues[0]!).slug;
+  setRequestLeague(active);
+  return { tabs: leagues, active };
 }

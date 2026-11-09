@@ -1,34 +1,36 @@
 import { Search } from "lucide-react";
 import Link from "next/link";
-import type { Community } from "@/types/domain";
+import type { League } from "@/lib/league";
 import { Logo } from "../brand/logo";
 import { RefreshButton } from "../pwa/app-refresh";
+import { LeagueSwitcher } from "./community-switcher";
 import { MobileNav } from "./mobile-nav";
-import { PlayerSearch } from "./player-search";
 import { TopNav } from "./top-nav";
 import { UserMenu, type MenuUser } from "./user-menu";
 
 /** Menu superior: logo, navegação, busca e conta. No celular, o menu vira ☰. */
 export function Topbar({
-  community,
+  leagues,
+  league,
   user,
   showAdmin,
 }: {
-  community: Community;
+  leagues: League[];
+  league: League | null;
   user: MenuUser | null;
   showAdmin: boolean;
 }) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-bg/90 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 lg:gap-6 lg:px-6">
-        <MobileNav community={community} showAdmin={showAdmin} />
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 lg:px-6 xl:gap-5">
+        <MobileNav leagues={leagues} league={league} showAdmin={showAdmin} />
         <Logo height={30} className="shrink-0" />
-        <TopNav className="hidden lg:flex" />
+        <LeagueSwitcher leagues={leagues} current={league} className="hidden shrink-0 sm:flex" />
+        <TopNav className="hidden xl:flex" />
         <div className="ml-auto flex items-center gap-2">
-          <PlayerSearch className="hidden w-56 2xl:block" />
           <Link
             href="/jogadores"
-            className="flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg 2xl:hidden"
+            className="flex size-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg"
             aria-label="Buscar jogadores"
           >
             <Search className="size-4" />

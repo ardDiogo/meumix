@@ -50,6 +50,21 @@ export interface PushTarget {
   exclude?: string[];
   /** Envia uma vez só por chave (ex.: "abre:<agenda>:<data>"). */
   once?: string;
+  /** Só quem joga nesta liga (e quem ainda não joga em nenhuma). */
+  leagueId?: string | null;
+}
+
+/** Quem pode receber avisos da liga: os membros dela e quem não está em nenhuma. */
+async function leagueAudience(admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>, leagueId: string) {
+  const { data, error } = await admin.from("league_members").select("league_id, user_id");
+  if (error) return null;
+  const inLeague = new Set<string>();
+  const inAny = new Set<string>();
+  for (const m of data ?? []) {
+    inAny.add(m.user_id as string);
+    if (m.league_id === leagueId) inLeague.add(m.user_id as string);
+  }
+  return (userId: string) => inLeague.has(userId) || !inAny.has(userId);
 }
 
 /** Marca a chave como enviada; false se já tinha sido (ou se a tabela não existe). */
@@ -74,7 +89,10 @@ export async function sendPush(target: PushTarget, message: PushMessage): Promis
     const { data, error } = await query;
     if (error) return 0;
     const exclude = new Set(target.exclude ?? []);
-    const subs = (data ?? []).filter((s) => !exclude.has(s.user_id as string));
+    const audience = target.leagueId ? await leagueAudience(admin, target.leagueId) : null;
+    const subs = (data ?? []).filter(
+      (s) => !exclude.has(s.user_id as string) && (!audience || audience(s.user_id as string)),
+    );
     if (!subs.length) return 0;
     if (target.once && !(await claim(target.once))) return 0;
 

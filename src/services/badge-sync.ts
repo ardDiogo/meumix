@@ -61,7 +61,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
   if (!badges.length) return { ok: true, inseridas: 0, atualizadas: 0, removidas: 0, badges: 0 };
 
   const [matches, records, profiles, maps, allRows, predictions, drafts, gcRows] = await Promise.all([
-    admin.from("mix_matches").select("id, schedule_id, event_date, finalized_at, maps"),
+    admin.from("mix_matches").select("*"),
     // O Supabase devolve no máximo 1000 linhas por consulta: lê em páginas.
     allPages((from, to) =>
       admin
@@ -249,64 +249,101 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     return { players: [...players.values()], comebacks };
   };
 
-  const engineMatches: EngineMatch[] = (matches.data ?? []).map((m) => ({
-    id: m.id as string,
-    date: m.event_date as string,
-    finalizedAt: (m.finalized_at as string) ?? "",
-    maps: ((m.maps as { map_id: string; score_a: number | null; score_b: number | null }[]) ?? []).map((x) => ({
-      mapId: x.map_id,
-      scoreA: x.score_a ?? null,
-      scoreB: x.score_b ?? null,
-    })),
-    records: byMatch.get(m.id as string) ?? [],
-    tops: topsOf(m.id as string),
-    bets: betsOf(m),
-    participants: [
-      ...new Set((rowsByMatch.get(m.id as string) ?? []).map((r) => r.userId).filter((u): u is string => !!u)),
-    ],
-    gc: gcOf(m.id as string),
+  const engineMatches = (matches.data ?? []).map((m) => ({
+    leagueId: (m.league_id as string | null | undefined) ?? null,
+    match: {
+      id: m.id as string,
+      date: m.event_date as string,
+      finalizedAt: (m.finalized_at as string) ?? "",
+      maps: ((m.maps as { map_id: string; score_a: number | null; score_b: number | null }[]) ?? []).map((x) => ({
+        mapId: x.map_id,
+        scoreA: x.score_a ?? null,
+        scoreB: x.score_b ?? null,
+      })),
+      records: byMatch.get(m.id as string) ?? [],
+      tops: topsOf(m.id as string),
+      bets: betsOf(m),
+      participants: [
+        ...new Set((rowsByMatch.get(m.id as string) ?? []).map((r) => r.userId).filter((u): u is string => !!u)),
+      ],
+      gc: gcOf(m.id as string),
+    } satisfies EngineMatch,
   }));
+  const mapNames = Object.fromEntries((maps.data ?? []).map((m) => [m.id as string, m.name as string]));
+  const now = new Date().toISOString();
 
-  const { rows, progress } = computeBadges({
-    matches: engineMatches,
-    badges,
-    currentElo: new Map((profiles.data ?? []).map((p) => [p.id as string, p.elo as number])),
-    now: new Date().toISOString(),
-    mapNames: Object.fromEntries((maps.data ?? []).map((m) => [m.id as string, m.name as string])),
-  });
+  // Ligas (migrações 0045–0047): cada liga calcula as insígnias só com os mixes dela.
+  // Sem elas, uma rodada só com todos os mixes, do jeito antigo.
+  const [leagueRows, members, withLeague] = await Promise.all([
+    admin.from("communities").select("id, slug").order("sort_order"),
+    admin.from("league_members").select("league_id, user_id, elo"),
+    admin.from("player_badges").select("league_id").limit(1),
+  ]);
+  const leagues =
+    !leagueRows.error && !members.error && !withLeague.error && engineMatches.every((m) => m.leagueId)
+      ? (leagueRows.data ?? []).map((l) => ({ id: l.id as string, slug: l.slug as string }))
+      : null;
 
-  const { data, error } = await admin.rpc("sync_auto_badges", {
-    p_badges: badges.map((b) => b.id),
-    p_rows: rows.map((r) => ({
-      user_id: r.userId,
-      badge_id: r.badgeId,
-      source_ref: r.sourceRef,
-      scope: r.scope,
-      activated_at: r.activatedAt,
-      deactivated_at: r.deactivatedAt,
-      reason: r.reason.slice(0, 200),
-      end_reason: r.endReason?.slice(0, 200) ?? null,
-    })),
-    p_progress: progress.map((p) => ({
-      user_id: p.userId,
-      badge_id: p.badgeId,
-      current: p.current,
-      target: p.target,
-      detail: p.detail.slice(0, 120),
-    })),
-  });
-  if (error) {
-    console.error("[badges] sync:", error.code, error.message);
-    return { ok: false, message: "Não foi possível gravar as insígnias." };
+  const total = { inseridas: 0, atualizadas: 0, removidas: 0 };
+  const runs = leagues
+    ? leagues.map((l) => ({
+        league: l,
+        matches: engineMatches.filter((m) => m.leagueId === l.id).map((m) => m.match),
+        currentElo: new Map(
+          (members.data ?? []).filter((x) => x.league_id === l.id).map((x) => [x.user_id as string, x.elo as number]),
+        ),
+      }))
+    : [
+        {
+          league: null,
+          matches: engineMatches.map((m) => m.match),
+          currentElo: new Map((profiles.data ?? []).map((p) => [p.id as string, p.elo as number])),
+        },
+      ];
+
+  for (const run of runs) {
+    const { rows, progress } = computeBadges({
+      matches: run.matches,
+      badges,
+      currentElo: run.currentElo,
+      now,
+      mapNames,
+    });
+    // A mesma conquista pode sair nas duas ligas: fora da principal, a referência leva a liga.
+    const ref = (r: string) => (run.league && run.league.slug !== "principal" ? `${run.league.slug}:${r}` : r);
+    const payload = {
+      p_badges: badges.map((b) => b.id),
+      p_rows: rows.map((r) => ({
+        user_id: r.userId,
+        badge_id: r.badgeId,
+        source_ref: ref(r.sourceRef),
+        scope: r.scope,
+        activated_at: r.activatedAt,
+        deactivated_at: r.deactivatedAt,
+        reason: r.reason.slice(0, 200),
+        end_reason: r.endReason?.slice(0, 200) ?? null,
+      })),
+      p_progress: progress.map((p) => ({
+        user_id: p.userId,
+        badge_id: p.badgeId,
+        current: p.current,
+        target: p.target,
+        detail: p.detail.slice(0, 120),
+      })),
+    };
+    const { data, error } = run.league
+      ? await admin.rpc("sync_auto_badges_league", { p_league: run.league.id, ...payload })
+      : await admin.rpc("sync_auto_badges", payload);
+    if (error) {
+      console.error("[badges] sync:", error.code, error.message);
+      return { ok: false, message: "Não foi possível gravar as insígnias." };
+    }
+    const d = (data ?? {}) as { inseridas?: number; atualizadas?: number; removidas?: number };
+    total.inseridas += d.inseridas ?? 0;
+    total.atualizadas += d.atualizadas ?? 0;
+    total.removidas += d.removidas ?? 0;
   }
-  const d = (data ?? {}) as { inseridas?: number; atualizadas?: number; removidas?: number };
-  return {
-    ok: true,
-    inseridas: d.inseridas ?? 0,
-    atualizadas: d.atualizadas ?? 0,
-    removidas: d.removidas ?? 0,
-    badges: badges.length,
-  };
+  return { ok: true, ...total, badges: badges.length };
 }
 
 /** Versão para depois de uma ação: nunca derruba a ação principal. */

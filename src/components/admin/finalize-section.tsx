@@ -2,6 +2,7 @@ import { CheckCircle2, LockKeyhole } from "lucide-react";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getOccurrenceForFinalization } from "@/services/mix-events";
+import { eloInLeague, leagueOfSchedule } from "@/services/league";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
@@ -41,7 +42,15 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
   const supabase = await createSupabaseServerClient();
   // Todos os perfis: nicks do print que não se inscreveram no site ainda são ligados à conta certa.
   const { data: profiles } = await supabase!.from("profiles").select("id, display_name, elo");
-  const eloOf = new Map((profiles ?? []).map((p) => [p.id as string, p.elo as number]));
+  // ELO na liga do mix (quem nunca jogou nela começa no ELO inicial do nível GC).
+  const leagueElo = await eloInLeague(
+    supabase!,
+    await leagueOfSchedule(scheduleId),
+    (profiles ?? []).map((p) => p.id as string),
+  );
+  const eloOf = new Map(
+    (profiles ?? []).map((p) => [p.id as string, leagueElo.get(p.id as string)?.elo ?? (p.elo as number)]),
+  );
   // Apelidos já vinculados em finalizações anteriores (sem a migração 0030: nenhum).
   const { data: aliasRows } = (await createSupabaseAdminClient()
     ?.from("player_aliases")
@@ -72,7 +81,7 @@ export async function FinalizeSection({ scheduleId, date }: { scheduleId: string
       steamIds={steamIds}
       otherProfiles={(profiles ?? [])
         .filter((p) => !classified.some((r) => r.userId === p.id))
-        .map((p) => ({ userId: p.id as string, name: p.display_name as string, elo: (p.elo as number) ?? 0 }))}
+        .map((p) => ({ userId: p.id as string, name: p.display_name as string, elo: eloOf.get(p.id as string) ?? 0 }))}
       players={classified.map((r, i) => ({
         userId: r.userId,
         name: r.displayName,

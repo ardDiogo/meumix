@@ -17,6 +17,7 @@ import type {
 } from "@/types/domain";
 import { getSession } from "../auth";
 import { profileAvatars } from "../avatars";
+import { leagueScope } from "../league";
 
 /**
  * Dados reais (Supabase). Cada partida finalizada (`mix_matches`) vira um `Mix`;
@@ -109,6 +110,11 @@ async function loadMixes(filter?: { id?: string; playerId?: string }) {
   }
   let query = supabase.from("mix_matches").select("*").order("event_date", { ascending: false });
   if (filter?.id) query = query.eq("id", filter.id);
+  else {
+    // Só os mixes da liga atual (o mix aberto pelo endereço aparece em qualquer liga).
+    const scope = await leagueScope();
+    if (scope && scope !== "all") query = query.eq("league_id", scope.id);
+  }
   if (matchIds) query = query.in("id", matchIds);
   const { data: matches, error } = await query;
   if (error) throw new Error(`Falha ao carregar partidas: ${error.message}`);
@@ -134,12 +140,50 @@ async function loadMixes(filter?: { id?: string; playerId?: string }) {
   );
 }
 
+/** Histórico de ELO numa liga (recalculado pelo banco a cada mix). */
+async function leagueEloHistory(leagueId: string, playerId?: string): Promise<EloHistoryEntry[]> {
+  const supabase = await client();
+  let query = supabase
+    .from("league_elo_history")
+    .select("user_id, match_id, event_date, elo_before, elo_after, record_id")
+    .eq("league_id", leagueId)
+    .order("event_date", { ascending: true });
+  if (playerId) query = query.eq("user_id", playerId);
+  const { data } = await query;
+  const rows = (data ?? []).filter((h) => h.elo_before !== h.elo_after);
+  const ids = [...new Set(rows.map((h) => h.match_id as string))];
+  const { data: records } = ids.length
+    ? await supabase.from("player_match_records").select("match_id, user_id, wins, losses").in("match_id", ids)
+    : { data: [] };
+  const result = new Map(
+    (records ?? []).map((r) => [
+      `${r.match_id}:${r.user_id}`,
+      (r.wins as number) > (r.losses as number) ? "win" : (r.wins as number) < (r.losses as number) ? "loss" : "draw",
+    ]),
+  );
+  return rows.map(
+    (h): EloHistoryEntry => ({
+      playerId: h.user_id as string,
+      communityId: leagueId,
+      mixId: h.match_id as string,
+      date: `${h.event_date as string}T23:00:00Z`,
+      eloBefore: h.elo_before as number,
+      eloAfter: h.elo_after as number,
+      result: (result.get(`${h.match_id}:${h.user_id}`) as EloHistoryEntry["result"]) ?? "draw",
+    }),
+  );
+}
+
 export const supabaseDataSource: DataSource = {
   kind: "supabase",
   now: () => new Date(),
 
   async getCommunity(): Promise<Community> {
     const supabase = await client();
+    const scope = await leagueScope();
+    if (scope && scope !== "all") {
+      return { id: scope.id, slug: scope.slug, name: scope.name, startingElo: 0, createdAt: new Date().toISOString() };
+    }
     const { data } = await supabase.from("communities").select("*").eq("slug", "principal").maybeSingle();
     return {
       id: data?.id ?? "principal",
@@ -189,6 +233,12 @@ export const supabaseDataSource: DataSource = {
 
   async getElos() {
     const supabase = await client();
+    const scope = await leagueScope();
+    if (scope === "all") return new Map();
+    if (scope) {
+      const { data } = await supabase.from("league_members").select("user_id, elo").eq("league_id", scope.id);
+      return new Map((data ?? []).map((p) => [p.user_id as string, p.elo as number]));
+    }
     const { data } = await supabase.from("profiles").select("id, elo");
     return new Map((data ?? []).map((p) => [p.id as string, p.elo as number]));
   },
@@ -207,6 +257,9 @@ export const supabaseDataSource: DataSource = {
 
   async getEloHistory(playerId) {
     const supabase = await client();
+    const scope = await leagueScope();
+    if (scope === "all") return [];
+    if (scope) return leagueEloHistory(scope.id, playerId);
     let query = supabase
       .from("elo_change_logs")
       .select("user_id, match_id, old_elo, new_elo, created_at")

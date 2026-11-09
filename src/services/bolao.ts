@@ -1,4 +1,5 @@
 import "server-only";
+import { leagueScope } from "./league";
 import {
   bolaoRanking,
   outcomeOf,
@@ -218,7 +219,7 @@ export interface BolaoRankingView {
   mixes: number;
 }
 
-/** Ranking geral dos palpiteiros (só mixes finalizados contam). */
+/** Ranking dos palpiteiros da liga atual (só mixes finalizados contam). */
 export async function getBolaoRanking(): Promise<BolaoRankingView | null> {
   const admin = createSupabaseAdminClient();
   if (!admin) return null;
@@ -227,8 +228,10 @@ export async function getBolaoRanking(): Promise<BolaoRankingView | null> {
   const rows = (data ?? []) as PredictionRow[];
   if (!rows.length) return { rows: [], mixes: 0 };
 
+  const scope = await leagueScope();
+  const matchQuery = admin.from("mix_matches").select("id, schedule_id, event_date");
   const [{ data: matches }, { data: drafts }] = await Promise.all([
-    admin.from("mix_matches").select("id, schedule_id, event_date"),
+    scope && scope !== "all" ? matchQuery.eq("league_id", scope.id) : matchQuery,
     admin.from("mix_draft_state").select("schedule_id, event_date, captain_a, captain_b"),
   ]);
   const byOccurrence = new Map<string, PredictionRow[]>();

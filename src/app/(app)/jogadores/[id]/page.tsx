@@ -41,7 +41,15 @@ import { aggregatePlayer, seriesScore } from "@/lib/stats";
 import { mixesInPeriod, parsePlayerPeriod, playerPeriods } from "@/lib/player-period";
 import { PeriodSelect } from "@/components/players/period-select";
 import { getDataSource } from "@/services";
-import { getHighlightsFeed, getPlayerHighlights, resolvePlayerProfile, searchPlayers } from "@/services/queries";
+import {
+  chooseProfileLeague,
+  getHighlightsFeed,
+  getPlayerHighlights,
+  resolvePlayerId,
+  resolvePlayerProfile,
+  searchPlayers,
+} from "@/services/queries";
+import { LeagueTabs } from "@/components/players/league-tabs";
 import { playerHref, playerSlug } from "@/lib/player-slug";
 import { CsrepCard } from "@/components/players/csrep-card";
 import { getPermissions } from "@/services/auth";
@@ -63,8 +71,11 @@ export async function generateMetadata({ params }: PageProps<"/jogadores/[id]">)
 }
 
 export default async function PlayerProfilePage({ params, searchParams }: PageProps<"/jogadores/[id]">) {
-  const [{ id }, { comparar, periodo }] = await Promise.all([params, searchParams]);
+  const [{ id }, { comparar, periodo, liga }] = await Promise.all([params, searchParams]);
   const otherId = typeof comparar === "string" && comparar !== id ? comparar : null;
+  // Liga das estatísticas e do ELO (aba do perfil); antes de qualquer consulta.
+  const leagueTabs = await chooseProfileLeague(await resolvePlayerId(id), liga);
+  const isGeral = leagueTabs.active === "geral";
   const [profile, other, allPlayers] = await Promise.all([
     resolvePlayerProfile(id),
     otherId ? resolvePlayerProfile(otherId) : null,
@@ -76,7 +87,10 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
   const slugTaken =
     allPlayers.filter((p) => playerSlug(p.player.nickname) === playerSlug(profile.player.nickname)).length > 1;
   if (!slugTaken && decodeURIComponent(`/jogadores/${id}`) !== canonical) {
-    redirect(otherId ? `${canonical}?comparar=${encodeURIComponent(otherId)}` : canonical);
+    const query = new URLSearchParams();
+    if (otherId) query.set("comparar", otherId);
+    if (typeof liga === "string") query.set("liga", liga);
+    redirect(query.size ? `${canonical}?${query}` : canonical);
   }
 
   const ds = getDataSource();
@@ -201,24 +215,30 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
               )}
             </div>
           </div>
-          <div className="flex gap-6 sm:text-right">
-            <div>
-              <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">ELO</div>
-              <div className="flex items-center gap-2">
-                <LevelBadge elo={elo} size="md" />
-                <span className="font-display text-4xl font-bold text-brand tabular">{elo}</span>
+          {!isGeral && (
+            <div className="flex gap-6 sm:text-right">
+              <div>
+                <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">ELO</div>
+                <div className="flex items-center gap-2">
+                  <LevelBadge elo={elo} size="md" />
+                  <span className="font-display text-4xl font-bold text-brand tabular">{elo}</span>
+                </div>
+                <Delta value={recentChange} className="mt-0.5" />
+                <div className="text-[10px] text-subtle">em 30 dias</div>
               </div>
-              <Delta value={recentChange} className="mt-0.5" />
-              <div className="text-[10px] text-subtle">em 30 dias</div>
+              <div>
+                <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">Ranking</div>
+                <div className="font-display text-4xl font-bold tabular">{position ? `#${position}` : "—"}</div>
+                <div className="text-xs text-muted">de {totalPlayers}</div>
+              </div>
             </div>
-            <div>
-              <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">Ranking</div>
-              <div className="font-display text-4xl font-bold tabular">{position ? `#${position}` : "—"}</div>
-              <div className="text-xs text-muted">de {totalPlayers}</div>
-            </div>
-          </div>
+          )}
         </div>
       </Card>
+
+      {leagueTabs.tabs.length > 0 && (
+        <LeagueTabs tabs={leagueTabs.tabs} active={leagueTabs.active} basePath={playerHref(player)} compare={otherId} />
+      )}
 
       <Card aria-label="Resumo do período">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
@@ -299,7 +319,13 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         <Card className="lg:col-span-2">
           <CardHeader title="Evolução do ELO" action={<DemoBadge kind={kind} />} />
           <CardContent className="pb-2">
-            <EloChart data={series} />
+            {isGeral ? (
+              <p className="py-8 text-center text-sm text-muted">
+                Cada liga tem o seu ELO. Escolha uma liga acima para ver a evolução.
+              </p>
+            ) : (
+              <EloChart data={series} />
+            )}
           </CardContent>
           <div className="border-t border-border p-4">
             <div className="mb-2 text-[11px] font-semibold tracking-wider text-muted uppercase">Últimos resultados</div>

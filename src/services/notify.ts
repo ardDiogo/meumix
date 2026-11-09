@@ -187,15 +187,20 @@ export async function notifyTeamsDefined(scheduleId: string, date: string) {
 export async function notifyMixResult(matchId: string) {
   const admin = createSupabaseAdminClient();
   if (!admin) return;
-  const [{ data: match }, { data: records }] = await Promise.all([
+  const [{ data: match }, { data: records }, leagueHistory] = await Promise.all([
     admin.from("mix_matches").select("event_date, maps").eq("id", matchId).maybeSingle(),
     admin
       .from("player_match_records")
-      .select("user_id, team, elo_before, elo_after, is_mvp, is_lanterna")
+      .select("id, user_id, team, elo_before, elo_after, is_mvp, is_lanterna")
       .eq("match_id", matchId)
       .not("user_id", "is", null),
+    admin.from("league_elo_history").select("record_id, elo_before, elo_after").eq("match_id", matchId),
   ]);
   if (!match) return;
+  // ELO da liga do mix (sem a migração 0046: o gravado no registro).
+  const leagueElo = leagueHistory.error
+    ? null
+    : new Map((leagueHistory.data ?? []).map((h) => [h.record_id as string, h]));
   let a = 0;
   let b = 0;
   for (const m of (match.maps as { score_a: number | null; score_b: number | null }[]) ?? []) {
@@ -211,8 +216,9 @@ export async function notifyMixResult(matchId: string) {
       const mine = r.team === "A" ? a : b;
       const theirs = r.team === "A" ? b : a;
       const result = mine > theirs ? "Vitória" : mine < theirs ? "Derrota" : "Empate";
-      const before = r.elo_before as number | null;
-      const after = r.elo_after as number | null;
+      const h = leagueElo?.get(r.id as string);
+      const before = ((leagueElo ? h?.elo_before : r.elo_before) as number | null | undefined) ?? null;
+      const after = ((leagueElo ? h?.elo_after : r.elo_after) as number | null | undefined) ?? null;
       const diff = before != null && after != null ? after - before : null;
       const elo = diff == null ? "Resultado lançado." : `ELO ${before} → ${after} (${diff > 0 ? "+" : ""}${diff}).`;
       const extra = r.is_mvp ? " Você foi o MVP! 🏆" : r.is_lanterna ? " Lanterna da noite 🔦" : "";
@@ -258,8 +264,10 @@ export async function runScheduledNotices(now = new Date()) {
   const skipped = new Set((skips ?? []).map((s) => `${s.schedule_id}|${s.event_date}`));
   let sent = 0;
 
-  for (const row of (schedules ?? []) as ScheduleRow[]) {
+  for (const row of (schedules ?? []) as (ScheduleRow & { community_id?: string })[]) {
     const schedule = toSchedule(row);
+    // Avisos gerais do mix só para quem joga na liga dele.
+    const leagueId = row.community_id ?? null;
     const o = currentOccurrence(schedule, now, (d) => skipped.has(`${schedule.id}|${d}`));
     if (!o) continue;
     const key = `${schedule.id}:${o.date}`;
@@ -269,7 +277,7 @@ export async function runScheduledNotices(now = new Date()) {
     // Inscrições abrem em até 15 minutos.
     if (toOpen > 0 && toOpen <= 15 * MIN) {
       sent += await sendPush(
-        { topic: "inscricoes", once: `abre:${key}` },
+        { topic: "inscricoes", once: `abre:${key}`, leagueId },
         {
           title: `Inscrições abrem às ${hourMin(o.opensAt)} ⏰`,
           body: `Mix de ${dayMonth(o.date)} às ${hourMin(o.eventAt)}. Fique pronto: as vagas vão por ordem de chegada.`,
@@ -292,7 +300,7 @@ export async function runScheduledNotices(now = new Date()) {
     const left = schedule.maxPlayers - registered.length;
     if (left > 0 && now >= o.opensAt) {
       sent += await sendPush(
-        { topic: "inscricoes", exclude: registered, once: `vagas:${key}` },
+        { topic: "inscricoes", exclude: registered, once: `vagas:${key}`, leagueId },
         {
           title: `Faltam ${left} vaga${left > 1 ? "s" : ""} para o mix das ${hourMin(o.eventAt)} 🔥`,
           body: "Corre que ainda dá tempo de entrar.",
@@ -309,6 +317,7 @@ export async function runScheduledNotices(now = new Date()) {
           topic: "bolao",
           exclude: (bets ?? []).map((b) => b.user_id as string),
           once: `bolao-fecha:${key}`,
+          leagueId,
         },
         {
           title: `Bolão fecha às ${hourMin(o.eventAt)} 🎲`,

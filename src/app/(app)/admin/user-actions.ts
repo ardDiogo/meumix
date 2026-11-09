@@ -1,5 +1,6 @@
 "use server";
 
+import { eloInLeague, getCurrentLeague, listLeagues } from "@/services/league";
 import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -172,6 +173,63 @@ export async function updateUserElo(userId: string, elo: number, gcLevel?: numbe
     return { ok: false, message: "Nível GC inválido." };
   }
   const level = levelForElo(elo, await getLevels()).level;
+  const league = await getCurrentLeague();
+
+  // Com ligas: o ELO é o da liga do topo, guardado como ajuste que vale nos próximos mixes.
+  if (league) {
+    const before = (await eloInLeague(admin, league.id, [userId])).get(userId);
+    const oldElo = before?.elo ?? 0;
+    if (gcLevel != null) {
+      const { error } = await admin.from("profiles").update({ gc_level: gcLevel }).eq("id", userId);
+      if (error) return { ok: false, message: "Não foi possível salvar o nível GC." };
+    }
+    const { data: newElo, error } = await admin.rpc("set_league_elo", {
+      p_league: league.id,
+      p_user: userId,
+      p_elo: elo,
+    });
+    if (error) {
+      console.error("[elo] liga:", error.code, error.message);
+      return {
+        ok: false,
+        message:
+          error.code === "PGRST202"
+            ? "Rode a migração 0047_leagues_badges.sql no Supabase."
+            : "Não foi possível salvar o ELO.",
+      };
+    }
+    // O nível GC mexe no ELO inicial das outras ligas também.
+    if (gcLevel != null) {
+      const leagues = (await listLeagues()) ?? [];
+      await Promise.all(
+        leagues.filter((l) => l.id !== league.id).map((l) => admin.rpc("recompute_league_elo", { p_league: l.id })),
+      );
+    }
+    const final = (newElo as number | null) ?? elo;
+    await admin.from("elo_change_logs").insert({
+      user_id: userId,
+      old_elo: oldElo,
+      new_elo: final,
+      old_level: before?.level ?? 1,
+      new_level: levelForElo(final, await getLevels()).level,
+      reason: `ajuste manual (${league.name})`,
+      changed_by: session.id,
+      league_id: league.id,
+    });
+    await audit({
+      action: "admin.elo_edit",
+      outcome: "success",
+      actorId: session.id,
+      detail: { userId, from: oldElo, to: final, liga: league.slug },
+    });
+    await recomputeBadgesSafely();
+    refresh();
+    return {
+      ok: true,
+      message: `ELO no ${league.name}: ${oldElo} → ${final} (nível ${levelForElo(final, await getLevels()).level}).`,
+    };
+  }
+
   const oldElo = (profile?.elo as number | undefined) ?? 0;
   const { error } = await admin
     .from("profiles")

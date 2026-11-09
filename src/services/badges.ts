@@ -1,4 +1,5 @@
 import "server-only";
+import { leagueScope } from "./league";
 import { BADGE_RULES, MANUAL_BADGE_PRIORITY, type BadgeRule } from "@/lib/badge-engine";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -78,7 +79,17 @@ function paramsOf(b: BadgeRow) {
   return out;
 }
 
-/** Todas as insígnias, com quantos jogadores têm agora e quantas conquistas já houve. */
+/**
+ * Conquista visível na liga atual: as automáticas são da liga em que saíram; as
+ * manuais (sem liga) valem em todas. Na aba Geral e sem ligas, todas.
+ */
+async function inLeague() {
+  const scope = await leagueScope();
+  return (row: Record<string, unknown>) =>
+    !scope || scope === "all" || row.league_id == null || row.league_id === scope.id;
+}
+
+/** Todas as insígnias, com quantos jogadores têm agora e quantas conquistas já houve (na liga atual). */
 export async function listBadges(): Promise<Badge[] | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
@@ -89,7 +100,8 @@ export async function listBadges(): Promise<Badge[] | null> {
   if (error) return null;
   const active = new Map<string, number>();
   const total = new Map<string, number>();
-  for (const l of links ?? []) {
+  const visible = await inLeague();
+  for (const l of (links ?? []).filter(visible)) {
     const id = l.badge_id as string;
     total.set(id, (total.get(id) ?? 0) + 1);
     if (!l.deactivated_at) active.set(id, (active.get(id) ?? 0) + 1);
@@ -122,7 +134,9 @@ export async function playerBadges(userIds?: string[], opts: { history?: boolean
   if (userIds) query = query.in("user_id", userIds);
   const { data, error } = await query;
   if (error) return [];
+  const visible = await inLeague();
   return (data ?? [])
+    .filter(visible)
     .map((r) => {
       const b = ((Array.isArray(r.badges) ? r.badges[0] : r.badges) ?? {}) as BadgeRow;
       const rule = ruleOf(b);
@@ -164,7 +178,16 @@ export async function badgeProgress(userIds: string[]): Promise<BadgeProgressVie
   if (!supabase || !userIds.length) return [];
   const { data, error } = await supabase.from("badge_progress").select("*").in("user_id", userIds);
   if (error) return [];
-  return (data ?? []).map((p) => ({
+  const visible = await inLeague();
+  // Na aba Geral (várias ligas), fica o progresso mais adiantado de cada insígnia.
+  const best = new Map<string, Record<string, unknown>>();
+  for (const p of (data ?? []).filter(visible)) {
+    const key = `${p.user_id}|${p.badge_id}`;
+    const ratio = (x: Record<string, unknown>) => Number(x.current) / Math.max(Number(x.target), 1);
+    const prev = best.get(key);
+    if (!prev || ratio(p) > ratio(prev)) best.set(key, p);
+  }
+  return [...best.values()].map((p) => ({
     userId: p.user_id as string,
     badgeId: p.badge_id as string,
     current: p.current as number,

@@ -77,8 +77,7 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
         )}
       </Card>
       <p className="mt-3 text-xs text-subtle">
-        {total} jogadores classificados. Rankings separados por comunidade serão habilitados com o suporte a múltiplas
-        comunidades.
+        {total} jogadores classificados. Cada liga tem o seu ranking: troque de liga no topo da página.
       </p>
     </>
   );

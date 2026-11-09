@@ -10,6 +10,7 @@ import type { MixRecurrence, Weekday } from "@/types/domain";
 import { profileAvatars } from "./avatars";
 import { listAllMaps } from "./maps";
 import { loadSuggestion, syncSuggestion, teamWinProbability, type SuggestionView } from "./team-suggestion";
+import { getCurrentLeague } from "./league";
 
 export const DEFAULT_COMMUNITY_SLUG = "principal";
 
@@ -161,14 +162,18 @@ export type NextMixResult = { status: "not_configured" } | { status: "none" } | 
 const SCHEDULE_COLUMNS =
   "id, recurrence_kind, weekday, event_date, event_time, registration_opens_at, max_players, active, created_by, created_at";
 
+/** Agendas ativas da liga do topo (sem ligas: todas). */
 export async function listSchedules(): Promise<Schedule[] | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
-  const { data, error } = await supabase
+  const league = await getCurrentLeague();
+  let query = supabase
     .from("mix_schedules")
     .select(SCHEDULE_COLUMNS)
     .eq("active", true)
     .order("created_at", { ascending: false });
+  if (league) query = query.eq("community_id", league.id);
+  const { data, error } = await query;
   if (error) throw new Error(`Falha ao carregar a agenda de mixes: ${error.message}`);
   return (data as ScheduleRow[]).map(toSchedule);
 }
@@ -458,10 +463,11 @@ async function loadFinalizedMatch(scheduleId: string, date: string) {
   return (data?.id as string | undefined) ?? null;
 }
 
-/** Ocorrências com inscritos ainda não finalizadas (mais recentes primeiro). */
+/** Ocorrências com inscritos ainda não finalizadas, da liga do topo (mais recentes primeiro). */
 export async function listPendingFinalization(limit = 6) {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return [];
+  const league = await getCurrentLeague();
   const [{ data: regs }, { data: matches }, { data: schedules }] = await Promise.all([
     supabase
       .from("mix_registrations")
@@ -469,7 +475,9 @@ export async function listPendingFinalization(limit = 6) {
       .order("event_date", { ascending: false })
       .limit(500),
     supabase.from("mix_matches").select("schedule_id, event_date"),
-    supabase.from("mix_schedules").select(SCHEDULE_COLUMNS),
+    league
+      ? supabase.from("mix_schedules").select(SCHEDULE_COLUMNS).eq("community_id", league.id)
+      : supabase.from("mix_schedules").select(SCHEDULE_COLUMNS),
   ]);
   // Finalizados e descartados ("Deletar mix") não aparecem.
   const done = new Set([
@@ -480,7 +488,7 @@ export async function listPendingFinalization(limit = 6) {
   const seen = new Map<string, { scheduleId: string; date: string; players: number; eventTime: string }>();
   for (const r of regs ?? []) {
     const key = `${r.schedule_id}|${r.event_date}`;
-    if (done.has(key)) continue;
+    if (done.has(key) || !byId.has(r.schedule_id as string)) continue;
     const entry = seen.get(key);
     if (entry) entry.players += 1;
     else

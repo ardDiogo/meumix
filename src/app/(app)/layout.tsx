@@ -3,6 +3,7 @@ import { DemoBanner } from "@/components/demo-notice";
 import { Topbar } from "@/components/layout/topbar";
 import { getDataSource } from "@/services";
 import { getPermissions } from "@/services/auth";
+import { getCurrentLeague, visibleLeagues } from "@/services/league";
 import { profileAvatars } from "@/services/avatars";
 import { getLevels } from "@/services/levels";
 import { LevelsProvider } from "@/components/players/levels-context";
@@ -14,8 +15,9 @@ import { InstallBanner, InstallLink } from "@/components/pwa/pwa";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ds = getDataSource();
-  const [community, { session, canManageMixes }, levels, features, musicUrl] = await Promise.all([
-    ds.getCommunity(),
+  const [league, leagues, { session, canManageMixes }, levels, features, musicUrl] = await Promise.all([
+    ds.kind === "supabase" ? getCurrentLeague() : null,
+    ds.kind === "supabase" ? visibleLeagues() : [],
     getPermissions(),
     getLevels(),
     getFeatures(),
@@ -32,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <LevelsProvider levels={levels}>
       <div className="flex min-h-dvh flex-col">
-        <Topbar community={community} user={user} showAdmin={canManageMixes} />
+        <Topbar leagues={leagues} league={league} user={user} showAdmin={canManageMixes} />
         <DemoBanner kind={ds.kind} />
         <main id="conteudo" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6">
           {children}

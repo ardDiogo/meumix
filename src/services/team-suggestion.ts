@@ -1,4 +1,5 @@
 import "server-only";
+import { eloInLeague, getCurrentLeague } from "./league";
 import { ACCEPT_RATIO, suggestTeams, winProbability, type BalancePlayer } from "@/lib/team-balance";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -43,12 +44,14 @@ export async function loadBalancePlayers(client: Client, ids: string[]): Promise
     }
   }
   const byId = new Map((profiles ?? []).map((p) => [p.id as string, p]));
+  // ELO e nível da liga do mix (o próximo mix é sempre da liga do topo).
+  const elos = await eloInLeague(client, (await getCurrentLeague())?.id ?? null, ids);
   return ids.map((id) => {
     const p = byId.get(id);
     return {
       id,
-      elo: (p?.elo as number) ?? 0,
-      level: (p?.level as number) ?? 1,
+      elo: elos.get(id)?.elo ?? (p?.elo as number) ?? 0,
+      level: elos.get(id)?.level ?? (p?.level as number) ?? 1,
       games: (p?.mixes_played as number) ?? 0,
       wins: (p?.total_wins as number) ?? 0,
       mvps: (p?.mvp_count as number) ?? 0,
