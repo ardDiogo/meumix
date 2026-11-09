@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { pickPlayer, resetDraft, submitPpt, type DraftResult } from "@/app/(app)/draft/actions";
 import { cn } from "@/lib/utils";
 import type { DraftView, PptChoice } from "@/services/mix-events";
+import type { DraftReviewView } from "@/services/draft-review";
+import { DraftReviewBanner } from "./draft-review-banner";
 import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -46,6 +48,7 @@ export function DraftPanel({
   viewerId,
   isAdmin,
   probA = null,
+  review = null,
   info = {},
 }: {
   scheduleId: string;
@@ -58,6 +61,8 @@ export function DraftPanel({
   isAdmin: boolean;
   /** Chance do time A, com os times completos. */
   probA?: number | null;
+  /** Troca no time tirado (alguém saiu e o reserva entrou). */
+  review?: DraftReviewView | null;
   /** Resumo e insígnias de cada jogador (PICK). */
   info?: Record<string, PickInfo>;
 }) {
@@ -104,6 +109,18 @@ export function DraftPanel({
           </div>
         )}
       </div>
+
+      {draft.status === "completed" && review && (
+        <DraftReviewBanner
+          scheduleId={scheduleId}
+          date={date}
+          review={review}
+          mySide={mySide}
+          name={name}
+          captainA={draft.captainA}
+          captainB={draft.captainB}
+        />
+      )}
 
       {draft.status === "completed" && probA != null && (
         <WinProbability

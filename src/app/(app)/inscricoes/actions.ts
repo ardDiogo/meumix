@@ -1,6 +1,7 @@
 "use server";
 
 import { canJoinScheduleLeague, canManageLeagueOf } from "@/services/league";
+import { reconcileTeams } from "@/services/draft-review";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { after } from "next/server";
@@ -12,7 +13,7 @@ import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
-import { notifyCaptains, notifyListFull } from "@/services/notify";
+import { notifyCaptains, notifyDraftReview, notifyListFull } from "@/services/notify";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
 /**
@@ -176,6 +177,8 @@ export async function joinMix(
   }
 
   await audit({ ...base, outcome: "success", detail: meta });
+  // Vaga aberta no time tirado (alguém saiu sem reserva): quem entrou ocupa a vaga.
+  await afterRosterChange(ctx.admin, scheduleId, date);
   // Fechou a lista (10 classificados): chama todos para votar.
   const { count } = await ctx.admin
     .from("mix_registrations")
@@ -185,6 +188,21 @@ export async function joinMix(
   if (count === ctx.schedule.maxPlayers) after(() => notifyListFull(scheduleId, date));
   refresh();
   return { ok: true, message: "Inscrição confirmada!" };
+}
+
+/** Depois de entrar ou sair alguém: ajusta o time tirado e avisa os capitães se precisar. */
+async function afterRosterChange(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  scheduleId: string,
+  date: string,
+) {
+  try {
+    const r = await reconcileTeams(admin, scheduleId, date);
+    if (r?.kind === "review") after(() => notifyDraftReview(scheduleId, date, r.captains, r.changes));
+    if (r?.kind === "redraft") after(() => notifyCaptains(scheduleId, date));
+  } catch (e) {
+    console.error("[draft] ajuste do time:", e);
+  }
 }
 
 async function deleteRegistration(
@@ -202,10 +220,9 @@ async function deleteRegistration(
 
   const { error } = await admin.from("mix_registrations").delete().eq("id", reg.id);
   if (error) return { found: true as const, error };
-  // Remover um jogador zera a escolha dos times (mantém os votos de capitão).
-  await admin.from("mix_draft_state").delete().match({ schedule_id: reg.schedule_id, event_date: reg.event_date });
-  // Times desfeitos: os palpites do bolão deixam de valer.
-  await admin.from("mix_predictions").delete().match({ schedule_id: reg.schedule_id, event_date: reg.event_date });
+  // Time tirado: reserva saindo não muda nada; um dos classificados saindo é trocado
+  // pelo reserva que sobe e os capitães decidem manter ou tirar de novo.
+  await afterRosterChange(admin, reg.schedule_id as string, reg.event_date as string);
   await admin.from("mix_cancellations").insert({
     schedule_id: reg.schedule_id,
     event_date: reg.event_date,
@@ -285,6 +302,7 @@ export async function addPlayerToMix(scheduleId: string, date: string, userId: s
     .insert({ schedule_id: scheduleId, event_date: date, user_id: userId, device: null });
   if (error?.code === "23505") return { ok: true, message: `${name} já está na lista.` };
   if (error) return fail("Não foi possível incluir o jogador.", "error");
+  await afterRosterChange(ctx.admin, scheduleId, date);
 
   await audit({
     action: "admin.add_registration",

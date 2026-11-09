@@ -9,6 +9,7 @@ import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { notifyCaptains, notifyPicked, notifyPickTurn, notifyTeamsDefined } from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
+import { redraft } from "@/services/draft-review";
 
 export type DraftResult = { ok: true; message: string } | { ok: false; message: string };
 const fail = (message: string): DraftResult => ({ ok: false, message });
@@ -232,4 +233,54 @@ export async function setCaptains(
   });
   refresh();
   return { ok: true, message: "Capitães definidos! Agora é o pedra-papel-tesoura." };
+}
+
+/**
+ * Troca no time tirado (um classificado saiu e o reserva entrou no lugar): cada capitão
+ * responde. Os dois mantendo, o time fica; um pedindo para tirar de novo, recomeça.
+ */
+export async function answerDraftReview(scheduleId: string, date: string, keep: boolean): Promise<DraftResult> {
+  const session = await getSession();
+  if (!session) return fail("Entre na sua conta.");
+  const admin = createSupabaseAdminClient();
+  if (!admin) return fail("Servidor não configurado.");
+  const match = { schedule_id: scheduleId, event_date: date };
+  const [{ data: draft }, { data: review }] = await Promise.all([
+    admin.from("mix_draft_state").select("captain_a, captain_b, status").match(match).maybeSingle(),
+    admin.from("mix_draft_reviews").select("vote_a, vote_b, status").match(match).maybeSingle(),
+  ]);
+  if (!draft || !review || review.status !== "pending") return fail("Não há troca aguardando resposta.");
+  const side = session.id === draft.captain_a ? "a" : session.id === draft.captain_b ? "b" : null;
+  if (!side) return fail("Só os capitães respondem.");
+
+  await audit({
+    action: "draft.review",
+    outcome: "success",
+    actorId: session.id,
+    scheduleId,
+    eventDate: date,
+    detail: { decisao: keep ? "manter" : "tirar_novamente" },
+  });
+
+  if (!keep) {
+    const started = await redraft(admin, scheduleId, date);
+    if (started) after(() => notifyCaptains(scheduleId, date));
+    refresh();
+    return { ok: true, message: "Vamos tirar o time novamente." };
+  }
+
+  const other = side === "a" ? review.vote_b : review.vote_a;
+  const now = new Date().toISOString();
+  await admin
+    .from("mix_draft_reviews")
+    .update({ [`vote_${side}`]: true, status: other === true ? "kept" : "pending", updated_at: now })
+    .match(match);
+  // Avisa as telas abertas (o painel acompanha a seleção em tempo real).
+  await admin.from("mix_draft_state").update({ updated_at: now }).match(match);
+  refresh();
+  return {
+    ok: true,
+    message:
+      other === true ? "Time mantido! Os dois capitães concordaram." : "Resposta registrada. Falta o outro capitão.",
+  };
 }

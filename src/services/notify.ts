@@ -343,3 +343,34 @@ export async function runScheduledNotices(now = new Date()) {
   }
   return { ok: true as const, sent };
 }
+
+/** Troca no time tirado: os 2 capitães decidem se mantêm o time ou tiram de novo. */
+export async function notifyDraftReview(
+  scheduleId: string,
+  date: string,
+  captains: [string, string],
+  changes: { out: string | null; in: string | null; side: "A" | "B" }[],
+) {
+  const ids = changes.flatMap((c) => [c.out, c.in]).filter((x): x is string => !!x);
+  const names = await nameMap(ids);
+  const text = changes
+    .filter((c) => c.in)
+    .map((c) =>
+      c.out
+        ? `${names.get(c.out) ?? "Um jogador"} saiu e ${names.get(c.in!) ?? "o reserva"} entrou`
+        : `${names.get(c.in!) ?? "O reserva"} entrou`,
+    )
+    .join("; ");
+  await sendPush(
+    {
+      topic: "pick",
+      userIds: captains,
+      once: `troca:${scheduleId}:${date}:${changes.map((c) => `${c.out}>${c.in}`).join(",")}`,
+    },
+    {
+      title: "Troca no time 🔁",
+      body: `${text}. Manter o time ou tirar novamente? Responda no MeuMix.`,
+      tag: `pick:${date}`,
+    },
+  );
+}

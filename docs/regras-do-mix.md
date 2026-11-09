@@ -72,6 +72,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 
 - Cada classificado vota em **até 2 jogadores**; não pode votar em si mesmo; só pode votar em classificados. Cada par voto/votado é único.
 - Os **2 mais votados** viram capitães.
+- **Quando começa:** com a lista fechada (10 classificados), assim que **todos os classificados votaram** (1 ou 2 capitães cada). Reservas não votam e não contam. A checagem roda a cada voto e também ao abrir o mix.
 - **Bloqueio de voto tardio:** assim que a disputa de capitães (pedra-papel-tesoura) começa, o banco recusa novos votos. A tela também verifica antes de enviar e pula direto para a votação de mapas.
 - Se o resultado já está matematicamente garantido, a etapa pode avançar antes.
 
@@ -91,7 +92,16 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 - Antes de confirmar cada escolha, o app **relê o estado atual no banco** e confirma que ainda é a vez daquele capitão e que o jogador está livre (evita erros com cliques simultâneos).
 - A ordem em que cada jogador foi escolhido fica registrada e é exibida.
 - Ao fim do 5º turno, a escolha é marcada como concluída (e dispara a checagem de desempate de mapas).
-- **Admin:** pode reiniciar só a escolha (mantém os votos de capitão) ou tudo. Remover um jogador zera as escolhas, mas mantém os votos. Ações ficam em log.
+- **Admin:** pode reiniciar só a escolha (mantém os votos de capitão) ou tudo. Ações ficam em log.
+
+### Mudanças na lista com o time tirado
+
+- **Reserva entra ou sai:** nada muda (o time fica travado).
+- **Durante a escolha:** se sai um capitão ou alguém já escolhido, a escolha recomeça; se sai alguém ainda não escolhido, o reserva que sobe entra no grupo de quem pode ser escolhido.
+- **Time tirado:** se um dos classificados sai, o 1º reserva entra **no lugar dele, no mesmo time**, e os **2 capitães** respondem: **Manter o time** (precisa dos dois) ou **Tirar novamente** (basta um, e a seleção recomeça do pedra, papel ou tesoura, com os palpites do bolão zerados). Os capitães recebem aviso no celular.
+- Sem reserva na hora, a vaga fica aberta; quem entrar depois ocupa a vaga e a pergunta volta para os capitães.
+- Se quem sai é um capitão, a seleção recomeça.
+- Guardado em `mix_draft_reviews` (migração `0050_draft_review.sql`).
 
 ## 7) Sugestão de times balanceados e probabilidade de vitória
 

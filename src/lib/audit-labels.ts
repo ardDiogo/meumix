@@ -24,6 +24,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.chronicle": "Gerou ou editou a crônica do mix",
   "admin.analysis": "Gerou a análise da partida pela IA",
   "league.rename": "Renomeou uma liga",
+  "draft.review": "Respondeu à troca no time",
   "league.create": "Criou uma liga",
   "league.delete": "Excluiu uma liga",
   "league.join": "Entrou numa liga pelo convite",

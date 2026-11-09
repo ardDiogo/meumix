@@ -292,12 +292,17 @@ export async function NextMixPanel() {
           scheduleId={schedule.id}
           date={occurrence.date}
           draft={draft}
-          names={Object.fromEntries(registrations.map((r) => [r.userId, r.displayName]))}
+          names={Object.fromEntries([
+            // Quem saiu também (para a troca no time mostrar o nome).
+            ...departures.map((d) => [d.userId, d.displayName]),
+            ...registrations.map((r) => [r.userId, r.displayName]),
+          ])}
           avatars={Object.fromEntries(registrations.map((r) => [r.userId, r.avatarUrl]))}
           classified={classifiedList.map((r) => r.userId)}
           viewerId={session?.id ?? null}
           isAdmin={canManageMixes}
           probA={result.mix.draftProbA}
+          review={result.mix.review}
           info={pickInfo}
         />
       )}

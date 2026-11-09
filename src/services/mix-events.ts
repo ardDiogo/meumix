@@ -3,6 +3,7 @@ import { currentOccurrence, describeRecurrence, type Occurrence } from "@/lib/mi
 import { isAuthConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { allClassifiedVoted, captainsDecided, tally } from "@/lib/mix-rules";
+import { loadReview, type DraftReviewView } from "./draft-review";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { after } from "next/server";
 import { getFeatures } from "./features";
@@ -159,6 +160,8 @@ export interface NextMix {
   suggestion: SuggestionView | null;
   /** Chance do time A vencer, com os times completos. */
   draftProbA: number | null;
+  /** Troca no time tirado aguardando (ou decidida pelos) capitães. */
+  review: DraftReviewView | null;
 }
 
 export type NextMixResult = { status: "not_configured" } | { status: "none" } | { status: "ok"; mix: NextMix };
@@ -376,12 +379,16 @@ export async function getNextMix(
       ? await loadDraft(next.schedule.id, next.occurrence.date)
       : firstDraft;
   const ids = [...new Set([...registrations.map((r) => r.userId), ...(viewerId ? [viewerId] : [])])];
-  const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA] = await Promise.all([
+  const reviewClient = await createSupabaseServerClient();
+  const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA, review] = await Promise.all([
     activePenalties(ids),
     loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId),
     loadFinalizedMatch(next.schedule.id, next.occurrence.date),
     loadSuggestion(next.schedule.id, next.occurrence.date, viewerId, classified),
     draft?.status === "completed" ? teamWinProbability(draft.teamA, draft.teamB, next.schedule.id) : null,
+    draft?.status === "completed" && reviewClient
+      ? loadReview(reviewClient, next.schedule.id, next.occurrence.date)
+      : null,
   ]);
   for (const r of registrations) {
     const p = penalties.get(r.userId);
@@ -401,6 +408,7 @@ export async function getNextMix(
       finalizedMatchId,
       suggestion,
       draftProbA,
+      review,
     },
   };
 }
