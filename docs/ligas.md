@@ -109,3 +109,16 @@ tem mixes, as insígnias que a 0047 deixou nela passam para o Jantinha. Rodar de
 
 **Limite conhecido**: a separação é feita pelo site. As tabelas continuam com leitura pública no
 banco (como antes); levar as regras para o RLS do Supabase é um passo à parte.
+
+## Tela Comunidade (super admin)
+
+Admin → **Comunidade**, só para o super admin:
+
+- **Ligas**: membros, admins e mixes de cada uma; convite (ver, copiar link/código, gerar outro);
+  criar liga (nome e dia do mix) e excluir liga **vazia** (sem mixes nem agenda; a principal nunca).
+  Nomes editáveis ali mesmo.
+- **Jogadores cadastrados**: todos os perfis, com uma coluna por liga: ✓ inclui ou remove da liga e o
+  escudo torna admin da liga. Busca e filtro por liga ou "Sem liga".
+
+As ações reaproveitam as da aba Liga (`setLeagueMember`, `setLeagueAdmin`, `leagueInvite`) com o id
+da liga, o que exige super admin.

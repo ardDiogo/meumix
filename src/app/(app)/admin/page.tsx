@@ -14,6 +14,7 @@ import {
   ShieldAlert,
   Swords,
   Trophy,
+  Network,
   UsersRound,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -39,7 +40,9 @@ import { FeatureToggles } from "@/components/admin/feature-toggles";
 import { PenaltiesPanel } from "@/components/admin/penalties-panel";
 import { UsersTable } from "@/components/admin/users-table";
 import { LeagueInvite, LeagueMembers } from "@/components/leagues/league-admin";
-import { getCurrentLeague, leagueMembersView } from "@/services/league";
+import { communityOverview, getCurrentLeague, leagueMembersView } from "@/services/league";
+import { CommunityLeagues, CommunityPlayers } from "@/components/leagues/community-admin";
+import { LeagueNamesForm } from "@/components/settings/league-names-form";
 import { isPlatformAdmin } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -71,6 +74,7 @@ export const maxDuration = 60;
 const TABS = {
   mix: { label: "Controle de mix", icon: Swords },
   liga: { label: "Liga", icon: Trophy },
+  comunidade: { label: "Comunidade", icon: Network },
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
   usuarios: { label: "Jogadores", icon: UsersRound },
@@ -111,8 +115,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   // Punições agora ficam em Configurações (links antigos continuam funcionando).
   const aba = rawTab === "punicoes" ? "configuracoes" : rawTab;
   // Admin da liga (não da plataforma): só o controle de mix e a liga dele.
-  const visibleTabs = (Object.keys(TABS) as Tab[]).filter(
-    (t) => isPlatformAdmin(session) || t === "mix" || t === "liga",
+  // Comunidade (todas as ligas e jogadores): só o super admin.
+  const visibleTabs = (Object.keys(TABS) as Tab[]).filter((t) =>
+    t === "comunidade" ? !!session?.isSuperAdmin : isPlatformAdmin(session) || t === "mix" || t === "liga",
   );
   const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
   const [schedules, upcoming] = await Promise.all([
@@ -180,6 +185,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
         </div>
       )}
       {tab === "liga" && <LeagueTab viewerId={session!.id} />}
+      {tab === "comunidade" && <CommunityTab viewerId={session!.id} />}
       {tab === "insignias" && <BadgesTab />}
       {tab === "logs" && (
         <LogsTab
@@ -197,6 +203,44 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       )}
       {tab === "configuracoes" && <SettingsTab canManageAdmins={canManageAdmins} />}
     </>
+  );
+}
+
+/** Comunidade (super admin): todas as ligas do sistema e todos os jogadores cadastrados. */
+async function CommunityTab({ viewerId }: { viewerId: string }) {
+  const view = await communityOverview();
+  if (!view) {
+    return (
+      <Card>
+        <EmptyState icon={Network} title="Rode as migrações das ligas (0045 a 0049) no Supabase" className="py-10" />
+      </Card>
+    );
+  }
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader
+          title="Ligas"
+          description="Cada liga é um mix com seus jogadores, ranking e ELO. Só ligas sem mixes podem ser excluídas."
+        />
+        <CardContent className="space-y-4">
+          <CommunityLeagues leagues={view.leagues} />
+          <div className="border-t border-border pt-4">
+            <div className="mb-2 text-xs font-semibold tracking-wider text-muted uppercase">Nomes</div>
+            <LeagueNamesForm leagues={view.leagues} />
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader
+          title="Jogadores cadastrados"
+          description="Inclua ou remova cada jogador das ligas e escolha os admins de cada uma."
+        />
+        <CardContent>
+          <CommunityPlayers leagues={view.leagues} players={view.players} viewerId={viewerId} />
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

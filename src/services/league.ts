@@ -310,3 +310,58 @@ export async function canJoinScheduleLeague(
   const mine = (await activeLeagueIdsOf(userId)) ?? [];
   return mine.includes(league.id) ? { ok: true } : { ok: false, league: league.name };
 }
+
+export interface CommunityLeague {
+  id: string;
+  slug: string;
+  name: string;
+  weekday: number | null;
+  members: number;
+  admins: number;
+  mixes: number;
+  schedules: number;
+}
+
+export interface CommunityPlayer {
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  /** Por liga: papel de quem é membro ativo. */
+  leagues: Record<string, "admin" | "player">;
+}
+
+/** Tela Comunidade (super admin): todas as ligas e todos os jogadores cadastrados. */
+export async function communityOverview(): Promise<{ leagues: CommunityLeague[]; players: CommunityPlayer[] } | null> {
+  const admin = createSupabaseAdminClient();
+  const leagues = await listLeagues();
+  if (!admin || !leagues) return null;
+  const [members, profiles, matches, schedules] = await Promise.all([
+    admin.from("league_members").select("league_id, user_id, role, active").limit(20000),
+    admin.from("profiles").select("id, display_name").order("display_name"),
+    admin.from("mix_matches").select("league_id").limit(20000),
+    admin.from("mix_schedules").select("community_id, active"),
+  ]);
+  if (members.error) return null;
+  const active = (members.data ?? []).filter((m) => m.active !== false);
+  const avatars = await profileAvatars((profiles.data ?? []).map((p) => p.id as string));
+  const count = <T>(rows: T[] | null | undefined, test: (r: T) => boolean) => (rows ?? []).filter(test).length;
+  return {
+    leagues: leagues.map((l) => ({
+      ...l,
+      members: count(active, (m) => m.league_id === l.id),
+      admins: count(active, (m) => m.league_id === l.id && m.role === "admin"),
+      mixes: count(matches.data, (m) => m.league_id === l.id),
+      schedules: count(schedules.data, (s) => s.community_id === l.id && s.active !== false),
+    })),
+    players: (profiles.data ?? []).map((p) => ({
+      id: p.id as string,
+      name: p.display_name as string,
+      avatarUrl: avatars.get(p.id as string)?.avatarUrl ?? null,
+      leagues: Object.fromEntries(
+        active
+          .filter((m) => m.user_id === p.id)
+          .map((m) => [m.league_id as string, m.role === "admin" ? "admin" : "player"]),
+      ) as Record<string, "admin" | "player">,
+    })),
+  };
+}
