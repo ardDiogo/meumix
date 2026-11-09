@@ -5,7 +5,7 @@
 --   agenda      → as agendas de mix e o dia da semana de cada uma
 --   mixes       → quantos mixes finalizados vão para cada liga
 --   atencao     → mixes fora de segunda/terça (vão para o Mix de Segunda)
---   jogador     → ELO de cada um em cada liga (começa em 0 e soma o RP dos mixes da liga)
+--   jogador     → ELO de cada um em cada liga (começa no ELO inicial do nível GC e soma o RP dos mixes da liga)
 --   duas ligas  → quem jogou nas duas
 
 with dias(n, nome) as (

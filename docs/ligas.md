@@ -7,8 +7,9 @@ insígnias, bolão e crônicas. Conta, perfil, Steam, vínculo com a GC e campeo
 
 - O histórico é **separado pela data**: mix numa terça vai para o Mix de Terça; qualquer outro dia,
   para o Mix de Segunda.
-- O **ELO de cada liga começa do zero**: 0 + RP de cada mix daquela liga, em ordem de data, limitado
-  a 0–1600 a cada mix (a mesma regra da finalização). O ELO inicial pelo nível GC não entra.
+- O **ELO de cada liga começa do zero, mais o ELO inicial do nível GC** (opção B): ELO inicial + RP de
+  cada mix daquela liga, em ordem de data, limitado a 0–1600 a cada mix (a mesma regra da finalização).
+  Ajustes manuais de ELO feitos antes não entram.
 - Quem joga nas duas ligas tem dois ELOs.
 - Perfil: uma aba por liga e uma aba "Geral" só com totais (sem ELO somado).
 - Quem não é membro não vê a liga.
@@ -20,8 +21,12 @@ insígnias, bolão e crônicas. Conta, perfil, Steam, vínculo com a GC e campeo
    (`principal` = Mix de Segunda, `terca` = Mix de Terça), com `league_members` (ELO e nível por liga)
    e `league_id` em `mix_matches` e `elo_change_logs`, preenchido por trigger. Todo o histórico fica
    no Mix de Segunda. O site não muda.
-2. **Separar e recalcular.** Conferir antes com `supabase/ligas-relatorio.sql` (só lê). Depois,
-   mover os mixes de terça e a agenda de terça para o Mix de Terça, e gravar o ELO de cada liga.
+2. **Separar e recalcular** (`0046_leagues_split.sql`). Conferir antes com `supabase/ligas-relatorio.sql`
+   (só lê). A migração move os mixes de terça (pela data) e a agenda de terça para o Mix de Terça e
+   grava o ELO de cada liga em `league_members` e `league_elo_history`. Nada é apagado: o ELO de hoje
+   (`profiles`, `elo_before`/`elo_after`) continua, e o site segue mostrando ele até a Fase 3.
+   Gatilhos adiados recalculam a liga do zero, uma vez por transação, quando um mix é finalizado,
+   excluído, muda de data ou tem convidado vinculado. Os mixes novos entram na liga da agenda.
 3. **Telas por liga** e seletor de liga no topo.
 4. **Membros e acesso**: convite por link com código, admins por liga, privacidade.
 
