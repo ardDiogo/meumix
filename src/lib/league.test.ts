@@ -55,6 +55,22 @@ describe("pickLeagueSlug", () => {
   });
 });
 
+describe("pickLeagueSlug com a agenda de hoje", () => {
+  it("jogo da Lanterna numa quinta abre na Lanterna", () => {
+    const thursday = at("2026-11-12T15:00:00Z");
+    assert.equal(pickLeagueSlug("terca|2026-11-10", LEAGUES, BOTH, thursday, new Set(["principal"])), "principal");
+  });
+  it("a agenda de hoje vem antes do dia de costume", () => {
+    const monday = at("2026-11-09T15:00:00Z");
+    assert.equal(pickLeagueSlug(null, LEAGUES, BOTH, monday, new Set(["terca"])), "terca");
+  });
+  it("a escolha feita hoje ainda vale", () => {
+    const thursday = at("2026-11-12T15:00:00Z");
+    const cookie = leagueCookieValue("terca", thursday);
+    assert.equal(pickLeagueSlug(cookie, LEAGUES, BOTH, thursday, new Set(["principal"])), "terca");
+  });
+});
+
 describe("leagueDayLabel", () => {
   it("monta o subtítulo", () => {
     assert.equal(leagueDayLabel(1), "Mix de Segunda-feira");

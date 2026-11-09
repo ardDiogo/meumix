@@ -10,6 +10,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { cookies } from "next/headers";
 import { LEAGUE_COOKIE, pickLeagueSlug } from "@/lib/league";
+import { leagueIdsWithMixToday } from "./league-today";
 import type { CommunityRole } from "@/types/domain";
 
 /**
@@ -55,7 +56,7 @@ async function leagueRole(
 ): Promise<CommunityRole | null> {
   const { data, error } = await supabase
     .from("league_members")
-    .select("role, active, communities(slug, sort_order, weekday)")
+    .select("league_id, role, active, communities(slug, sort_order, weekday)")
     .eq("user_id", userId)
     .eq("active", true);
   if (error || !data?.length) return null;
@@ -63,11 +64,25 @@ async function leagueRole(
     .map((r) => {
       const c = (Array.isArray(r.communities) ? r.communities[0] : r.communities) as
         { slug: string; sort_order: number | null; weekday: number | null } | null | undefined;
-      return { role: r.role as string, slug: c?.slug ?? "", order: c?.sort_order ?? 0, weekday: c?.weekday ?? null };
+      return {
+        id: r.league_id as string,
+        role: r.role as string,
+        slug: c?.slug ?? "",
+        order: c?.sort_order ?? 0,
+        weekday: c?.weekday ?? null,
+      };
     })
     .sort((a, b) => a.order - b.order);
   // A mesma escolha de getCurrentLeague (escolhida hoje, liga do dia, última escolhida).
-  const slug = pickLeagueSlug((await cookies()).get(LEAGUE_COOKIE)?.value, rows, new Set(rows.map((r) => r.slug)));
+  // A mesma escolha de getCurrentLeague (inclui a liga com mix hoje pela agenda).
+  const today = await leagueIdsWithMixToday();
+  const slug = pickLeagueSlug(
+    (await cookies()).get(LEAGUE_COOKIE)?.value,
+    rows,
+    new Set(rows.map((r) => r.slug)),
+    new Date(),
+    new Set(rows.filter((r) => today.has(r.id)).map((r) => r.slug)),
+  );
   const row = rows.find((r) => r.slug === slug) ?? rows[0]!;
   return row.role === "admin" ? "admin" : "player";
 }

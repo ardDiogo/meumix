@@ -47,7 +47,8 @@ export function leagueToday(now = new Date()) {
 export const leagueCookieValue = (slug: string, now = new Date()) => `${slug}|${leagueToday(now).date}`;
 
 /**
- * Qual liga abrir. Ordem: a escolhida no seletor hoje; a liga do dia (ex.: segunda →
+ * Qual liga abrir. Ordem: a escolhida no seletor hoje; a liga com mix hoje (pela agenda,
+ * `withMixToday`, ex.: um jogo numa quinta; senão pelo dia de costume: segunda →
  * Lanterna); a última escolhida; a primeira em que a pessoa joga; a primeira visível.
  */
 export function pickLeagueSlug(
@@ -55,13 +56,17 @@ export function pickLeagueSlug(
   visible: { slug: string; weekday: number | null }[],
   memberSlugs: Set<string>,
   now = new Date(),
+  withMixToday: Set<string> = new Set(),
 ): string | null {
   if (!visible.length) return null;
   const has = (s: string | undefined) => !!s && visible.some((l) => l.slug === s);
   const [chosen, day] = (cookie ?? "").split("|");
   const today = leagueToday(now);
   if (has(chosen) && day === today.date) return chosen!;
-  const ofToday = visible.filter((l) => l.weekday === today.weekday);
+  const ofToday = [
+    ...visible.filter((l) => withMixToday.has(l.slug)),
+    ...visible.filter((l) => !withMixToday.has(l.slug) && l.weekday === today.weekday),
+  ];
   const pick = ofToday.find((l) => memberSlugs.has(l.slug)) ?? ofToday[0];
   if (pick) return pick.slug;
   if (has(chosen)) return chosen!;

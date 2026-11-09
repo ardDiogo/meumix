@@ -1,18 +1,24 @@
 "use client";
 
-import { AlertCircle, CalendarPlus, Info, Loader2 } from "lucide-react";
+import { AlertCircle, CalendarPlus, Info, Loader2, Trophy } from "lucide-react";
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { createMixSchedule, type CreateMixState } from "@/app/(app)/admin/actions";
 import { communityToday, describeRecurrence, nextOccurrence, parseSchedule, WEEKDAYS } from "@/lib/mix-schedule";
+import { leagueDayLabel } from "@/lib/league";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { Input, Label, Select } from "../ui/input";
 
 const todayISO = () => communityToday(new Date());
 
-export function CreateMixForm() {
+/**
+ * Novo mix. A 1ª pergunta é de qual mix (liga) é o jogo: quem cuida de uma liga só vê
+ * ela; quem cuida de mais de uma escolhe (jogos fora do dia de costume, ex.: quinta).
+ */
+export function CreateMixForm({ leagues = [] }: { leagues?: { id: string; name: string; weekday: number | null }[] }) {
   const [state, action, pending] = useActionState<CreateMixState, FormData>(createMixSchedule, { status: "idle" });
+  const [leagueId, setLeagueId] = useState(leagues.length === 1 ? leagues[0]!.id : "");
   const [recurrence, setRecurrence] = useState("weekly:1");
   const [date, setDate] = useState("");
   const [eventTime, setEventTime] = useState("20:00");
@@ -36,6 +42,32 @@ export function CreateMixForm() {
       />
       <CardContent>
         <form action={action} className="space-y-4" noValidate>
+          {leagues.length === 1 && (
+            <div className="flex items-center gap-2 rounded-md border border-border bg-surface-2/60 px-3 py-2 text-sm">
+              <Trophy className="size-4 shrink-0 text-brand" aria-hidden />
+              <span className="text-muted">Mix:</span> <span className="font-medium">{leagues[0]!.name}</span>
+              <input type="hidden" name="leagueId" value={leagues[0]!.id} />
+            </div>
+          )}
+          {leagues.length > 1 && (
+            <div>
+              <Label htmlFor="leagueId">De qual mix é este jogo?</Label>
+              <Select id="leagueId" name="leagueId" value={leagueId} onChange={(e) => setLeagueId(e.target.value)}>
+                <option value="" disabled>
+                  Escolha o mix…
+                </option>
+                {leagues.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                    {leagueDayLabel(l.weekday) ? ` (${leagueDayLabel(l.weekday)})` : ""}
+                  </option>
+                ))}
+              </Select>
+              <p className="mt-1 text-xs text-muted">
+                O jogo entra no ranking, no ELO e no histórico desse mix, mesmo num dia diferente do de costume.
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className={recurrence === "once" ? "" : "sm:col-span-2"}>
               <Label htmlFor="recurrence">Tipo de recorrência</Label>
@@ -109,7 +141,13 @@ export function CreateMixForm() {
             )}
           </div>
 
-          <Button type="submit" variant="primary" size="lg" className="w-full" disabled={pending}>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            className="w-full"
+            disabled={pending || (leagues.length > 1 && !leagueId)}
+          >
             {pending ? <Loader2 className="animate-spin" /> : <CalendarPlus />}
             {pending ? "Criando…" : "Criar mix"}
           </Button>

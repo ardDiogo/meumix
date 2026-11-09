@@ -18,7 +18,7 @@ import { getLevels } from "@/services/levels";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { DEFAULT_COMMUNITY_SLUG } from "@/services/mix-events";
-import { getCurrentLeague, listLeagues } from "@/services/league";
+import { getCurrentLeague, listLeagues, manageableLeagues } from "@/services/league";
 
 export type CreateMixState =
   | { status: "idle" }
@@ -48,8 +48,13 @@ export async function createMixSchedule(_prev: CreateMixState, formData: FormDat
   const admin = createSupabaseAdminClient();
   if (!admin) return { status: "error", message: "O banco de dados não está configurado no servidor." };
 
-  // A agenda nasce na liga escolhida no topo (sem ligas: a comunidade padrão).
-  const league = await getCurrentLeague();
+  // De qual mix é este jogo (pergunta do formulário); sem ligas: a comunidade padrão.
+  const allowed = await manageableLeagues();
+  const chosenId = String(formData.get("leagueId") ?? "");
+  const league = allowed.length
+    ? (allowed.find((l) => l.id === chosenId) ?? (allowed.length === 1 ? allowed[0]! : null))
+    : await getCurrentLeague();
+  if (allowed.length > 1 && !league) return { status: "error", message: "Escolha de qual mix é este jogo." };
   const { data: community } = league
     ? { data: { id: league.id } }
     : await admin.from("communities").select("id").eq("slug", DEFAULT_COMMUNITY_SLUG).maybeSingle();

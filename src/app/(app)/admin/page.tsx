@@ -40,7 +40,7 @@ import { FeatureToggles } from "@/components/admin/feature-toggles";
 import { PenaltiesPanel } from "@/components/admin/penalties-panel";
 import { UsersTable } from "@/components/admin/users-table";
 import { LeagueInvite, LeagueMembers } from "@/components/leagues/league-admin";
-import { communityOverview, getCurrentLeague, leagueMembersView } from "@/services/league";
+import { communityOverview, getCurrentLeague, leagueMembersView, manageableLeagues } from "@/services/league";
 import { CommunityLeagues, CommunityPlayers } from "@/components/leagues/community-admin";
 import { LeagueNamesForm } from "@/components/settings/league-names-form";
 import { isPlatformAdmin } from "@/lib/auth/permissions";
@@ -148,7 +148,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           <GcExample />
           <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
             <div className="space-y-4">
-              <CreateMixForm />
+              <CreateMixForm leagues={await manageableLeagues()} />
               <PendingFinalization viewerId={session!.id} />
             </div>
             <Card className="self-start">

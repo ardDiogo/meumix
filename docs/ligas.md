@@ -125,9 +125,17 @@ da liga, o que exige super admin.
 
 ## Liga padrão pelo dia
 
-Ao entrar, o site abre na **liga do dia** (segunda → Mix da Lanterna, terça → Mix do Jantinha), entre
-as ligas que a pessoa vê. Se ela trocar no seletor, a escolha vale até o fim do dia; em dia sem mix,
+Ao entrar, o site abre na **liga que tem mix hoje** pela agenda (inclusive jogo fora do dia de
+costume, ex.: Lanterna numa quinta) ou, sem agenda hoje, na liga do dia de costume (segunda → Mix da
+Lanterna, terça → Mix do Jantinha), entre as ligas que a pessoa vê. Se ela trocar no seletor, a escolha vale até o fim do dia; em dia sem mix,
 fica a última escolha. O dia vira às 6h (horário de Brasília), para o mix de segunda que passa da
 meia-noite continuar na Lanterna. O cookie guarda a liga e o dia (`terca|2026-11-10`). Regra em
 `pickLeagueSlug` (`src/lib/league.ts`, testes: `npm run test:ligas`), usada pela liga atual e pelo
 papel de admin da liga. O seletor mostra o subtítulo de cada liga ("Mix de Segunda-feira").
+
+## Jogo fora do dia de costume
+
+Em **Controle de mix → Criar novo mix**, a 1ª pergunta é **"De qual mix é este jogo?"**: quem é admin de
+uma liga só vê essa liga (já escolhida); o admin da plataforma escolhe entre todas
+(`manageableLeagues`). O jogo entra no ranking, no ELO e no histórico da liga escolhida, mesmo numa
+quinta ou sexta, e o site abre nessa liga no dia do jogo (`leagueIdsWithMixToday`).

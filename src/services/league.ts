@@ -8,6 +8,7 @@ import { initialEloFromGc, levelForElo } from "@/lib/levels";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSession } from "./auth";
 import { getLevels } from "./levels";
+import { leagueIdsWithMixToday } from "./league-today";
 import { profileAvatars } from "./avatars";
 
 /**
@@ -95,7 +96,14 @@ export async function getCurrentLeague(): Promise<League | null> {
   if (!visible.length) return NO_LEAGUE;
   const cookie = (await cookies()).get(LEAGUE_COOKIE)?.value ?? null;
   const mine = await myLeagueIds();
-  const slug = pickLeagueSlug(cookie, visible, new Set(visible.filter((l) => mine.has(l.id)).map((l) => l.slug)));
+  const today = await leagueIdsWithMixToday();
+  const slug = pickLeagueSlug(
+    cookie,
+    visible,
+    new Set(visible.filter((l) => mine.has(l.id)).map((l) => l.slug)),
+    new Date(),
+    new Set(visible.filter((l) => today.has(l.id)).map((l) => l.slug)),
+  );
   return visible.find((l) => l.slug === slug) ?? visible[0]!;
 }
 
@@ -366,4 +374,24 @@ export async function communityOverview(): Promise<{ leagues: CommunityLeague[];
       ) as Record<string, "admin" | "player">,
     })),
   };
+}
+
+/**
+ * Ligas em que a pessoa pode criar mix: admin da plataforma, todas; admin de liga,
+ * as ligas em que é admin.
+ */
+export async function manageableLeagues(): Promise<League[]> {
+  const leagues = (await listLeagues()) ?? [];
+  const session = await getSession();
+  if (!session || !leagues.length) return [];
+  if (isPlatformAdmin(session)) return leagues;
+  const admin = createSupabaseAdminClient();
+  if (!admin) return [];
+  const { data } = await admin
+    .from("league_members")
+    .select("league_id, role, active")
+    .eq("user_id", session.id)
+    .eq("role", "admin");
+  const ids = new Set((data ?? []).filter((m) => m.active !== false).map((m) => m.league_id as string));
+  return leagues.filter((l) => ids.has(l.id));
 }
