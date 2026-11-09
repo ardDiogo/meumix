@@ -9,7 +9,7 @@ import type { GcMapStored } from "@/lib/gc-api";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { playerSlug } from "@/lib/player-slug";
 import type { League } from "@/lib/league";
-import { getCurrentLeague, playerLeagues, setRequestLeague, setRequestLeagueOfMatch } from "./league";
+import { getCurrentLeague, playerLeagues, setRequestLeague, setRequestLeagueOfMatch, visibleLeagues } from "./league";
 
 export const RANKING_PERIODS: Record<RankingPeriod, { label: string; days: number | null }> = {
   "7d": { label: "7 dias", days: 7 },
@@ -59,7 +59,7 @@ export async function getRanking({ period = "30d", query = "" }: { period?: Rank
       ),
       stats: aggregatePlayer(player.id, periodMixes),
     }))
-    .filter((r) => r.stats.mixes > 0)
+    .filter((r) => r.stats.mixes > 0 && elos.has(r.player.id))
     .sort((a, b) => b.elo - a.elo || b.stats.winRate - a.stats.winRate)
     .map((r, i) => ({ ...r, position: i + 1 }));
 
@@ -166,8 +166,13 @@ export async function getMixDetail(idOrSlug: ID) {
     mix = findMixBySlug(param, all);
   }
   if (!mix) return null;
-  // Endereço amigável calculado entre os mixes da liga do mix.
-  if (ds.kind === "supabase" && (await setRequestLeagueOfMatch(mix.id))) all = await ds.listMixes();
+  if (ds.kind === "supabase") {
+    const league = await setRequestLeagueOfMatch(mix.id);
+    // Mix de uma liga em que a pessoa não está: como se não existisse.
+    if (league && !(await visibleLeagues()).some((l) => l.id === league.id)) return null;
+    // Endereço amigável calculado entre os mixes da liga do mix.
+    if (league) all = await ds.listMixes();
+  }
   const id = mix.id;
   const [players, highlights] = await Promise.all([ds.listPlayers(), ds.listHighlights()]);
   const byId = new Map(players.map((p) => [p.id, p]));

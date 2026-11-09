@@ -6,6 +6,8 @@ export interface League {
   name: string;
   /** Dia do mix (0 = domingo). */
   weekday: number | null;
+  /** Quem não participa de nenhuma liga (as consultas voltam vazias). */
+  none?: boolean;
 }
 
 /** Cookie com o slug da liga escolhida no seletor. */

@@ -28,7 +28,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     displayName: session.displayName,
     avatarUrl,
     email: session.email,
-    roleLabel: session.isSuperAdmin ? "Super admin" : session.role === "admin" ? "Administrador" : null,
+    roleLabel: session.isSuperAdmin
+      ? "Super admin"
+      : session.role === "admin"
+        ? "Administrador"
+        : session.communityRole === "admin"
+          ? "Admin da liga"
+          : null,
   };
 
   return (
@@ -37,6 +43,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <Topbar leagues={leagues} league={league} user={user} showAdmin={canManageMixes} />
         <DemoBanner kind={ds.kind} />
         <main id="conteudo" className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6">
+          {session && league?.none && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand/40 bg-brand/10 px-4 py-3 text-sm">
+              <span>
+                Você ainda não está em nenhuma liga. Peça o <strong>link de convite</strong> ao admin do seu mix para
+                ver os mixes, o ranking e se inscrever.
+              </span>
+              <Link href="/liga/entrar" className="font-semibold text-brand hover:text-brand-hover">
+                Tenho um código →
+              </Link>
+            </div>
+          )}
           {children}
         </main>
         <footer className="border-t border-border">

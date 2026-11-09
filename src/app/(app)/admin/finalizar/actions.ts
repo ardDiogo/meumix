@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { aliasKey } from "@/lib/alias";
 import { revalidatePath } from "next/cache";
@@ -58,7 +59,8 @@ export async function finalizeMix(input: {
   gcMaps?: GcMapStored[];
 }): Promise<FinalizeResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem finalizar mixes." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ scheduleId: input.scheduleId })))
+    return { ok: false, message: "Apenas administradores da liga podem finalizar este mix." };
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
 

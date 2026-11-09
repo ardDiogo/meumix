@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { canManageMixes } from "@/lib/auth/permissions";
+import { isPlatformAdmin } from "@/lib/auth/permissions";
 import { fetchSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
@@ -18,7 +18,7 @@ async function authorize(targetUserId?: string) {
   const session = await getSession();
   if (!session) return { error: "Entre na sua conta para continuar." } as const;
   const userId = targetUserId ?? session.id;
-  if (userId !== session.id && !canManageMixes(session)) {
+  if (userId !== session.id && !isPlatformAdmin(session)) {
     return { error: "Apenas administradores podem alterar o perfil de outro jogador." } as const;
   }
   const admin = createSupabaseAdminClient();

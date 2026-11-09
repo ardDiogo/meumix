@@ -236,8 +236,15 @@ export const supabaseDataSource: DataSource = {
     const scope = await leagueScope();
     if (scope === "all") return new Map();
     if (scope) {
-      const { data } = await supabase.from("league_members").select("user_id, elo").eq("league_id", scope.id);
-      return new Map((data ?? []).map((p) => [p.user_id as string, p.elo as number]));
+      // Só os membros ativos (quem saiu da liga some do ranking e da lista dela).
+      const { data, error } = await supabase
+        .from("league_members")
+        .select("user_id, elo, active")
+        .eq("league_id", scope.id);
+      const rows = error
+        ? ((await supabase.from("league_members").select("user_id, elo").eq("league_id", scope.id)).data ?? [])
+        : (data ?? []).filter((p) => p.active !== false);
+      return new Map(rows.map((p) => [p.user_id as string, p.elo as number]));
     }
     const { data } = await supabase.from("profiles").select("id, elo");
     return new Map((data ?? []).map((p) => [p.id as string, p.elo as number]));

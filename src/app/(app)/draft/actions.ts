@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
@@ -35,7 +36,8 @@ function refresh() {
 /** Inicia a disputa: os 2 mais votados viram capitães. Admin ou automático. */
 export async function startDraft(scheduleId: string, date: string): Promise<DraftResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return fail("Apenas administradores podem iniciar a seleção.");
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ scheduleId })))
+    return fail("Apenas administradores da liga podem iniciar a seleção.");
   const admin = createSupabaseAdminClient();
   if (!admin) return fail("Servidor não configurado.");
   const { error } = await admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
@@ -145,7 +147,8 @@ export async function pickPlayer(scheduleId: string, date: string, playerId: str
  */
 export async function resetDraft(scheduleId: string, date: string, scope: "draft" | "all"): Promise<DraftResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return fail("Apenas administradores podem reiniciar a seleção.");
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ scheduleId })))
+    return fail("Apenas administradores da liga podem reiniciar a seleção.");
   const admin = createSupabaseAdminClient();
   if (!admin) return fail("Servidor não configurado.");
   const match = { schedule_id: scheduleId, event_date: date };

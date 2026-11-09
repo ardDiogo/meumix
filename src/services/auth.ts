@@ -8,6 +8,9 @@ import {
   type SessionUser,
 } from "@/lib/auth/permissions";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
+import { LEAGUE_COOKIE } from "@/lib/league";
+import type { CommunityRole } from "@/types/domain";
 
 /**
  * Sessão do usuário atual (Supabase Auth). Deduplicada por requisição.
@@ -37,9 +40,36 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
       profile?.display_name ?? (user.user_metadata?.display_name as string | undefined) ?? email.split("@")[0]!,
     role: profile?.role === "admin" ? "admin" : "user",
     isSuperAdmin: isSuperAdminEmail(email, !!user.email_confirmed_at),
-    communityRole: null,
+    communityRole: await leagueRole(supabase, user.id),
   };
 });
+
+/**
+ * Papel na liga atual (a do seletor do topo; sem escolha válida, a primeira liga em
+ * que a pessoa joga, como em `getCurrentLeague`). Admin da liga gerencia os mixes dela.
+ * Sem as migrações das ligas: nenhum.
+ */
+async function leagueRole(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+  userId: string,
+): Promise<CommunityRole | null> {
+  const { data, error } = await supabase
+    .from("league_members")
+    .select("role, active, communities(slug, sort_order)")
+    .eq("user_id", userId)
+    .eq("active", true);
+  if (error || !data?.length) return null;
+  const rows = data
+    .map((r) => {
+      const c = (Array.isArray(r.communities) ? r.communities[0] : r.communities) as
+        { slug: string; sort_order: number | null } | null | undefined;
+      return { role: r.role as string, slug: c?.slug ?? "", order: c?.sort_order ?? 0 };
+    })
+    .sort((a, b) => a.order - b.order);
+  const wanted = (await cookies()).get(LEAGUE_COOKIE)?.value;
+  const row = rows.find((r) => r.slug === wanted) ?? rows[0]!;
+  return row.role === "admin" ? "admin" : "player";
+}
 
 function devSession(): SessionUser | null {
   const email = process.env.MEUMIX_DEV_SESSION_EMAIL;

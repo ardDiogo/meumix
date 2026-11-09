@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, ChevronDown, Loader2, Trophy } from "lucide-react";
+import { Check, ChevronDown, KeyRound, Loader2, Trophy } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
@@ -34,6 +35,20 @@ export function LeagueSwitcher({
   const router = useRouter();
   const [pending, start] = useTransition();
   if (!current) return null;
+  if (current.none) {
+    return (
+      <Link
+        href="/liga/entrar"
+        className={cn(
+          "flex items-center gap-2 rounded-md border border-dashed border-border-strong text-sm font-medium text-muted transition-colors hover:text-fg",
+          block ? "w-full px-3 py-2" : "h-9 px-2.5",
+          className,
+        )}
+      >
+        <KeyRound className="size-4 shrink-0 text-brand" /> Entrar numa liga
+      </Link>
+    );
+  }
 
   // No topo, o nome curto ("Lanterna"); o inteiro no menu do celular e no título.
   const short = current.name.replace(/^Mix d[aeo] /i, "");

@@ -11,7 +11,7 @@ export interface SessionUser {
   role: PlatformRole;
   /** Definido por `SUPER_ADMIN_EMAILS` e exige e-mail confirmado. Pode nomear administradores. */
   isSuperAdmin: boolean;
-  /** Papel do usuário na comunidade ativa, se for membro. */
+  /** Papel do usuário na liga ativa (seletor do topo), se for membro. */
   communityRole: CommunityRole | null;
 }
 
@@ -30,7 +30,12 @@ export function isSuperAdminEmail(
   return !!email && emailConfirmed && admins.includes(normalizeEmail(email));
 }
 
-/** Pode criar, editar e cancelar mixes. */
+/** Administrador da plataforma (todas as ligas): contas, insígnias, configurações. */
+export function isPlatformAdmin(user: SessionUser | null) {
+  return !!user && (user.isSuperAdmin || user.role === "admin");
+}
+
+/** Pode criar, editar e cancelar mixes (admin da plataforma ou admin da liga ativa). */
 export function canManageMixes(user: SessionUser | null) {
   if (!user) return false;
   return user.isSuperAdmin || user.role === "admin" || user.communityRole === "owner" || user.communityRole === "admin";

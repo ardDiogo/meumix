@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -58,7 +59,8 @@ export async function submitTiebreakerVote(roundId: string, maps: string[]): Pro
 /** Admin: força o fechamento do round com os votos atuais. */
 export async function forceCloseRound(roundId: string): Promise<TiebreakResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return fail("Apenas administradores podem forçar o fechamento.");
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ roundId })))
+    return fail("Apenas administradores da liga podem forçar o fechamento.");
   const result = await closeRound(roundId, true);
   await audit({
     action: "admin.force_close_tiebreaker",

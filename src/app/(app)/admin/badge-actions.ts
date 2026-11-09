@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { canManageMixes } from "@/lib/auth/permissions";
+import { isPlatformAdmin } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
@@ -33,7 +33,7 @@ const missing = (code?: string) => code === "42P01" || code === "PGRST205" || co
 
 async function requireAdmin() {
   const session = await getSession();
-  if (!canManageMixes(session)) return { error: "Apenas administradores gerenciam insígnias." } as const;
+  if (!isPlatformAdmin(session)) return { error: "Apenas administradores gerenciam insígnias." } as const;
   const admin = createSupabaseAdminClient();
   if (!admin) return { error: "O banco de dados não está configurado no servidor." } as const;
   return { session: session!, admin } as const;

@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
@@ -23,7 +24,8 @@ export async function linkGuests(
   applyElo: boolean,
 ): Promise<LinkResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem vincular jogadores." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga podem vincular jogadores." };
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
   if (!links.length) return { ok: false, message: "Escolha ao menos um jogador." };

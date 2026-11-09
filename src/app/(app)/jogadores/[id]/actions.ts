@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { canManageMixes } from "@/lib/auth/permissions";
+import { isPlatformAdmin } from "@/lib/auth/permissions";
 import { CSREP_METRICS, parseCsrepInput, sanitizeCsrep } from "@/lib/csrep";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ALLOWED_IMAGE_TYPES, MAX_IMAGE_BASE64, visionConfigured, visionJson } from "@/services/ai-vision";
@@ -17,7 +17,7 @@ const MIGRATION_HINT = "Rode a migração 0013_csrep.sql no Supabase.";
 async function authorize(userId: string) {
   const session = await getSession();
   if (!session) return { error: "Entre na sua conta para continuar." } as const;
-  if (session.id !== userId && !canManageMixes(session)) {
+  if (session.id !== userId && !isPlatformAdmin(session)) {
     return { error: "Só o próprio jogador ou um administrador pode fazer isso." } as const;
   }
   const admin = createSupabaseAdminClient();

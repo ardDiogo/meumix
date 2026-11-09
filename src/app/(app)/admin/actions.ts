@@ -1,7 +1,14 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
-import { canManageAdmins, canManageMixes, isSuperAdminEmail, type PlatformRole } from "@/lib/auth/permissions";
+import {
+  canManageAdmins,
+  canManageMixes,
+  isSuperAdminEmail,
+  type PlatformRole,
+  isPlatformAdmin,
+} from "@/lib/auth/permissions";
 import { communityToday, describeRecurrence, parseSchedule, type ScheduleErrors } from "@/lib/mix-schedule";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { validatePassword } from "@/lib/auth/validation";
@@ -75,7 +82,7 @@ export async function createMixSchedule(_prev: CreateMixState, formData: FormDat
 
 /** Desativa uma agenda de mix (deixa de aparecer para inscrições). */
 export async function deactivateSchedule(scheduleId: string): Promise<RoleChangeResult> {
-  if (!canManageMixes(await getSession()))
+  if (!canManageMixes(await getSession()) || !(await canManageLeagueOf({ scheduleId })))
     return { ok: false, message: "Apenas administradores podem encerrar mixes." };
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
@@ -190,7 +197,7 @@ export async function setFeature(
   enabled: boolean,
 ): Promise<RoleChangeResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem alterar funcionalidades." };
+  if (!isPlatformAdmin(session)) return { ok: false, message: "Apenas administradores podem alterar funcionalidades." };
   if (key !== "map_tiebreaker" && key !== "team_suggestion") {
     return { ok: false, message: "Funcionalidade ainda não disponível." };
   }

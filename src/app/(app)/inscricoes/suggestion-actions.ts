@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
@@ -114,7 +115,8 @@ export async function voteSuggestion(scheduleId: string, date: string, agree: bo
 /** Admin: aceita ou descarta a sugestão sem esperar os votos. */
 export async function decideSuggestion(scheduleId: string, date: string, accepted: boolean): Promise<SuggestionResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return fail("Apenas administradores.");
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ scheduleId })))
+    return fail("Apenas administradores da liga.");
   const ctx = await context(scheduleId, date);
   if ("error" in ctx) return fail(ctx.error!);
   const { admin, match, suggestion, draft } = ctx;

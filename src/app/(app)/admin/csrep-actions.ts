@@ -1,6 +1,6 @@
 "use server";
 
-import { canManageMixes } from "@/lib/auth/permissions";
+import { isPlatformAdmin } from "@/lib/auth/permissions";
 import { csrepRequest, isSafeCsrepPath, OPENAPI_CANDIDATES } from "@/lib/integrations/csrep-api";
 import { getSession } from "@/services/auth";
 
@@ -14,7 +14,7 @@ export interface CsrepProbeResult {
 const MAX_BODY = 200_000;
 
 async function allowed() {
-  return canManageMixes(await getSession());
+  return isPlatformAdmin(await getSession());
 }
 
 function errorMessage(e: unknown) {

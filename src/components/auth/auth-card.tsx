@@ -70,7 +70,7 @@ export function AuthCard({
       )}
 
       {mode === "login" && <LoginForm next={next} disabled={!configured} onForgot={() => setMode("recuperar")} />}
-      {mode === "cadastro" && <SignUpForm disabled={!configured} />}
+      {mode === "cadastro" && <SignUpForm next={next} disabled={!configured} />}
       {mode === "recuperar" && <ResetForm disabled={!configured} onBack={() => setMode("login")} />}
     </div>
   );
@@ -133,12 +133,14 @@ function LoginForm({ next, disabled, onForgot }: { next: string; disabled: boole
   );
 }
 
-function SignUpForm({ disabled }: { disabled: boolean }) {
+function SignUpForm({ next, disabled }: { next: string; disabled: boolean }) {
   const [state, action, pending] = useActionState(signUp, IDLE);
   const errors = errorsOf(state);
   if (state.status === "success") return <FormMessage tone="success">{state.message}</FormMessage>;
   return (
     <form action={action} className="space-y-4" noValidate>
+      {/* Volta para onde a pessoa estava (ex.: convite da liga) depois de confirmar o e-mail. */}
+      <input type="hidden" name="next" value={next} />
       {state.status === "error" && state.message && <FormMessage tone="error">{state.message}</FormMessage>}
       <AuthField
         id="displayName"

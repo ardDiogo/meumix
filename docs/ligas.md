@@ -32,7 +32,7 @@ insígnias, bolão e crônicas. Conta, perfil, Steam, vínculo com a GC e campeo
    Gatilhos adiados recalculam a liga do zero, uma vez por transação, quando um mix é finalizado,
    excluído, muda de data ou tem convidado vinculado. Os mixes novos entram na liga da agenda.
 3. **Telas por liga** (`0047_leagues_badges.sql` + código). Detalhes abaixo.
-4. **Membros e acesso**: convite por link com código, admins por liga, privacidade.
+4. **Membros e acesso** (`0049_league_access.sql` + código). Detalhes abaixo.
 
 ## Relatório de conferência (Fase 2)
 
@@ -79,3 +79,33 @@ recálculo. `set_league_elo(liga, jogador, elo)` acerta o valor na hora. Mudar o
 todas as ligas.
 
 O ELO antigo em `profiles` continua sendo atualizado na finalização, mas o site não mostra mais.
+
+## Fase 4: membros, convite e admins por liga
+
+**Quem vê o quê**: admin da plataforma vê todas as ligas. Os outros veem só as ligas em que são
+membros ativos. Sem login ou sem liga, nenhuma: as consultas usam uma "liga vazia" (`NO_LEAGUE`) e
+voltam vazias; o topo mostra **Entrar numa liga** e o site avisa para pedir o convite. Mix de outra
+liga não abre nem pelo endereço. Só membros da liga se inscrevem nos mixes dela. O link pessoal de
+confirmação (sem login) usa as ligas do dono do link.
+
+**Convite**: `league_codes` (um código de 6 caracteres por liga, só o servidor lê). O link
+`/liga/entrar?codigo=XXXXXX` coloca quem está logado na liga e já a escolhe no topo; quem não está
+logado entra (ou cria a conta) e volta para o convite. Gerar outro código invalida o anterior.
+
+**Aba Liga** (Admin → Liga, da liga escolhida no topo): código e link, membros, adicionar,
+remover e tornar admin. Membro removido fica com `active = false` (histórico e ELO guardados; volta
+pelo convite) e some do ranking e da lista da liga.
+
+**Admin da liga** (`league_members.role = 'admin'`): na liga em que é admin (escolhida no topo),
+cria agendas, gerencia inscrições, draft, desempate, sugestão de times, finaliza, exclui e corrige
+mixes, crônicas e clipes, e gerencia os membros. Não mexe em mixes de outra liga (a checagem
+`canManageLeagueOf` olha a liga do mix, mesmo numa chamada montada à mão). Contas, senhas,
+insígnias, configurações e ajuste de ELO continuam só com os admins da plataforma
+(`isPlatformAdmin`).
+
+**Primeira execução da 0049**: todo o histórico de hoje é do mix de terça, então todas as contas
+que já existem entram no Mix do Jantinha, o código de convite dele é criado e, se a Lanterna não
+tem mixes, as insígnias que a 0047 deixou nela passam para o Jantinha. Rodar de novo não refaz isso.
+
+**Limite conhecido**: a separação é feita pelo site. As tabelas continuam com leitura pública no
+banco (como antes); levar as regras para o RLS do Supabase é um passo à parte.

@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
@@ -24,7 +25,8 @@ function placar(maps: unknown) {
 /** Exclui um mix finalizado e desfaz o ELO que ele aplicou (admin). */
 export async function deleteMatch(matchId: string): Promise<MatchActionResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem excluir mixes." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga podem excluir este mix." };
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
   if (!/^[0-9a-f-]{36}$/i.test(matchId)) return { ok: false, message: "Mix inválido." };
@@ -66,7 +68,8 @@ export async function deleteMatch(matchId: string): Promise<MatchActionResult> {
 /** Corrige a data de um mix finalizado (ex.: finalizado na ocorrência errada). */
 export async function updateMatchDate(matchId: string, date: string): Promise<MatchActionResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem alterar a data." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga podem alterar a data." };
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
   if (!/^[0-9a-f-]{36}$/i.test(matchId)) return { ok: false, message: "Mix inválido." };

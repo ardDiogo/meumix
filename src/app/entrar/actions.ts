@@ -88,7 +88,7 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
         terms_version: LEGAL.version,
         terms_accepted_at: new Date().toISOString(),
       },
-      emailRedirectTo: `${await origin()}/auth/callback?next=/dashboard`,
+      emailRedirectTo: `${await origin()}/auth/callback?next=${encodeURIComponent(safeNextPath(fd.get("next")))}`,
     },
   });
   if (error) {
@@ -106,7 +106,7 @@ export async function signUp(_prev: AuthState, fd: FormData): Promise<AuthState>
   }
 
   // Com confirmação de e-mail desativada no Supabase, a sessão já vem pronta.
-  if (data.session) redirect("/dashboard");
+  if (data.session) redirect(safeNextPath(fd.get("next")));
   return {
     status: "success",
     message: `Conta criada! Enviamos um link de confirmação para ${email}. Confirme o e-mail para entrar.`,

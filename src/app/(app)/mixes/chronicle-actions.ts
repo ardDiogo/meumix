@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { sanitizeChronicle, type Chronicle } from "@/lib/chronicle";
@@ -20,7 +21,8 @@ function refresh() {
 /** Gera a crônica de novo (nova versão da IA, ou o modelo pronto sem IA). */
 export async function regenerateChronicle(matchId: string): Promise<ChronicleResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga." };
   if (!validId(matchId)) return { ok: false, message: "Mix inválido." };
   const r = await generateChronicle(matchId, session!.id);
   if (!r.ok) return { ok: false, message: r.message };
@@ -45,7 +47,8 @@ export async function regenerateChronicle(matchId: string): Promise<ChronicleRes
 /** Salva a crônica editada pelo admin. */
 export async function saveChronicle(matchId: string, content: Chronicle): Promise<ChronicleResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga." };
   const clean = sanitizeChronicle(content, 1);
   if (!validId(matchId) || !clean) return { ok: false, message: "Preencha a abertura e pelo menos um tópico." };
   const admin = createSupabaseAdminClient();
@@ -70,7 +73,8 @@ export async function saveChronicle(matchId: string, content: Chronicle): Promis
 /** Oculta ou mostra a crônica no site e na imagem. */
 export async function setChronicleHidden(matchId: string, hidden: boolean): Promise<ChronicleResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga." };
   const admin = createSupabaseAdminClient();
   if (!admin || !validId(matchId)) return { ok: false, message: "Não foi possível salvar." };
   const { error } = await admin
@@ -85,7 +89,8 @@ export async function setChronicleHidden(matchId: string, hidden: boolean): Prom
 /** Escreve (ou reescreve) a análise da partida pela IA. */
 export async function regenerateAnalysis(matchId: string): Promise<ChronicleResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga." };
   if (!validId(matchId)) return { ok: false, message: "Mix inválido." };
   const r = await generateAnalysis(matchId, session!.id);
   if (!r.ok) return { ok: false, message: r.message };

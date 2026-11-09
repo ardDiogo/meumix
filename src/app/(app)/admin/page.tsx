@@ -38,6 +38,9 @@ import { ScheduleList } from "@/components/admin/schedule-list";
 import { FeatureToggles } from "@/components/admin/feature-toggles";
 import { PenaltiesPanel } from "@/components/admin/penalties-panel";
 import { UsersTable } from "@/components/admin/users-table";
+import { LeagueInvite, LeagueMembers } from "@/components/leagues/league-admin";
+import { getCurrentLeague, leagueMembersView } from "@/services/league";
+import { isPlatformAdmin } from "@/lib/auth/permissions";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { StatusBadge } from "@/components/mixes/badges";
@@ -67,6 +70,7 @@ export const maxDuration = 60;
 
 const TABS = {
   mix: { label: "Controle de mix", icon: Swords },
+  liga: { label: "Liga", icon: Trophy },
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
   usuarios: { label: "Jogadores", icon: UsersRound },
@@ -106,7 +110,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   const rawTab = params.aba;
   // Punições agora ficam em Configurações (links antigos continuam funcionando).
   const aba = rawTab === "punicoes" ? "configuracoes" : rawTab;
-  const visibleTabs = Object.keys(TABS) as Tab[];
+  // Admin da liga (não da plataforma): só o controle de mix e a liga dele.
+  const visibleTabs = (Object.keys(TABS) as Tab[]).filter(
+    (t) => isPlatformAdmin(session) || t === "mix" || t === "liga",
+  );
   const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
   const [schedules, upcoming] = await Promise.all([
     listSchedules(),
@@ -172,6 +179,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           </div>
         </div>
       )}
+      {tab === "liga" && <LeagueTab viewerId={session!.id} />}
       {tab === "insignias" && <BadgesTab />}
       {tab === "logs" && (
         <LogsTab
@@ -189,6 +197,42 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       )}
       {tab === "configuracoes" && <SettingsTab canManageAdmins={canManageAdmins} />}
     </>
+  );
+}
+
+/** Liga atual: convite por link e membros (admins da plataforma e da liga). */
+async function LeagueTab({ viewerId }: { viewerId: string }) {
+  const league = await getCurrentLeague();
+  if (!league || league.none) {
+    return (
+      <Card>
+        <EmptyState icon={Trophy} title="Escolha uma liga no topo da página" className="py-10" />
+      </Card>
+    );
+  }
+  const view = await leagueMembersView(league.id);
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+      <Card className="self-start">
+        <CardHeader title={`Convite: ${league.name}`} description="Link e código para entrar na liga." />
+        <CardContent>
+          <LeagueInvite leagueName={league.name} />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader
+          title="Membros"
+          description="Só os membros veem os mixes, o ranking e as estatísticas da liga. Admin da liga cria, finaliza e exclui os mixes dela."
+        />
+        <CardContent>
+          {view ? (
+            <LeagueMembers leagueName={league.name} members={view.members} others={view.others} viewerId={viewerId} />
+          ) : (
+            <p className="text-sm text-muted">Rode a migração 0049_league_access.sql no Supabase.</p>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

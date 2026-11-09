@@ -162,17 +162,22 @@ export type NextMixResult = { status: "not_configured" } | { status: "none" } | 
 const SCHEDULE_COLUMNS =
   "id, recurrence_kind, weekday, event_date, event_time, registration_opens_at, max_players, active, created_by, created_at";
 
-/** Agendas ativas da liga do topo (sem ligas: todas). */
-export async function listSchedules(): Promise<Schedule[] | null> {
+/**
+ * Agendas ativas da liga do topo (sem ligas: todas). Com `leagueIds`, as dessas ligas
+ * (ex.: link pessoal sem login: as ligas do jogador).
+ */
+export async function listSchedules(leagueIds?: string[]): Promise<Schedule[] | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
-  const league = await getCurrentLeague();
+  const league = leagueIds ? null : await getCurrentLeague();
   let query = supabase
     .from("mix_schedules")
     .select(SCHEDULE_COLUMNS)
     .eq("active", true)
     .order("created_at", { ascending: false });
   if (league) query = query.eq("community_id", league.id);
+  if (leagueIds && !leagueIds.length) return [];
+  if (leagueIds) query = query.in("community_id", leagueIds);
   const { data, error } = await query;
   if (error) throw new Error(`Falha ao carregar a agenda de mixes: ${error.message}`);
   return (data as ScheduleRow[]).map(toSchedule);
@@ -292,9 +297,13 @@ async function cancelledOccurrences(): Promise<Set<string>> {
 }
 
 /** Próximo mix (a ocorrência atual mais próxima entre as agendas ativas). */
-export async function getNextMix(viewerId: string | null = null, now = new Date()): Promise<NextMixResult> {
+export async function getNextMix(
+  viewerId: string | null = null,
+  now = new Date(),
+  opts: { leagueIds?: string[] } = {},
+): Promise<NextMixResult> {
   if (!isAuthConfigured()) return { status: "not_configured" };
-  const schedules = await listSchedules();
+  const schedules = await listSchedules(opts.leagueIds);
   if (!schedules) return { status: "not_configured" };
 
   const cancelled = await cancelledOccurrences();
@@ -330,7 +339,7 @@ export async function getNextMix(viewerId: string | null = null, now = new Date(
     loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId),
     loadFinalizedMatch(next.schedule.id, next.occurrence.date),
     loadSuggestion(next.schedule.id, next.occurrence.date, viewerId, classified),
-    draft?.status === "completed" ? teamWinProbability(draft.teamA, draft.teamB) : null,
+    draft?.status === "completed" ? teamWinProbability(draft.teamA, draft.teamB, next.schedule.id) : null,
   ]);
   for (const r of registrations) {
     const p = penalties.get(r.userId);

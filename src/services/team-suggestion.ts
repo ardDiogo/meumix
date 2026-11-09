@@ -1,5 +1,5 @@
 import "server-only";
-import { eloInLeague, getCurrentLeague } from "./league";
+import { eloInLeague, getCurrentLeague, leagueOfSchedule } from "./league";
 import { ACCEPT_RATIO, suggestTeams, winProbability, type BalancePlayer } from "@/lib/team-balance";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -23,7 +23,11 @@ export interface SuggestionView {
 type Client = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
 /** Dados de cada jogador para o balanceamento (ELO, nível, histórico e HLTV do CSRep). */
-export async function loadBalancePlayers(client: Client, ids: string[]): Promise<BalancePlayer[]> {
+export async function loadBalancePlayers(
+  client: Client,
+  ids: string[],
+  scheduleId: string | null = null,
+): Promise<BalancePlayer[]> {
   if (!ids.length) return [];
   const [{ data: profiles }, analyses] = await Promise.all([
     client
@@ -44,8 +48,9 @@ export async function loadBalancePlayers(client: Client, ids: string[]): Promise
     }
   }
   const byId = new Map((profiles ?? []).map((p) => [p.id as string, p]));
-  // ELO e nível da liga do mix (o próximo mix é sempre da liga do topo).
-  const elos = await eloInLeague(client, (await getCurrentLeague())?.id ?? null, ids);
+  // ELO e nível da liga do mix (pela agenda; sem agenda, a liga do topo).
+  const leagueId = scheduleId ? await leagueOfSchedule(scheduleId) : ((await getCurrentLeague())?.id ?? null);
+  const elos = await eloInLeague(client, leagueId, ids);
   return ids.map((id) => {
     const p = byId.get(id);
     return {
@@ -64,10 +69,10 @@ export async function loadBalancePlayers(client: Client, ids: string[]): Promise
 }
 
 /** Chance do time A com os dados atuais dos jogadores. */
-export async function teamWinProbability(teamA: string[], teamB: string[]) {
+export async function teamWinProbability(teamA: string[], teamB: string[], scheduleId: string | null = null) {
   const client = await createSupabaseServerClient();
   if (!client || !teamA.length || !teamB.length) return null;
-  const players = await loadBalancePlayers(client, [...teamA, ...teamB]);
+  const players = await loadBalancePlayers(client, [...teamA, ...teamB], scheduleId);
   const by = new Map(players.map((p) => [p.id, p]));
   return winProbability(
     teamA.map((id) => by.get(id)!),
@@ -108,7 +113,7 @@ export async function syncSuggestion(opts: {
   if (valid || opts.draftStarted || !opts.enabled) return;
   if (opts.maxPlayers !== 10 || opts.classified.length !== 10) return;
 
-  const players = await loadBalancePlayers(admin, opts.classified);
+  const players = await loadBalancePlayers(admin, opts.classified, opts.scheduleId);
   const s = suggestTeams(players);
   if (!s) return;
   const by = new Map(players.map((p) => [p.id, p]));
@@ -145,7 +150,7 @@ export async function loadSuggestion(
   ]);
   if (error || !s) return null;
   const counted = (votes ?? []).filter((v) => classified.includes(v.user_id as string));
-  const players = await loadBalancePlayers(client, [...(s.team_a as string[]), ...(s.team_b as string[])]);
+  const players = await loadBalancePlayers(client, [...(s.team_a as string[]), ...(s.team_b as string[])], scheduleId);
   return {
     teamA: s.team_a as string[],
     teamB: s.team_b as string[],

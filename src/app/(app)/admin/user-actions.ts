@@ -4,7 +4,7 @@ import { eloInLeague, getCurrentLeague, listLeagues } from "@/services/league";
 import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { canManageAdmins, canManageMixes, isSuperAdminEmail } from "@/lib/auth/permissions";
+import { canManageAdmins, isSuperAdminEmail, isPlatformAdmin } from "@/lib/auth/permissions";
 import { validateDisplayName, validatePassword } from "@/lib/auth/validation";
 import { fetchSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
 import { resolveTwitchLogin } from "@/services/twitch";
@@ -26,7 +26,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 async function authorize(userId: string) {
   const session = await getSession();
-  if (!canManageMixes(session)) return { error: "Apenas administradores podem gerenciar usuários." } as const;
+  if (!isPlatformAdmin(session)) return { error: "Apenas administradores podem gerenciar usuários." } as const;
   const admin = createSupabaseAdminClient();
   if (!admin) return { error: "Gestão de usuários não configurada no servidor." } as const;
 
@@ -323,7 +323,7 @@ export type ConfirmLinksResult =
 /** Links pessoais de todos os jogadores (cria os que faltam), para enviar no privado. */
 export async function listConfirmLinks(): Promise<ConfirmLinksResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem ver os links." };
+  if (!isPlatformAdmin(session)) return { ok: false, message: "Apenas administradores podem ver os links." };
   const admin = createSupabaseAdminClient();
   if (!admin) return { ok: false, message: "Banco de dados não configurado no servidor." };
   const { data, error } = await admin.from("profiles").select("id, display_name").order("display_name");

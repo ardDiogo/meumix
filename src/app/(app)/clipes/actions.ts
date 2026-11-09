@@ -1,5 +1,6 @@
 "use server";
 
+import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { parseAllstarClip } from "@/lib/allstar";
 import { clipKindFromAllstar, fetchAllstarMatch, parseAllstarMatchUrl } from "@/lib/integrations/allstar-api";
@@ -115,7 +116,8 @@ export interface ImportResult {
  */
 export async function importAllstarClips(matchId: string, links: string[]): Promise<ImportResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem importar clipes." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga podem importar clipes." };
   const admin = createSupabaseAdminClient();
   if (!admin || !UUID.test(matchId)) return { ok: false, message: "Mix inválido." };
 
@@ -229,7 +231,8 @@ export async function importAllstarClips(matchId: string, links: string[]): Prom
  */
 export async function importTwitchClips(matchId: string): Promise<ImportResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores podem importar clipes." };
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ matchId })))
+    return { ok: false, message: "Apenas administradores da liga podem importar clipes." };
   const admin = createSupabaseAdminClient();
   if (!admin || !UUID.test(matchId)) return { ok: false, message: "Mix inválido." };
   if (!twitchConfigured()) {

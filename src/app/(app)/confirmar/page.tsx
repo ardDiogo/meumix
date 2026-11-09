@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getPermissions } from "@/services/auth";
 import { confirmLinkUser } from "@/services/confirm-links";
 import { getNextMix } from "@/services/mix-events";
+import { activeLeagueIdsOf } from "@/services/league";
 
 export const metadata: Metadata = { title: "Confirmar presença" };
 
@@ -55,7 +56,9 @@ export default async function ConfirmarPage({ searchParams }: PageProps<"/confir
     );
   }
 
-  const result = await getNextMix(viewer.id).catch(() => null);
+  // O próximo mix entre as ligas da pessoa (o link funciona sem login).
+  const leagueIds = (await activeLeagueIdsOf(viewer.id)) ?? undefined;
+  const result = await getNextMix(viewer.id, new Date(), { leagueIds }).catch(() => null);
   if (!result || result.status !== "ok") {
     return (
       <Card className="mx-auto max-w-lg">

@@ -1,5 +1,6 @@
 "use server";
 
+import { canJoinScheduleLeague, canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { after } from "next/server";
@@ -107,6 +108,13 @@ export async function joinMix(
   if ("error" in ctx) {
     await audit({ ...base, outcome: "error", detail: { ...meta, reason: ctx.error } });
     return fail(ctx.error!, "retryable" in ctx ? "error" : "unavailable");
+  }
+
+  // 0. Só quem é da liga do mix (o convite da liga coloca a pessoa nela).
+  const member = await canJoinScheduleLeague(userId, scheduleId);
+  if (!member.ok) {
+    await audit({ ...base, outcome: "denied", detail: { ...meta, reason: "not_league_member" } });
+    return fail(`Este mix é do ${member.league}. Peça o link de convite da liga ao admin.`, "denied");
   }
 
   // 1. Já inscrito → sucesso (não duplica).
@@ -229,7 +237,8 @@ export async function leaveMix(scheduleId: string, date: string): Promise<Action
 /** Admin: remove um inscrito. */
 export async function removeRegistration(registrationId: string): Promise<ActionResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return fail("Apenas administradores podem remover inscritos.", "denied");
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ registrationId })))
+    return fail("Apenas administradores da liga podem remover inscritos.", "denied");
   const admin = createSupabaseAdminClient();
   if (!admin) return fail("Servidor não configurado.", "unavailable");
 
@@ -298,7 +307,8 @@ export async function addPlayerToMix(scheduleId: string, date: string, userId: s
 /** Admin: apaga todas as inscrições e votos da ocorrência atual. */
 export async function resetRegistrations(scheduleId: string, date: string): Promise<ActionResult> {
   const session = await getSession();
-  if (!canManageMixes(session)) return fail("Apenas administradores podem reiniciar o mix.", "denied");
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ scheduleId })))
+    return fail("Apenas administradores da liga podem reiniciar o mix.", "denied");
   const admin = createSupabaseAdminClient();
   if (!admin) return fail("Servidor não configurado.", "unavailable");
 

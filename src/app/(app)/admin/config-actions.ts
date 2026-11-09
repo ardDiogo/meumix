@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { canManageAdmins, canManageMixes } from "@/lib/auth/permissions";
+import { canManageAdmins, isPlatformAdmin } from "@/lib/auth/permissions";
 import { validateLevels, type LevelDef } from "@/lib/levels";
 import { MAPS_IN_ROTATION } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -17,7 +17,7 @@ const MIGRATION_HINT = "Rode a migração 0010_admin_config.sql no Supabase para
 
 async function requireAdmin(master = false) {
   const session = await getSession();
-  const allowed = master ? canManageAdmins(session) : canManageMixes(session);
+  const allowed = master ? canManageAdmins(session) : isPlatformAdmin(session);
   if (!allowed) {
     return { error: master ? "Apenas o master pode alterar isto." : "Apenas administradores podem alterar isto." };
   }
