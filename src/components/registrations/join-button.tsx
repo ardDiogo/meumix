@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { joinMix, leaveMix } from "@/app/(app)/inscricoes/actions";
 import { useServerClock, useTick } from "@/hooks/use-server-clock";
 import { Button } from "../ui/button";
+import { Dialog, DialogClose, DialogContent, DialogTrigger } from "../ui/dialog";
 
 /* Regras: docs/regras-do-mix.md, seção 2. */
 const RETRY_DELAYS_S = [1, 1, 2, 2, 3, 3, 5, 5, 10, 10];
@@ -78,6 +79,7 @@ export function JoinButton({
   useTick(1000);
   const [processing, setProcessing] = useState(false);
   const [leaving, startLeave] = useTransition();
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const inFlight = useRef(false);
 
   const serverNow = now();
@@ -183,23 +185,46 @@ export function JoinButton({
   }
 
   if (registered) {
+    if (started) {
+      return (
+        <Button variant="secondary" size="lg" className="w-full" disabled>
+          <UserMinus /> Inscrição confirmada
+        </Button>
+      );
+    }
+    // Sair do mix pede confirmação: quem sai perde a vaga e, se voltar, entra no fim da lista.
     return (
-      <Button
-        variant="secondary"
-        size="lg"
-        className="w-full"
-        disabled={leaving || started}
-        onClick={() =>
-          startLeave(async () => {
-            const r = await leaveMix(scheduleId, date);
-            if (r.ok) toast.success(r.message);
-            else toast.error(r.message);
-          })
-        }
-      >
-        {leaving ? <Loader2 className="animate-spin" /> : <UserMinus />}
-        {started ? "Inscrição confirmada" : "Cancelar minha inscrição"}
-      </Button>
+      <Dialog open={confirmLeave} onOpenChange={setConfirmLeave}>
+        <DialogTrigger asChild>
+          <Button variant="secondary" size="lg" className="w-full" disabled={leaving}>
+            {leaving ? <Loader2 className="animate-spin" /> : <UserMinus />} Cancelar minha inscrição
+          </Button>
+        </DialogTrigger>
+        <DialogContent
+          title="Deseja sair do mix?"
+          description="Você perde a sua vaga na lista. Se entrar de novo, volta para o fim da fila e pode ficar como reserva."
+        >
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <DialogClose asChild>
+              <Button variant="secondary">Continuar no mix</Button>
+            </DialogClose>
+            <Button
+              variant="danger"
+              disabled={leaving}
+              onClick={() =>
+                startLeave(async () => {
+                  const r = await leaveMix(scheduleId, date);
+                  setConfirmLeave(false);
+                  if (r.ok) toast.success(r.message);
+                  else toast.error(r.message);
+                })
+              }
+            >
+              {leaving ? <Loader2 className="animate-spin" /> : <UserMinus />} Sim, sair do mix
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
