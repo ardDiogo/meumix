@@ -33,6 +33,8 @@ export const AUDIT_LABELS: Record<string, string> = {
   "league.admin_add": "Tornou alguém admin da liga",
   "league.admin_remove": "Tirou o admin da liga de alguém",
   "championship.create": "Criou um campeonato",
+  "championship.self_register": "Se inscreveu num campeonato",
+  "championship.self_unregister": "Cancelou a inscrição num campeonato",
   "championship.update": "Editou um campeonato",
   "championship.delete": "Excluiu um campeonato",
   "championship.organizer_add": "Liberou um organizador de campeonato",

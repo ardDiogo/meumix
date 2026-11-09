@@ -93,9 +93,9 @@ Aba **Calendário** (`/campeonatos/<slug>/calendario`), ao vivo. Migração `004
   R5 Snkk×Beli, Mald×Marlon (folga Koder). Outros tamanhos: método do círculo; ida e volta inverte o
   mando. Dá para gerar de novo enquanto nenhum jogo tiver data.
 - **Agendamento pelos capitães**: o capitão de um dos times **propõe** data e hora (com recado
-  opcional) → *Aguardando resposta do adversário*; o capitão adversário **aceita** (→ *Aguardando
-  aprovação da organização*) ou **recusa** (→ *Aguardando agendamento*) e pode propor outra. A
-  organização **aprova** (escolhe o servidor ou pega o primeiro livre) → *Agendada*.
+  opcional) → _Aguardando resposta do adversário_; o capitão adversário **aceita** (→ _Aguardando
+  aprovação da organização_) ou **recusa** (→ _Aguardando agendamento_) e pode propor outra. A
+  organização **aprova** (escolhe o servidor ou pega o primeiro livre) → _Agendada_.
 - **Regras** (servidor e testes): a data precisa cair nos dias e horários do campeonato (fuso de
   Brasília; janela que passa da meia-noite vale para a madrugada seguinte); nenhum time em dois
   jogos ao mesmo tempo; no máximo `servidores` jogos simultâneos e cada servidor com um jogo. Cada
@@ -234,3 +234,18 @@ entrada. Quem já está em outro time recebe o aviso para sair dele antes.
 
 Criar campeonato por draft funciona; "Times já definidos" avisa para rodar a 0044. (O PostgREST responde
 `PGRST204` quando a gravação usa uma coluna que ainda não existe; tratado em `missingColumn`.)
+
+## Inscrição pelo próprio jogador (Dashboard)
+
+O Dashboard mostra até 2 campeonatos: primeiro os com inscrições abertas, depois os em formação de
+equipes e os em andamento. Cada card traz capa, status, formato, datas, valor da inscrição e o
+prêmio do 1º lugar (com as vagas cheias), a barra de inscritos e o botão:
+
+- **Draft, "Aguardando inscrições"**: **Inscrever-se** (até completar as vagas) e **Cancelar
+  inscrição** enquanto o draft não começa (o capitão precisa ser trocado pela organização antes).
+  O pagamento continua manual, com a organização.
+- **Times por código**: **Inscrever-se com o código do time** leva à aba Equipes.
+- Sem login: **Entrar para se inscrever**.
+
+A visão geral do campeonato mostra o mesmo bloco "Inscrições abertas". Ações em
+`campeonatos/register-actions.ts` (`registerSelf`, `unregisterSelf`), registradas no log.

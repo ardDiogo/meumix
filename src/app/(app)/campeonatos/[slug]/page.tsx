@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { formatDays } from "@/components/championships/format";
 import { TeamLogo } from "@/components/championships/team-logo";
+import { RegisterButton } from "@/components/championships/register-button";
+import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/stats/stat-card";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -44,7 +46,7 @@ function Item({ icon: Icon, label, value }: { icon: typeof Users; label: string;
 export default async function ChampionshipOverview({ params }: PageProps<"/campeonatos/[slug]">) {
   const data = await getChampionship((await params).slug);
   if (!data) notFound();
-  const { championship: c, organizers, players: all } = data;
+  const { championship: c, organizers, players: all, session } = data;
   const [s, paid] = await Promise.all([getSummary(c), getPaidPlayers(c.id)]);
   const byTeam = new Map(s.teams.map((t) => [t.id, t]));
   const byUser = new Map(all.map((p) => [p.id, p]));
@@ -116,8 +118,40 @@ export default async function ChampionshipOverview({ params }: PageProps<"/campe
     );
   };
 
+  const vagas = c.teamCount * c.playersPerTeam;
+  const registration = c.status === "registration" || (c.teamMode === "code" && c.status === "teams");
+  const me = session ? s.players.find((p) => p.userId === session.id) : undefined;
+
   return (
     <div className="space-y-4">
+      {registration && (
+        <Card className="border-brand/40">
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold tracking-wider text-brand uppercase">Inscrições abertas</div>
+              <div className="text-sm text-muted">
+                {s.players.length}/{vagas} {c.teamMode === "draft" ? "inscritos" : "jogadores nos times"}
+                {c.entryFee > 0 ? ` · inscrição ${formatMoney(c.entryFee)} (paga à organização)` : ""}
+              </div>
+            </div>
+            {!session ? (
+              <Button variant="primary" asChild>
+                <Link href={`/entrar?next=${encodeURIComponent(`/campeonatos/${c.slug}`)}`}>
+                  Entrar para se inscrever
+                </Link>
+              </Button>
+            ) : c.teamMode === "draft" ? (
+              <RegisterButton championshipId={c.id} registered={!!me} full={s.players.length >= vagas} />
+            ) : me ? (
+              <span className="text-sm font-semibold text-win">Você já está num time</span>
+            ) : (
+              <Button variant="primary" asChild>
+                <Link href={`/campeonatos/${c.slug}/equipes`}>Inscrever-se com o código do time</Link>
+              </Button>
+            )}
+          </div>
+        </Card>
+      )}
       {champion && (
         <Card className="overflow-hidden border-brand/60 shadow-[0_0_40px_-12px] shadow-brand/60">
           <div className="flex flex-wrap items-center gap-4 bg-gradient-to-r from-brand/25 via-brand/5 to-transparent px-5 py-4">

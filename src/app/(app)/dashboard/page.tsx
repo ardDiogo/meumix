@@ -5,6 +5,8 @@ import { DemoBadge } from "@/components/demo-notice";
 import { MixList } from "@/components/mixes/mix-list";
 import { LevelBadge } from "@/components/players/level-badge";
 import { NextMixPanel } from "@/components/registrations/next-mix-panel";
+import { ChampionshipHome } from "@/components/championships/championship-home";
+import { dashboardChampionships } from "@/services/championship-home";
 import { HeroBanner } from "@/components/dashboard/hero-banner";
 import { LiveNow } from "@/components/twitch/live-now";
 import { PushPrompt } from "@/components/push/push-prompt";
@@ -33,9 +35,11 @@ export const metadata: Metadata = { title: "Dashboard" };
 const RECENT_WINDOW = 10;
 
 export default async function DashboardPage() {
-  const [{ kind, profile, highlights }, { session, canManageMixes }] = await Promise.all([
+  const [{ kind, profile, highlights }, { session, canManageMixes }, championships] = await Promise.all([
     getDashboard(),
     getPermissions(),
+    // Campeonatos com inscrições abertas ou em andamento (sem as migrações: nenhum).
+    dashboardChampionships().catch(() => []),
   ]);
 
   if (!profile || !highlights) {
@@ -54,6 +58,7 @@ export default async function DashboardPage() {
         {session && pushConfigured() && <PushPrompt />}
         <LiveNow />
         <NextMixPanel />
+        <ChampionshipHome items={championships} loggedIn={!!session} />
         <Card>
           <EmptyState
             icon={UserRoundX}
@@ -115,6 +120,7 @@ export default async function DashboardPage() {
       {session && pushConfigured() && <PushPrompt />}
       <LiveNow />
       <NextMixPanel />
+      <ChampionshipHome items={championships} loggedIn={!!session} />
 
       {/* Resumo competitivo */}
       <section aria-label="Resumo competitivo" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
