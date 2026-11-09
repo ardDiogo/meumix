@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { LEAGUE_COOKIE, validLeagueSlug } from "@/lib/league";
+import { LEAGUE_COOKIE, leagueCookieValue, validLeagueSlug } from "@/lib/league";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
@@ -16,7 +16,7 @@ export async function setLeague(slug: string): Promise<{ ok: boolean; message: s
   if (!validLeagueSlug(slug)) return { ok: false, message: "Liga inválida." };
   const league = (await visibleLeagues()).find((l) => l.slug === slug);
   if (!league) return { ok: false, message: "Você não participa dessa liga." };
-  (await cookies()).set(LEAGUE_COOKIE, slug, {
+  (await cookies()).set(LEAGUE_COOKIE, leagueCookieValue(slug), {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",
@@ -114,7 +114,7 @@ export async function joinLeagueByCode(raw: string): Promise<Result & { slug?: s
   if (joinError) return { ok: false, message: "Não foi possível entrar na liga." };
   // Quem é novo na liga começa no ELO inicial do nível GC.
   if (!before) await admin.rpc("recompute_league_elo", { p_league: invite.league_id });
-  (await cookies()).set(LEAGUE_COOKIE, league.slug, {
+  (await cookies()).set(LEAGUE_COOKIE, leagueCookieValue(league.slug), {
     path: "/",
     maxAge: 60 * 60 * 24 * 365,
     sameSite: "lax",

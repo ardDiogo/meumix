@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { setLeague } from "@/app/(app)/liga/actions";
-import type { League } from "@/lib/league";
+import { leagueDayLabel, type League } from "@/lib/league";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -56,7 +56,12 @@ export function LeagueSwitcher({
     <span className="min-w-0 text-left">
       {block && <span className="block text-[10px] font-semibold tracking-wider text-subtle uppercase">Liga</span>}
       {block ? (
-        <span className="block truncate text-sm font-medium text-fg">{current.name}</span>
+        <>
+          <span className="block truncate text-sm font-medium text-fg">{current.name}</span>
+          {leagueDayLabel(current.weekday) && (
+            <span className="block truncate text-[11px] text-muted">{leagueDayLabel(current.weekday)}</span>
+          )}
+        </>
       ) : (
         <span className="block truncate text-sm font-medium text-fg" title={current.name}>
           {short}
@@ -105,9 +110,14 @@ export function LeagueSwitcher({
       <DropdownMenuContent align="start" className="min-w-52">
         <DropdownMenuLabel>Trocar de liga</DropdownMenuLabel>
         {leagues.map((l) => (
-          <DropdownMenuItem key={l.id} onSelect={() => choose(l.slug)}>
-            <Check className={cn("size-4", l.id === current.id ? "text-brand" : "invisible")} />
-            {l.name}
+          <DropdownMenuItem key={l.id} onSelect={() => choose(l.slug)} className="items-start">
+            <Check className={cn("mt-0.5 size-4", l.id === current.id ? "text-brand" : "invisible")} />
+            <span className="min-w-0">
+              <span className="block">{l.name}</span>
+              {leagueDayLabel(l.weekday) && (
+                <span className="block text-[11px] text-muted">{leagueDayLabel(l.weekday)}</span>
+              )}
+            </span>
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

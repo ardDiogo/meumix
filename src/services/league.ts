@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { canManageMixes, isPlatformAdmin } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { LEAGUE_COOKIE, leagueLabel, type League } from "@/lib/league";
+import { LEAGUE_COOKIE, leagueLabel, pickLeagueSlug, type League } from "@/lib/league";
 import { initialEloFromGc, levelForElo } from "@/lib/levels";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getSession } from "./auth";
@@ -84,17 +84,19 @@ export function setRequestLeague(slug: string | null | undefined) {
   override().slug = slug ?? null;
 }
 
-/** Liga atual (a do seletor do topo). `null` sem as migrações das ligas. */
+/**
+ * Liga atual (a do seletor do topo): a escolhida hoje, senão a do dia do mix, senão a
+ * última escolhida (`pickLeagueSlug`). `null` sem as migrações das ligas.
+ */
 export async function getCurrentLeague(): Promise<League | null> {
   const leagues = await listLeagues();
   if (!leagues) return null;
   const visible = await visibleLeagues();
   if (!visible.length) return NO_LEAGUE;
-  const wanted = (await cookies()).get(LEAGUE_COOKIE)?.value ?? null;
-  const chosen = wanted ? visible.find((l) => l.slug === wanted) : undefined;
-  if (chosen) return chosen;
+  const cookie = (await cookies()).get(LEAGUE_COOKIE)?.value ?? null;
   const mine = await myLeagueIds();
-  return visible.find((l) => mine.has(l.id)) ?? visible[0]!;
+  const slug = pickLeagueSlug(cookie, visible, new Set(visible.filter((l) => mine.has(l.id)).map((l) => l.slug)));
+  return visible.find((l) => l.slug === slug) ?? visible[0]!;
 }
 
 /** Liga de uma agenda de mix (para finalizar, sugerir times e mostrar o ELO certo). */

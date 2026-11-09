@@ -12,6 +12,7 @@ import {
   setLeagueAdmin,
   setLeagueMember,
 } from "@/app/(app)/liga/actions";
+import { leagueDayLabel } from "@/lib/league";
 import { cn } from "@/lib/utils";
 import type { CommunityLeague, CommunityPlayer } from "@/services/league";
 import { Avatar } from "../ui/avatar";
@@ -56,7 +57,7 @@ export function CommunityLeagues({ leagues }: { leagues: CommunityLeague[] }) {
               <Trophy className="mt-0.5 size-4 shrink-0 text-brand" />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold">{l.name}</div>
-                <div className="text-xs text-muted">{l.weekday != null ? WEEKDAY[l.weekday] : "Sem dia fixo"}</div>
+                <div className="text-xs text-muted">{leagueDayLabel(l.weekday) ?? "Sem dia fixo"}</div>
               </div>
               {l.slug !== "principal" && l.mixes === 0 && l.schedules === 0 && (
                 <Button

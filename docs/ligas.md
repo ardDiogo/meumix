@@ -122,3 +122,12 @@ Admin → **Comunidade**, só para o super admin:
 
 As ações reaproveitam as da aba Liga (`setLeagueMember`, `setLeagueAdmin`, `leagueInvite`) com o id
 da liga, o que exige super admin.
+
+## Liga padrão pelo dia
+
+Ao entrar, o site abre na **liga do dia** (segunda → Mix da Lanterna, terça → Mix do Jantinha), entre
+as ligas que a pessoa vê. Se ela trocar no seletor, a escolha vale até o fim do dia; em dia sem mix,
+fica a última escolha. O dia vira às 6h (horário de Brasília), para o mix de segunda que passa da
+meia-noite continuar na Lanterna. O cookie guarda a liga e o dia (`terca|2026-11-10`). Regra em
+`pickLeagueSlug` (`src/lib/league.ts`, testes: `npm run test:ligas`), usada pela liga atual e pelo
+papel de admin da liga. O seletor mostra o subtítulo de cada liga ("Mix de Segunda-feira").
