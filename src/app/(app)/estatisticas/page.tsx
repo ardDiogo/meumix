@@ -53,7 +53,25 @@ const GC_BOARDS: { title: string; value: (g: GcLine) => number | null; format: (
   },
 ];
 
-const BOARDS: { title: string; value: (s: PlayerAggregate) => number | null; format: (n: number) => string }[] = [
+type Board = {
+  title: string;
+  value: (s: PlayerAggregate) => number | null;
+  format: (n: number) => string;
+  /** Texto ao lado do número (ex.: "de 20 mixes"). */
+  detail?: (s: PlayerAggregate) => string;
+  /** Desempate (maior primeiro). */
+  tie?: (s: PlayerAggregate) => number;
+};
+
+const BOARDS: Board[] = [
+  {
+    title: "Maior vencedor de mix",
+    value: (s) => s.wins,
+    format: (n) => `${n} ${n === 1 ? "vitória" : "vitórias"}`,
+    detail: (s) => `de ${s.mixes} ${s.mixes === 1 ? "jogado" : "jogados"}`,
+    // Empate nas vitórias: quem jogou menos (melhor aproveitamento).
+    tie: (s) => -s.mixes,
+  },
   { title: "Maior K/D", value: (s) => s.kd, format: (n) => formatDecimal(n) },
   { title: "Maior ADR", value: (s) => s.adr, format: (n) => formatDecimal(n, 1) },
   { title: "Maior win rate", value: (s) => s.winRate, format: (n) => formatPercent(n) },
@@ -149,6 +167,8 @@ export default async function StatsPage() {
             leaders={leaders}
             value={board.value}
             format={board.format}
+            detail={board.detail}
+            tie={board.tie}
           />
         ))}
       </div>
@@ -162,16 +182,20 @@ function LeaderBoard({
   leaders,
   value,
   format,
+  detail,
+  tie,
 }: {
   title: string;
   leaders: Leader[];
   value: (s: PlayerAggregate) => number | null;
   format: (n: number) => string;
+  detail?: (s: PlayerAggregate) => string;
+  tie?: (s: PlayerAggregate) => number;
 }) {
   const top = leaders
     .map((l) => ({ ...l, v: value(l.stats) }))
     .filter((l): l is Leader & { v: number } => l.v != null)
-    .sort((a, b) => b.v - a.v)
+    .sort((a, b) => b.v - a.v || (tie ? tie(b.stats) - tie(a.stats) : 0))
     .slice(0, 5);
   return (
     <Card>
@@ -183,7 +207,10 @@ function LeaderBoard({
               {i + 1}
             </span>
             <PlayerLink player={l.player} className="flex-1" />
-            <span className="font-semibold tabular">{format(l.v)}</span>
+            <span className="text-right">
+              <span className="font-semibold tabular">{format(l.v)}</span>
+              {detail && <span className="block text-[11px] text-muted tabular">{detail(l.stats)}</span>}
+            </span>
           </li>
         ))}
         {!top.length && <li className="px-4 py-6 text-center text-sm text-muted">Sem dados suficientes.</li>}
