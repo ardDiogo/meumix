@@ -8,6 +8,7 @@ import {
   type MixOutcome,
   type Prediction,
   type PredictionScore,
+  betKindOf,
 } from "@/lib/bolao";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { profileAvatars } from "./avatars";
@@ -24,22 +25,23 @@ interface PredictionRow {
   schedule_id: string;
   event_date: string;
   user_id: string;
-  winner_captain: string;
-  maps_won: number;
-  maps_lost: number;
+  /** null: palpite de empate. */
+  winner_captain: string | null;
+  kind?: string | null;
+  maps_won: number | null;
+  maps_lost: number | null;
   mvp_id: string | null;
   lanterna_id: string | null;
   updated_at: string;
 }
 
-const COLUMNS =
-  "schedule_id, event_date, user_id, winner_captain, maps_won, maps_lost, mvp_id, lanterna_id, updated_at";
+// "*": a coluna kind só existe depois da migração 0051 (antes, o tipo sai do placar).
+const COLUMNS = "*";
 
 const toPrediction = (r: PredictionRow): Prediction => ({
   userId: r.user_id,
   winnerCaptain: r.winner_captain,
-  mapsWon: r.maps_won,
-  mapsLost: r.maps_lost,
+  kind: betKindOf(r),
   mvpId: r.mvp_id,
   lanternaId: r.lanterna_id,
 });
@@ -59,11 +61,11 @@ export interface BolaoView {
   /** Capitães (time A, time B), pelos quais os times são identificados. */
   captains: [string, string];
   teams: [string[], string[]];
-  /** Mapas do mix (para os placares possíveis). */
-  mapsCount: number;
   total: number;
   /** Palpites no time de cada capitão. */
   split: [number, number];
+  /** Palpites de empate. */
+  draws: number;
   mine: Prediction | null;
   /** Todos os palpites (só depois de fechar). */
   entries: BolaoEntry[] | null;
@@ -103,7 +105,7 @@ async function matchOutcome(admin: Admin, matchId: string, captains: string[]): 
 /** Capitães do mix: os do PICK; sem ele (seleção reiniciada), os que aparecem nos palpites. */
 function captainsOf(draft: { captain_a: string; captain_b: string } | null, rows: PredictionRow[]) {
   if (draft) return [draft.captain_a, draft.captain_b];
-  return [...new Set(rows.map((r) => r.winner_captain))].slice(0, 2);
+  return [...new Set(rows.map((r) => r.winner_captain).filter((c): c is string => !!c))].slice(0, 2);
 }
 
 /** Bolão do próximo mix (painel do dashboard). Só existe com os times definidos. */
@@ -113,7 +115,6 @@ export async function loadBolao(opts: {
   closesAt: Date;
   captains: [string, string];
   teams: [string[], string[]];
-  mapsCount: number;
   finalizedMatchId: string | null;
   viewerId: string | null;
   now?: Date;
@@ -160,12 +161,12 @@ export async function loadBolao(opts: {
     closesAt: opts.closesAt.toISOString(),
     captains: opts.captains,
     teams: opts.teams,
-    mapsCount: opts.mapsCount,
     total: rows.length,
     split: [
       rows.filter((r) => r.winner_captain === opts.captains[0]).length,
       rows.filter((r) => r.winner_captain === opts.captains[1]).length,
     ],
+    draws: rows.filter((r) => betKindOf(r) === "draw").length,
     mine: mine ? toPrediction(mine) : null,
     entries,
     voters,
@@ -271,14 +272,4 @@ export async function getBolaoRanking(): Promise<BolaoRankingView | null> {
 export async function bolaoPointsForMatch(matchId: string) {
   const result = await bolaoForMatch(matchId, { withProfiles: false });
   return result?.entries.map((e) => ({ userId: e.userId, points: e.score?.points ?? 0 })) ?? [];
-}
-
-/** Quantos mapas o mix costuma ter (o último finalizado; padrão 3). */
-export async function typicalMapsCount() {
-  const admin = createSupabaseAdminClient();
-  const { data } = admin
-    ? await admin.from("mix_matches").select("maps").order("finalized_at", { ascending: false }).limit(1)
-    : { data: null };
-  const n = (data?.[0]?.maps as unknown[] | undefined)?.length ?? 0;
-  return n >= 1 && n <= 5 ? n : 3;
 }

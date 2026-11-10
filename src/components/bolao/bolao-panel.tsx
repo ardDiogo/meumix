@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { savePrediction } from "@/app/(app)/bolao/actions";
-import { BOLAO_POINTS, scoreOptions, type Prediction } from "@/lib/bolao";
+import { BET_KIND_HINT, BET_KIND_LABEL, BOLAO_POINTS, type BetKind, type Prediction } from "@/lib/bolao";
 import { cn } from "@/lib/utils";
 import type { BolaoEntry, BolaoView } from "@/services/bolao";
 import { TeamDot } from "../mixes/badges";
@@ -72,25 +72,30 @@ export function BolaoPanel({
 
 function Split({ bolao, teamName }: { bolao: BolaoView; teamName: (i: 0 | 1) => string }) {
   const [a, b] = bolao.split;
-  const total = a + b;
+  const d = bolao.draws ?? 0;
+  const total = a + b + d;
   if (!total) return <p className="text-xs text-subtle">Ninguém palpitou ainda. Seja o primeiro!</p>;
   const pa = Math.round((a / total) * 100);
+  const pd = Math.round((d / total) * 100);
+  const pb = 100 - pa - pd;
   return (
     <div className="space-y-1">
-      <div className="flex justify-between text-[11px] font-semibold">
+      <div className="flex justify-between gap-2 text-[11px] font-semibold">
         <span className="text-team-a">
           {teamName(0)} · {pa}%
         </span>
         <span className="text-muted">
+          {d ? `Empate ${pd}% · ` : ""}
           {total} palpite{total > 1 ? "s" : ""}
         </span>
         <span className="text-team-b">
-          {100 - pa}% · {teamName(1)}
+          {pb}% · {teamName(1)}
         </span>
       </div>
       <div className="flex h-1.5 overflow-hidden rounded-full bg-surface-3">
         <div className="bg-team-a" style={{ width: `${pa}%` }} />
-        <div className="bg-team-b" style={{ width: `${100 - pa}%` }} />
+        <div className="bg-muted" style={{ width: `${pd}%` }} />
+        <div className="bg-team-b" style={{ width: `${pb}%` }} />
       </div>
     </div>
   );
@@ -192,12 +197,10 @@ function OpenForm({
   loggedIn: boolean;
 }) {
   const mine = bolao.mine;
-  const [winner, setWinner] = useState<string | null>(mine?.winnerCaptain ?? null);
-  const options = scoreOptions(bolao.mapsCount);
-  const [score, setScore] = useState(() => {
-    const i = options.findIndex((o) => o.won === mine?.mapsWon && o.lost === mine?.mapsLost);
-    return i >= 0 ? i : 0;
-  });
+  // Quem vence: o capitão de um time ou "draw" (empate).
+  const initialWinner = mine ? (mine.kind === "draw" ? "draw" : mine.winnerCaptain) : null;
+  const [winner, setWinner] = useState<string | null>(initialWinner);
+  const [kind, setKind] = useState<Exclude<BetKind, "draw">>(mine && mine.kind !== "draw" ? mine.kind : "sweep");
   const [mvp, setMvp] = useState<string | null>(mine?.mvpId ?? null);
   const [lanterna, setLanterna] = useState<string | null>(mine?.lanternaId ?? null);
   const [pending, start] = useTransition();
@@ -207,26 +210,19 @@ function OpenForm({
   const name = (id: string) => people[id]?.name ?? "Jogador";
   const teamName = (i: 0 | 1) => `Time ${name(bolao.captains[i])}`;
   const cancel = () => {
-    setWinner(mine?.winnerCaptain ?? null);
-    setScore(
-      Math.max(
-        0,
-        options.findIndex((o) => o.won === mine?.mapsWon && o.lost === mine?.mapsLost),
-      ),
-    );
+    setWinner(initialWinner);
+    setKind(mine && mine.kind !== "draw" ? mine.kind : "sweep");
     setMvp(mine?.mvpId ?? null);
     setLanterna(mine?.lanternaId ?? null);
     setEditing(false);
   };
 
   const save = () => {
-    if (!winner) return toast.error("Escolha quem vence.");
-    const o = options[score]!;
+    if (!winner) return toast.error("Escolha quem vence (ou empate).");
     start(async () => {
       const r = await savePrediction(scheduleId, date, {
-        winnerCaptain: winner,
-        mapsWon: o.won,
-        mapsLost: o.lost,
+        winnerCaptain: winner === "draw" ? null : winner,
+        kind: winner === "draw" ? "draw" : kind,
         mvpId: mvp,
         lanternaId: lanterna,
       });
@@ -248,54 +244,76 @@ function OpenForm({
             <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
               Quem vence? <span className="font-normal tracking-normal normal-case">(+{BOLAO_POINTS.winner})</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              {([0, 1] as const).map((i) => (
-                <button
-                  key={i}
-                  type="button"
-                  disabled={!loggedIn}
-                  onClick={() => setWinner(bolao.captains[i])}
-                  aria-pressed={winner === bolao.captains[i]}
-                  className={cn(
-                    "flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50",
-                    winner === bolao.captains[i]
-                      ? i === 0
-                        ? "border-team-a bg-team-a/15 text-team-a"
-                        : "border-team-b bg-team-b/15 text-team-b"
-                      : "border-border hover:border-border-strong",
-                  )}
-                >
-                  <TeamDot side={i === 0 ? "A" : "B"} /> {teamName(i)}
-                </button>
-              ))}
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-2">
+              {([0, "draw", 1] as const).map((i) => {
+                const value = i === "draw" ? "draw" : bolao.captains[i];
+                const on = winner === value;
+                return (
+                  <button
+                    key={String(i)}
+                    type="button"
+                    disabled={!loggedIn}
+                    onClick={() => setWinner(value)}
+                    aria-pressed={on}
+                    className={cn(
+                      "flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50",
+                      on
+                        ? i === 0
+                          ? "border-team-a bg-team-a/15 text-team-a"
+                          : i === 1
+                            ? "border-team-b bg-team-b/15 text-team-b"
+                            : "border-fg/60 bg-surface-3 text-fg"
+                        : "border-border hover:border-border-strong",
+                    )}
+                  >
+                    {i === "draw" ? (
+                      "Empate"
+                    ) : (
+                      <>
+                        <TeamDot side={i === 0 ? "A" : "B"} /> {teamName(i)}
+                      </>
+                    )}
+                  </button>
+                );
+              })}
             </div>
+            {winner === "draw" && (
+              <p className="mt-1.5 text-xs text-muted">
+                {BET_KIND_HINT.draw}. Acertar o empate vale {BOLAO_POINTS.winner + BOLAO_POINTS.score} pontos.
+              </p>
+            )}
           </div>
 
-          <div>
-            <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
-              Placar de mapas{" "}
-              <span className="font-normal tracking-normal normal-case">
-                (+{BOLAO_POINTS.score} se acertar com o vencedor)
-              </span>
+          {winner && winner !== "draw" && (
+            <div>
+              <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
+                Como?{" "}
+                <span className="font-normal tracking-normal normal-case">
+                  (+{BOLAO_POINTS.score} se acertar com o vencedor)
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(["sweep", "close"] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    disabled={!loggedIn}
+                    onClick={() => setKind(k)}
+                    aria-pressed={kind === k}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-left transition-colors disabled:opacity-50",
+                      kind === k ? "border-brand bg-brand/12" : "border-border hover:border-border-strong",
+                    )}
+                  >
+                    <span className={cn("block text-sm font-semibold", kind === k && "text-brand")}>
+                      {BET_KIND_LABEL[k]}
+                    </span>
+                    <span className="block text-[11px] text-muted">{BET_KIND_HINT[k]}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {options.map((o, i) => (
-                <button
-                  key={`${o.won}-${o.lost}`}
-                  type="button"
-                  disabled={!loggedIn}
-                  onClick={() => setScore(i)}
-                  aria-pressed={score === i}
-                  className={cn(
-                    "rounded-md border px-3 py-1.5 font-display text-sm font-bold tabular transition-colors disabled:opacity-50",
-                    score === i ? "border-brand bg-brand/12 text-brand" : "border-border hover:border-border-strong",
-                  )}
-                >
-                  {o.won} × {o.lost}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           <PlayerPicker
             value={mvp}
@@ -329,7 +347,7 @@ function OpenForm({
             <p className="text-xs text-muted">
               Você já palpitou:{" "}
               <span className="font-semibold text-fg">
-                Time {name(mine.winnerCaptain)} · {mine.mapsWon}×{mine.mapsLost}
+                {betLabel(mine, name)}
                 {mine.mvpId && ` · MVP ${name(mine.mvpId)}`}
                 {mine.lanternaId && ` · Lanterna ${name(mine.lanternaId)}`}
               </span>
@@ -369,6 +387,12 @@ function OpenForm({
   );
 }
 
+/** "Time X · vitória seca" / "Empate" (resumo do palpite). */
+function betLabel(p: Prediction, name: (id: string) => string) {
+  if (p.kind === "draw") return "Empate";
+  return `Time ${p.winnerCaptain ? name(p.winnerCaptain) : "?"} · ${p.kind === "sweep" ? "vitória seca" : "com deslize"}`;
+}
+
 function Hit({ ok, children }: { ok: boolean | null; children: React.ReactNode }) {
   return (
     <span
@@ -397,10 +421,8 @@ export function PredictionLine({
   const name = (id: string) => names[id] ?? "Jogador";
   return (
     <div className="flex flex-wrap gap-1 text-[11px]">
-      <Hit ok={score ? score.winner : null}>Time {name(p.winnerCaptain)}</Hit>
-      <Hit ok={score ? score.score : null}>
-        {p.mapsWon}×{p.mapsLost}
-      </Hit>
+      <Hit ok={score ? score.winner : null}>{p.kind === "draw" ? "Empate" : `Time ${name(p.winnerCaptain!)}`}</Hit>
+      {p.kind !== "draw" && <Hit ok={score ? score.score : null}>{p.kind === "sweep" ? "Seca" : "Com deslize"}</Hit>}
       {p.mvpId && <Hit ok={score ? score.mvp : null}>MVP {name(p.mvpId)}</Hit>}
       {p.lanternaId && <Hit ok={score ? score.lanterna : null}>Lanterna {name(p.lanternaId)}</Hit>}
     </div>
@@ -426,7 +448,9 @@ function Results({
         <p className="text-sm text-muted">
           Deu{" "}
           <span className="font-semibold text-fg">{o.winnerCaptain ? `Time ${name(o.winnerCaptain)}` : "empate"}</span>{" "}
-          {o.mapsWon}×{o.mapsLost} · MVP <span className="text-fg">{name(o.mvpId)}</span> · Lanterna{" "}
+          {o.mapsWon}×{o.mapsLost}
+          {o.kind && o.kind !== "draw" ? ` (${o.kind === "sweep" ? "vitória seca" : "com deslize"})` : ""} · MVP{" "}
+          <span className="text-fg">{name(o.mvpId)}</span> · Lanterna{" "}
           <span className="text-fg">{name(o.lanternaId)}</span>
         </p>
       ) : (

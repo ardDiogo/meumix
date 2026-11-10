@@ -9,8 +9,12 @@
 - **Times refeitos:** se o mix ou a escolha dos times for reiniciada (desistência, jogador removido,
   "Reiniciar seleção", "Reiniciar mix" ou mix deletado), os palpites daquele mix são apagados. O
   bolão reabre quando os times novos forem definidos, com um novo aviso "Bolão aberto".
-- **Palpite:** time vencedor (identificado pelo capitão), placar de mapas (com 3 mapas: 3×0 ou
-  2×1), MVP e lanterna (opcionais; não podem ser o mesmo jogador).
+- **Palpite:** resultado — time vencedor (identificado pelo capitão) ou **empate** — e, com vencedor,
+  **vitória seca** (sem perder mapa: 2×0, 3×0, 4×0) ou **com deslize** (perdendo algum: 2×1, 3×1, 3×2).
+  Vale para 2, 3 ou 4 mapas. MVP e lanterna são opcionais e não podem ser o mesmo jogador
+  (migração `0051_bolao_outcome.sql`; palpites antigos viram seca ou com deslize pelo placar).
+- **Pontos:** resultado certo +3; tipo certo (seca/com deslize) +2; empate certo vale os dois (+5);
+  MVP +3; lanterna +2.
 - **Pontos** (`src/lib/bolao.ts`, testado em `bolao.test.ts`):
 
   | Acerto                               | Pontos |
@@ -30,7 +34,7 @@
   políticas). Enquanto o bolão está aberto, cada um vê só o próprio palpite e a divisão entre os
   times; depois de fechar, todos aparecem.
 - **Onde aparece:** no Dashboard (junto do PICK), na página do mix finalizado e em **/bolao**
-  (ranking geral: pontos; desempate por placares exatos, MVPs certos e menos palpites).
+  (ranking geral: pontos; desempate por tipos certos, MVPs certos e menos palpites).
 
 ## Avisos no celular (Web Push)
 

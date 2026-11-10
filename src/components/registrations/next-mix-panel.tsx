@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { getPermissions } from "@/services/auth";
 import { getNextMix, playersOutsideList } from "@/services/mix-events";
 import { getPickInfo } from "@/services/pick-info";
-import { loadBolao, typicalMapsCount } from "@/services/bolao";
+import { loadBolao } from "@/services/bolao";
 import { BolaoPanel } from "../bolao/bolao-panel";
 import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
@@ -164,7 +164,6 @@ export async function NextMixPanel() {
           closesAt: occurrence.eventAt,
           captains: [draft.captainA, draft.captainB],
           teams: [draft.teamA, draft.teamB],
-          mapsCount: await typicalMapsCount(),
           finalizedMatchId: result.mix.finalizedMatchId,
           viewerId: session?.id ?? null,
           now,

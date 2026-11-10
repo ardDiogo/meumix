@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { BetKind } from "@/lib/bolao";
 import { currentOccurrence } from "@/lib/mix-schedule";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
@@ -10,8 +11,7 @@ import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 export type BolaoResult = { ok: true; message: string } | { ok: false; message: string };
 const fail = (message: string): BolaoResult => ({ ok: false, message });
 
-const isInt = (n: unknown, min: number, max: number) =>
-  Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
+const KINDS = new Set(["sweep", "close", "draw"]);
 
 /**
  * Palpite no bolão: qualquer usuário cadastrado (jogando ou não), com os times
@@ -20,7 +20,14 @@ const isInt = (n: unknown, min: number, max: number) =>
 export async function savePrediction(
   scheduleId: string,
   date: string,
-  input: { winnerCaptain: string; mapsWon: number; mapsLost: number; mvpId: string | null; lanternaId: string | null },
+  input: {
+    /** Capitão do time vencedor; null com kind "draw" (empate). */
+    winnerCaptain: string | null;
+    /** Vitória seca, vitória com deslize ou empate (vale para 2, 3 ou 4 mapas). */
+    kind: BetKind;
+    mvpId: string | null;
+    lanternaId: string | null;
+  },
 ): Promise<BolaoResult> {
   const session = await getSession();
   if (!session) return fail("Entre na sua conta para palpitar.");
@@ -42,13 +49,11 @@ export async function savePrediction(
   if (draft?.status !== "completed") return fail("O bolão abre quando os times estiverem definidos.");
 
   const players = new Set([...(draft.team_a as string[]), ...(draft.team_b as string[])]);
-  if (input.winnerCaptain !== draft.captain_a && input.winnerCaptain !== draft.captain_b) {
-    return fail("Escolha o time vencedor.");
+  if (!KINDS.has(input.kind)) return fail("Escolha como o mix termina.");
+  const winner = input.kind === "draw" ? null : input.winnerCaptain;
+  if (input.kind !== "draw" && winner !== draft.captain_a && winner !== draft.captain_b) {
+    return fail("Escolha o time vencedor (ou empate).");
   }
-  if (!isInt(input.mapsWon, 1, 5) || !isInt(input.mapsLost, 0, 4) || input.mapsLost >= input.mapsWon) {
-    return fail("Placar inválido.");
-  }
-  if (input.mapsWon + input.mapsLost > 5) return fail("Placar inválido.");
   if ((input.mvpId && !players.has(input.mvpId)) || (input.lanternaId && !players.has(input.lanternaId))) {
     return fail("Escolha jogadores deste mix.");
   }
@@ -58,9 +63,11 @@ export async function savePrediction(
     {
       ...key,
       user_id: session.id,
-      winner_captain: input.winnerCaptain,
-      maps_won: input.mapsWon,
-      maps_lost: input.mapsLost,
+      winner_captain: winner,
+      kind: input.kind,
+      // O placar exato não é mais palpitado (2, 3 ou 4 mapas).
+      maps_won: null,
+      maps_lost: null,
       mvp_id: input.mvpId || null,
       lanterna_id: input.lanternaId || null,
       updated_at: new Date().toISOString(),
@@ -69,7 +76,11 @@ export async function savePrediction(
   );
   if (error) {
     return fail(
-      error.code === "42P01" ? "Rode a migração 0031_bolao_push.sql no Supabase." : "Não foi possível salvar.",
+      error.code === "42P01"
+        ? "Rode a migração 0031_bolao_push.sql no Supabase."
+        : error.code === "PGRST204" || error.code === "23502" || error.code === "42703"
+          ? "Rode a migração 0051_bolao_outcome.sql no Supabase."
+          : "Não foi possível salvar.",
     );
   }
   await audit({ action: "vote.bolao", outcome: "success", actorId: session.id, scheduleId, eventDate: date });

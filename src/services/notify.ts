@@ -321,7 +321,7 @@ export async function runScheduledNotices(now = new Date()) {
         },
         {
           title: `Bolão fecha às ${hourMin(o.eventAt)} 🎲`,
-          body: "Você ainda não palpitou. Quem vence, qual o placar, quem é o MVP e quem fica de lanterna?",
+          body: "Você ainda não palpitou. Quem vence (ou se empata), se é vitória seca ou com deslize, quem é o MVP e quem fica de lanterna?",
           tag: `bolao:${o.date}`,
         },
       );

@@ -30,11 +30,11 @@ export default async function BolaoPage() {
       <Card className="mb-4">
         <CardContent className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <span>
-            Vencedor <strong className="text-brand">+{BOLAO_POINTS.winner}</strong>
+            Vencedor ou empate <strong className="text-brand">+{BOLAO_POINTS.winner}</strong>
           </span>
           <span>
-            Placar de mapas exato <strong className="text-brand">+{BOLAO_POINTS.score}</strong>
-            <span className="text-muted"> (com o vencedor certo)</span>
+            Vitória seca ou com deslize <strong className="text-brand">+{BOLAO_POINTS.score}</strong>
+            <span className="text-muted"> (com o vencedor certo; empate certo já leva)</span>
           </span>
           <span>
             MVP <strong className="text-brand">+{BOLAO_POINTS.mvp}</strong>
@@ -60,8 +60,8 @@ export default async function BolaoPage() {
                 <TH className="text-right" title="Acertos do time vencedor">
                   Vencedor
                 </TH>
-                <TH className="text-right" title="Placares de mapas exatos">
-                  Placar
+                <TH className="text-right" title="Resultados com o tipo certo (seca, com deslize ou empate)">
+                  Tipo
                 </TH>
                 <TH className="text-right">MVP</TH>
                 <TH className="text-right">Lanterna</TH>

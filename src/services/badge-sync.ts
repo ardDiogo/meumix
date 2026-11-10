@@ -8,7 +8,7 @@ import {
   type EngineMatch,
   type TopKey,
 } from "@/lib/badge-engine";
-import { outcomeOf, scorePrediction } from "@/lib/bolao";
+import { betKindOf, outcomeOf, scorePrediction } from "@/lib/bolao";
 import type { GcMapStored } from "@/lib/gc-api";
 import { roundStory, winnerFirst } from "@/lib/gc-analysis";
 import { matchHighlights, type StatRow } from "@/lib/match-highlights";
@@ -88,10 +88,7 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
         .range(from, to),
     ),
     // Bolão (sem a migração 0031, só fica sem as insígnias do bolão).
-    admin
-      .from("mix_predictions")
-      .select("schedule_id, event_date, user_id, winner_captain, maps_won, maps_lost, mvp_id, lanterna_id")
-      .limit(20000),
+    admin.from("mix_predictions").select("*").limit(20000),
     admin.from("mix_draft_state").select("schedule_id, event_date, captain_a, captain_b"),
     // Dados importados da GC (sem a migração 0035, só fica sem as insígnias da GC).
     admin.from("match_gc_maps").select("match_id, map_order, map_id, data").order("map_order"),
@@ -186,13 +183,13 @@ export async function recomputeBadges(): Promise<BadgeSyncResult> {
     });
     return preds.map((p) => ({
       userId: p.user_id as string,
-      decided: outcome.winnerCaptain != null,
+      // Empate também é resultado (dá para acertar no bolão).
+      decided: outcome.kind != null,
       score: scorePrediction(
         {
           userId: p.user_id as string,
-          winnerCaptain: p.winner_captain as string,
-          mapsWon: p.maps_won as number,
-          mapsLost: p.maps_lost as number,
+          winnerCaptain: (p.winner_captain as string | null) ?? null,
+          kind: betKindOf(p),
           mvpId: (p.mvp_id as string | null) ?? null,
           lanternaId: (p.lanterna_id as string | null) ?? null,
         },
