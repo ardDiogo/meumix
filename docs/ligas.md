@@ -139,3 +139,11 @@ Em **Controle de mix → Criar novo mix**, a 1ª pergunta é **"De qual mix é e
 uma liga só vê essa liga (já escolhida); o admin da plataforma escolhe entre todas
 (`manageableLeagues`). O jogo entra no ranking, no ELO e no histórico da liga escolhida, mesmo numa
 quinta ou sexta, e o site abre nessa liga no dia do jogo (`leagueIdsWithMixToday`).
+
+## Insígnias dobradas (corrigido na 0052)
+
+Fora da liga principal, a referência da conquista leva o prefixo da liga (`terca:…`). O primeiro
+recálculo depois da 0047 não reconhecia as conquistas antigas (sem prefixo) e gravava outras; as
+permanentes (que nunca são apagadas) ficaram dobradas. A `0052_badges_dedupe.sql` apaga as
+duplicadas (fica a travada pelo admin, se houver) e o recálculo passa a renomear a conquista antiga
+para a referência com prefixo em vez de criar outra.
