@@ -15,26 +15,14 @@ function WhatsAppIcon() {
 }
 
 /**
- * Card único do resultado (imagem) para mandar no WhatsApp. No celular abre o
- * menu de compartilhar com a imagem; no computador baixa a imagem e abre o
- * WhatsApp com o texto e o link.
+ * Card único do resultado (imagem) para mandar no WhatsApp, só com o link da partida
+ * na mensagem (a crônica e a análise ficam no site). No celular abre o menu de
+ * compartilhar com a imagem; no computador baixa a imagem e abre o WhatsApp com o link.
  */
-export function ShareResult({
-  matchId,
-  fileName,
-  text,
-  chronicle,
-}: {
-  matchId: string;
-  fileName: string;
-  text: string;
-  /** Crônica do mix no formato do WhatsApp (vai na imagem e na mensagem). */
-  chronicle?: string | null;
-}) {
+export function ShareResult({ matchId, fileName }: { matchId: string; fileName: string }) {
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<Record<string, File>>({});
   const [loading, setLoading] = useState(false);
-  // A imagem vai sem a crônica; ela segue escrita na mensagem (se houver e não estiver oculta).
   const src = `/api/mixes/${matchId}/card`;
   const file = files[src] ?? null;
 
@@ -57,7 +45,8 @@ export function ShareResult({
   }, [open, file, src, fileName]);
 
   const link = typeof window === "undefined" ? "" : window.location.href.split("?")[0]!;
-  const message = chronicle ? `${chronicle}\n\n${link}` : `${text}\n\nVeja as estatísticas completas: ${link}`;
+  // Só o link da partida (a crônica e a análise com a resenha ficam no site).
+  const message = link;
 
   function download() {
     if (!file) return;
@@ -82,7 +71,7 @@ export function ShareResult({
     // Computador: baixa a imagem e abre o WhatsApp com o texto (anexe a imagem baixada).
     download();
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank", "noopener");
-    toast.success("Imagem baixada. Anexe no WhatsApp junto com a mensagem.");
+    toast.success("Imagem baixada. Anexe no WhatsApp junto com o link.");
   }
 
   return (
@@ -94,7 +83,7 @@ export function ShareResult({
       </DialogTrigger>
       <DialogContent
         title="Compartilhar resultado"
-        description="Card com placar, estatísticas e destaques para mandar no grupo. A crônica vai escrita na mensagem."
+        description="Card com placar, estatísticas e destaques para mandar no grupo, com o link da partida. A crônica e a resenha ficam no site."
         className="max-w-lg"
       >
         <div className="max-h-[55vh] overflow-y-auto rounded-md border border-border bg-bg">

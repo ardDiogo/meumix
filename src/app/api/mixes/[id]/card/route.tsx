@@ -97,14 +97,19 @@ const initials = (name: string) =>
     .map((w) => w[0]?.toUpperCase() ?? "")
     .join("") || "?";
 
-function Avatar({ name, src, size }: { name: string; src: string | null; size: number }) {
+/** Cores dos times (as mesmas da página do mix). */
+const TEAM_COLOR = { A: "#5da3e8", B: "#e3bd5a" } as const;
+
+/** Foto do jogador. `ring`: contorno na cor do time (no empate, para saber quem é de qual time). */
+function Avatar({ name, src, size, ring }: { name: string; src: string | null; size: number; ring?: string | null }) {
+  const border = ring ? `${Math.max(2, Math.round(size / 18))}px solid ${ring}` : undefined;
   return src ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={src}
       width={size}
       height={size}
-      style={{ borderRadius: size / 6, objectFit: "cover", flexShrink: 0 }}
+      style={{ borderRadius: size / 6, objectFit: "cover", flexShrink: 0, ...(border ? { border } : {}) }}
       alt=""
     />
   ) : (
@@ -115,7 +120,7 @@ function Avatar({ name, src, size }: { name: string; src: string | null; size: n
         flexShrink: 0,
         borderRadius: size / 6,
         background: C.surface2,
-        border: `1px solid ${C.border}`,
+        border: border ?? `1px solid ${C.border}`,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -274,8 +279,11 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   );
 
   const sideColor = (side: "A" | "B") => (!winner ? C.muted : winner === side ? C.win : C.loss);
+  // Empate: placar e rótulos ficam cinza, mas cada jogador é marcado com a cor do time.
+  const ring = (r: StatRow | null) => (!winner && r ? TEAM_COLOR[r.team] : null);
+  const barColor = (side: "A" | "B") => (winner ? sideColor(side) : TEAM_COLOR[side]);
   // Round: verde para o vencedor da série e vermelho para o outro (empate: as cores dos times).
-  const roundColor = (side: "A" | "B") => (winner ? sideColor(side) : side === "A" ? "#5da3e8" : "#e3bd5a");
+  const roundColor = (side: "A" | "B") => (winner ? sideColor(side) : TEAM_COLOR[side]);
   const sideLabel = (side: "A" | "B") => (!winner ? "EMPATE" : winner === side ? "VENCEDOR" : "DERROTA");
   const teamName = (side: "A" | "B") => mix.teams.find((t) => t.side === side)?.name ?? `Time ${side}`;
   const when = new Date(mix.scheduledAt);
@@ -299,7 +307,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
       const w = v == null ? 0 : Math.max((Math.abs(v) / perfScale) * 64, 2);
       return (
         <div key={r.key} style={{ display: "flex", alignItems: "center", gap: 8, height: 23 }}>
-          <Avatar name={r.name} src={avatar(r)} size={22} />
+          <Avatar name={r.name} src={avatar(r)} size={22} ring={ring(r)} />
           <span style={{ width: 104, fontSize: 15, fontWeight: 700, whiteSpace: "nowrap" }}>
             {r.name.length > 12 ? `${r.name.slice(0, 11)}…` : r.name}
           </span>
@@ -382,7 +390,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
         {rows
           .filter((r) => r.team === side)
           .map((r) => (
-            <Avatar key={r.key} name={r.name} src={avatar(r)} size={36} />
+            <Avatar key={r.key} name={r.name} src={avatar(r)} size={36} ring={ring(r)} />
           ))}
       </div>
     </div>
@@ -661,7 +669,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
             >
               <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: 3, color: "#C084FC" }}>MVP DA PARTIDA</span>
               <div style={{ display: "flex", marginTop: 14, borderRadius: 22, border: "3px solid #A855F7" }}>
-                <Avatar name={mvp.name} src={avatar(mvp)} size={116} />
+                <Avatar name={mvp.name} src={avatar(mvp)} size={116} ring={ring(mvp)} />
               </div>
               <span style={{ fontFamily: display, fontSize: 30, fontWeight: 700, marginTop: 12, whiteSpace: "nowrap" }}>
                 {mvp.name.length > 15 ? `${mvp.name.slice(0, 14)}…` : mvp.name}
@@ -701,7 +709,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                     background: `${color}1F`,
                   }}
                 >
-                  <Avatar name={name} src={avatar(row)} size={40} />
+                  <Avatar name={name} src={avatar(row)} size={40} ring={ring(row)} />
                   <div style={{ display: "flex", flexDirection: "column" }}>
                     <span style={{ fontSize: 14, fontWeight: 700, color, whiteSpace: "nowrap" }}>{title}</span>
                     <span style={{ fontSize: 19, fontWeight: 700, whiteSpace: "nowrap" }}>
@@ -728,7 +736,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                 }}
               >
                 <div style={{ display: "flex", borderRadius: 14, border: `2px solid ${C.loss}` }}>
-                  <Avatar name={worst.name} src={avatar(worst)} size={72} />
+                  <Avatar name={worst.name} src={avatar(worst)} size={72} ring={ring(worst)} />
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: 3, color: C.loss }}>LANTERNA</span>
@@ -822,10 +830,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
             >
               <span style={{ width: 30, color: C.subtle }}>{idx + 1}</span>
               <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 10, overflow: "hidden" }}>
-                <div
-                  style={{ display: "flex", width: 5, height: 26, borderRadius: 3, background: sideColor(r.team) }}
-                />
-                <Avatar name={r.name} src={avatar(r)} size={34} />
+                <div style={{ display: "flex", width: 5, height: 26, borderRadius: 3, background: barColor(r.team) }} />
+                <Avatar name={r.name} src={avatar(r)} size={34} ring={ring(r)} />
                 <span style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
                   {r.name.length > 18 ? `${r.name.slice(0, 17)}…` : r.name}
                 </span>

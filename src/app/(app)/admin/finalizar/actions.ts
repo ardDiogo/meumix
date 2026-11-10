@@ -156,11 +156,15 @@ export async function finalizeMix(input: {
 
   // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
   await recomputeBadgesSafely();
-  // Depois de responder: avisos no celular, a crônica do mix (IA ou modelo pronto) e a análise (IA, mix da GC).
+  // Depois de responder: avisos no celular, a crônica do mix (IA ou modelo pronto) e a análise com a
+  // resenha (IA, mix da GC). Ao mesmo tempo: uma depois da outra estourava o tempo limite do servidor
+  // e a análise não era gravada.
   after(async () => {
-    await notifyMixResult(data as string);
-    await generateChronicle(data as string, session!.id);
-    if (gcMaps.length) await generateAnalysis(data as string, session!.id);
+    await Promise.allSettled([
+      notifyMixResult(data as string),
+      generateChronicle(data as string, session!.id),
+      gcMaps.length ? generateAnalysis(data as string, session!.id) : Promise.resolve(),
+    ]);
   });
   for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
     revalidatePath(path, "layout");
