@@ -13,11 +13,19 @@ export function validatePassword(password: string) {
   return password.length >= PASSWORD_MIN ? undefined : `A senha deve ter pelo menos ${PASSWORD_MIN} caracteres.`;
 }
 
+/** Tamanho máximo do nickname. Em tabelas e na imagem do resultado, ele aparece abreviado (`shortNick`). */
+export const NICK_MAX = 32;
+
 export function validateDisplayName(name: string) {
   const n = name.trim();
   if (n.length < 2) return "Informe um nickname com pelo menos 2 caracteres.";
-  if (n.length > 24) return "O nickname pode ter no máximo 24 caracteres.";
+  if (n.length > NICK_MAX) return `O nickname pode ter no máximo ${NICK_MAX} caracteres.`;
   return undefined;
+}
+
+/** Nick abreviado com "…" (tabela de estatísticas e imagem do resultado): no máximo 24 caracteres. */
+export function shortNick(name: string, max = 24) {
+  return name.length > max ? `${name.slice(0, max - 1).trimEnd()}…` : name;
 }
 
 /** Aceita apenas caminhos internos (evita redirecionamento aberto). */

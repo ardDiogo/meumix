@@ -278,7 +278,7 @@ function EditDialog({ user, onDone }: { user: ManagedUser; onDone: () => void })
       <div className="space-y-3">
         <div>
           <Label htmlFor="edit-nick">Nick</Label>
-          <Input id="edit-nick" maxLength={24} {...field("nick")} />
+          <Input id="edit-nick" maxLength={32} {...field("nick")} />
         </div>
         <div>
           <Label htmlFor="edit-name">Nome</Label>

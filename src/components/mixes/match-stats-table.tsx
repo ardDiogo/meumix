@@ -14,6 +14,7 @@ import { LevelBadge } from "../players/level-badge";
 import { Avatar } from "../ui/avatar";
 import { TeamDot } from "./badges";
 import { playerSlug } from "@/lib/player-slug";
+import { shortNick } from "@/lib/auth/validation";
 
 /** Linha da tabela: a estatística do mix e, se importado da GC, os dados completos. */
 type Row = StatRow & { gc?: GcLine };
@@ -439,12 +440,13 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
                       <Link
                         href={r.profileNick ? `/jogadores/${playerSlug(r.profileNick)}` : `/jogadores/${r.userId}`}
                         className="max-w-44 truncate hover:text-brand"
+                        title={r.name}
                       >
-                        {r.name}
+                        {shortNick(r.name)}
                       </Link>
                     ) : (
-                      <span className="max-w-44 truncate" title="Convidado (sem conta)">
-                        {r.name}
+                      <span className="max-w-44 truncate" title={`${r.name} · convidado (sem conta)`}>
+                        {shortNick(r.name)}
                       </span>
                     )}
                     {r.elo != null && <LevelBadge elo={r.elo} />}

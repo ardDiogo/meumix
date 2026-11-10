@@ -36,7 +36,7 @@ export function parseBulkUsers(text: string): BulkRow[] {
       let error: string | null = null;
       if (!email) error = "e-mail não encontrado";
       else if (seen.has(email)) error = "e-mail repetido na lista";
-      else if (nick.length < 2 || nick.length > 24) error = "nick deve ter de 2 a 24 caracteres";
+      else if (nick.length < 2 || nick.length > 32) error = "nick deve ter de 2 a 32 caracteres";
       else if (gc !== null && !(Number.isInteger(gc) && gc >= 0 && gc <= 20)) error = "nível GC deve ser de 0 a 20";
       if (email) seen.add(email);
       return { line, nick, fullName, email, gcLevel: gc, error };

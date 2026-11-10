@@ -147,7 +147,7 @@ function SignUpForm({ next, disabled }: { next: string; disabled: boolean }) {
         label="Nickname"
         autoComplete="nickname"
         placeholder="Como você é conhecido no CS"
-        maxLength={24}
+        maxLength={32}
         error={errors.displayName}
         disabled={disabled}
         required
