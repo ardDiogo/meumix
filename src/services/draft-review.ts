@@ -5,11 +5,14 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
  * Time tirado e mudanças na lista (docs/regras-do-mix.md).
  *
  * - Reserva entra ou sai: nada muda.
- * - Seleção em andamento: se sai um capitão ou alguém já escolhido, a seleção
- *   recomeça; se sai alguém ainda não escolhido, o reserva que sobe entra no pool.
+ * - Seleção em andamento: se sai alguém já escolhido, o PICK recomeça; se sai alguém
+ *   ainda não escolhido, o reserva que sobe entra no pool.
  * - Time tirado: quem sai é trocado pelo reserva que sobe, no mesmo time, e os 2
  *   capitães respondem "manter o time" (os dois) ou "tirar novamente" (basta um).
- *   Sem reserva, a vaga fica aberta até alguém entrar. Se sai um capitão, tira de novo.
+ *   Sem reserva, a vaga fica aberta até alguém entrar.
+ * - "Tirar novamente" recomeça só o PICK: mesmos capitães e o vencedor do pedra, papel
+ *   ou tesoura escolhe primeiro de novo (sem jogar outra vez).
+ * - Se sai um capitão, a seleção recomeça do pedra, papel ou tesoura (capitão novo).
  */
 
 type Admin = NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
@@ -28,7 +31,37 @@ export interface DraftReviewView {
 
 const occ = (scheduleId: string, date: string) => ({ schedule_id: scheduleId, event_date: date });
 
-/** Recomeça a seleção do zero: apaga o time e os palpites e começa de novo (capitães pelos votos). */
+/**
+ * Recomeça só o PICK: mantém os capitães e o vencedor do pedra, papel ou tesoura (escolhe
+ * primeiro de novo), cada time volta a ter só o capitão e os palpites do bolão são zerados.
+ * Sem vencedor gravado (não deveria acontecer), recomeça do zero.
+ */
+export async function repick(admin: Admin, scheduleId: string, date: string) {
+  const { data: d } = await admin
+    .from("mix_draft_state")
+    .select("captain_a, captain_b, winner")
+    .match(occ(scheduleId, date))
+    .maybeSingle();
+  if (!d?.winner) return redraft(admin, scheduleId, date);
+  const { error } = await admin
+    .from("mix_draft_state")
+    .update({
+      status: "draft",
+      current_turn: d.winner === d.captain_a ? "a" : "b",
+      turn_number: 0,
+      picks_in_turn: 0,
+      team_a: [d.captain_a],
+      team_b: [d.captain_b],
+      updated_at: new Date().toISOString(),
+    })
+    .match(occ(scheduleId, date));
+  if (error) return false;
+  await admin.from("mix_draft_reviews").delete().match(occ(scheduleId, date));
+  await admin.from("mix_predictions").delete().match(occ(scheduleId, date));
+  return true;
+}
+
+/** Recomeça a seleção do zero (capitão novo): apaga o time e os palpites; capitães pelos votos. */
 export async function redraft(admin: Admin, scheduleId: string, date: string) {
   await admin.from("mix_draft_state").delete().match(occ(scheduleId, date));
   await admin.from("mix_predictions").delete().match(occ(scheduleId, date));
@@ -44,7 +77,12 @@ export async function reconcileTeams(
   admin: Admin,
   scheduleId: string,
   date: string,
-): Promise<{ kind: "review"; changes: DraftChange[]; captains: [string, string] } | { kind: "redraft" } | null> {
+): Promise<
+  | { kind: "review"; changes: DraftChange[]; captains: [string, string] }
+  | { kind: "redraft" }
+  | { kind: "repick" }
+  | null
+> {
   const { data: d } = await admin.from("mix_draft_state").select("*").match(occ(scheduleId, date)).maybeSingle();
   if (!d) return null;
   const [{ data: cls }, { data: sched }] = await Promise.all([
@@ -64,11 +102,12 @@ export async function reconcileTeams(
   }
 
   if (d.status !== "completed") {
-    // Seleção em andamento: saiu alguém já escolhido → recomeça; o resto se ajusta sozinho
-    // (quem ainda não foi escolhido sai do pool e o reserva que sobe entra nele).
+    // Escolha em andamento: saiu alguém já escolhido → recomeça o PICK (mesmo vencedor do
+    // pedra, papel ou tesoura); o resto se ajusta sozinho (quem ainda não foi escolhido
+    // sai do pool e o reserva que sobe entra nele).
     if ([...a, ...b].some((id) => !classified.has(id))) {
-      await redraft(admin, scheduleId, date);
-      return { kind: "redraft" };
+      await repick(admin, scheduleId, date);
+      return { kind: "repick" };
     }
     return null;
   }

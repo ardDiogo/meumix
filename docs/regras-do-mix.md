@@ -97,10 +97,10 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 ### Mudanças na lista com o time tirado
 
 - **Reserva entra ou sai:** nada muda (o time fica travado).
-- **Durante a escolha:** se sai um capitão ou alguém já escolhido, a escolha recomeça; se sai alguém ainda não escolhido, o reserva que sobe entra no grupo de quem pode ser escolhido.
-- **Time tirado:** se um dos classificados sai, o 1º reserva entra **no lugar dele, no mesmo time**, e os **2 capitães** respondem: **Manter o time** (precisa dos dois) ou **Tirar novamente** (basta um, e a seleção recomeça do pedra, papel ou tesoura, com os palpites do bolão zerados). Os capitães recebem aviso no celular.
+- **Durante a escolha:** se sai alguém já escolhido, o PICK recomeça (sem novo pedra, papel ou tesoura); se sai alguém ainda não escolhido, o reserva que sobe entra no grupo de quem pode ser escolhido.
+- **Time tirado:** se um dos classificados sai, o 1º reserva entra **no lugar dele, no mesmo time**, e os **2 capitães** respondem: **Manter o time** (precisa dos dois) ou **Tirar novamente** (basta um: o PICK recomeça **sem novo pedra, papel ou tesoura**, com os mesmos capitães e quem venceu o pedra, papel ou tesoura escolhendo primeiro de novo; os palpites do bolão são zerados). Os capitães recebem aviso no celular.
 - Sem reserva na hora, a vaga fica aberta; quem entrar depois ocupa a vaga e a pergunta volta para os capitães.
-- Se quem sai é um capitão, a seleção recomeça.
+- Se quem sai é um capitão, a seleção recomeça do pedra, papel ou tesoura (com o capitão novo pelos votos).
 - Guardado em `mix_draft_reviews` (migração `0050_draft_review.sql`).
 
 ## 7) Sugestão de times balanceados e probabilidade de vitória

@@ -13,7 +13,7 @@ import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
-import { notifyCaptains, notifyDraftReview, notifyListFull } from "@/services/notify";
+import { notifyCaptains, notifyDraftReview, notifyListFull, notifyRepick } from "@/services/notify";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
 /**
@@ -200,6 +200,7 @@ async function afterRosterChange(
     const r = await reconcileTeams(admin, scheduleId, date);
     if (r?.kind === "review") after(() => notifyDraftReview(scheduleId, date, r.captains, r.changes));
     if (r?.kind === "redraft") after(() => notifyCaptains(scheduleId, date));
+    if (r?.kind === "repick") after(() => notifyRepick(scheduleId, date));
   } catch (e) {
     console.error("[draft] ajuste do time:", e);
   }

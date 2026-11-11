@@ -7,9 +7,9 @@ import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
-import { notifyCaptains, notifyPicked, notifyPickTurn, notifyTeamsDefined } from "@/services/notify";
+import { notifyCaptains, notifyPicked, notifyPickTurn, notifyRepick, notifyTeamsDefined } from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
-import { redraft } from "@/services/draft-review";
+import { repick } from "@/services/draft-review";
 
 export type DraftResult = { ok: true; message: string } | { ok: false; message: string };
 const fail = (message: string): DraftResult => ({ ok: false, message });
@@ -263,10 +263,14 @@ export async function answerDraftReview(scheduleId: string, date: string, keep: 
   });
 
   if (!keep) {
-    const started = await redraft(admin, scheduleId, date);
-    if (started) after(() => notifyCaptains(scheduleId, date));
+    // Recomeça só o PICK: o vencedor do pedra, papel ou tesoura escolhe primeiro de novo.
+    const started = await repick(admin, scheduleId, date);
+    if (started) after(() => notifyRepick(scheduleId, date));
     refresh();
-    return { ok: true, message: "Vamos tirar o time novamente." };
+    return {
+      ok: true,
+      message: "Vamos tirar o time novamente. Quem venceu o pedra, papel ou tesoura escolhe primeiro.",
+    };
   }
 
   const other = side === "a" ? review.vote_b : review.vote_a;

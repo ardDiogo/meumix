@@ -28,11 +28,12 @@ async function draftOf(scheduleId: string, date: string) {
   if (!admin) return null;
   const { data } = await admin
     .from("mix_draft_state")
-    .select("status, captain_a, captain_b, team_a, team_b")
+    .select("status, captain_a, captain_b, team_a, team_b, current_turn")
     .match({ schedule_id: scheduleId, event_date: date })
     .maybeSingle();
   return data as {
     status: string;
+    current_turn: "a" | "b" | null;
     captain_a: string;
     captain_b: string;
     team_a: string[];
@@ -370,6 +371,26 @@ export async function notifyDraftReview(
     {
       title: "Troca no time 🔁",
       body: `${text}. Manter o time ou tirar novamente? Responda no MeuMix.`,
+      tag: `pick:${date}`,
+    },
+  );
+}
+
+/** O PICK recomeçou (troca no time ou alguém já escolhido saiu): quem escolhe primeiro. */
+export async function notifyRepick(scheduleId: string, date: string) {
+  const draft = await draftOf(scheduleId, date);
+  if (!draft || draft.status !== "draft") return;
+  const first = draft.current_turn === "a" ? draft.captain_a : draft.captain_b;
+  const names = await nameMap([first]);
+  await sendPush(
+    {
+      topic: "pick",
+      userIds: [draft.captain_a, draft.captain_b],
+      once: `repick:${scheduleId}:${date}:${new Date().toISOString().slice(0, 16)}`,
+    },
+    {
+      title: "Vamos tirar o time de novo 🔁",
+      body: `Sem pedra, papel ou tesoura: ${names.get(first) ?? "quem venceu"} escolhe primeiro, como na primeira vez.`,
       tag: `pick:${date}`,
     },
   );
