@@ -160,7 +160,32 @@ function PlayerPicker({
   );
 }
 
-/** Quem já palpitou: só foto e nick (o palpite fica escondido até fechar). */
+/** Palpites de todos enquanto o bolão está aberto (para a resenha antes do mix). */
+function OpenBets({ bolao, people }: { bolao: BolaoView; people: People }) {
+  const entries = bolao.entries ?? [];
+  if (!entries.length) return <Voters voters={bolao.voters} />;
+  const names = Object.fromEntries(Object.entries(people).map(([id, p]) => [id, p.name]));
+  return (
+    <div>
+      <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">
+        Palpites ({entries.length})
+      </div>
+      <ul className="divide-y divide-border rounded-md border border-border">
+        {entries.map((e) => (
+          <li key={e.userId} className="flex items-center gap-3 px-3 py-2">
+            <Avatar name={e.name} src={e.avatarUrl} size="sm" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{e.name}</div>
+              <PredictionLine p={e.prediction} score={null} names={names} />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Quem já palpitou: só foto e nick (reserva, se os palpites não vierem). */
 function Voters({ voters }: { voters: BolaoView["voters"] }) {
   if (!voters.length) return null;
   return (
@@ -236,7 +261,7 @@ function OpenForm({
   return (
     <div className="space-y-4 p-4 sm:p-5">
       <Split bolao={bolao} teamName={teamName} />
-      <Voters voters={bolao.voters} />
+      <OpenBets bolao={bolao} people={people} />
 
       {showForm && (
         <>
@@ -343,7 +368,7 @@ function OpenForm({
       {loggedIn ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3">
           {mine ? (
-            // Resumo do palpite salvo (só o seu: os dos outros ficam escondidos até fechar).
+            // Resumo do seu palpite (os de todos aparecem acima, para a resenha).
             <p className="text-xs text-muted">
               Você já palpitou:{" "}
               <span className="font-semibold text-fg">
@@ -355,7 +380,7 @@ function OpenForm({
             </p>
           ) : (
             <p className="text-xs text-muted">
-              Palpites ficam escondidos até {hourMin(bolao.closesAt)}; depois todos aparecem.
+              Os palpites de todos aparecem aqui. Dá para mudar o seu até {hourMin(bolao.closesAt)}.
             </p>
           )}
           {mine && !editing ? (

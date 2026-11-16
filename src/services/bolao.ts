@@ -67,7 +67,7 @@ export interface BolaoView {
   /** Palpites de empate. */
   draws: number;
   mine: Prediction | null;
-  /** Todos os palpites (só depois de fechar). */
+  /** Todos os palpites (à mostra desde o início, para a resenha). */
   entries: BolaoEntry[] | null;
   /** Quem já palpitou (só nome e foto, sem o palpite), na ordem dos palpites. */
   voters: { userId: string; name: string; avatarUrl: string | null }[];
@@ -143,18 +143,18 @@ export async function loadBolao(opts: {
     name: nameMap.get(r.user_id) ?? "Jogador",
     avatarUrl: avatars.get(r.user_id)?.avatarUrl ?? null,
   }));
-  if (status !== "open") {
-    outcome = opts.finalizedMatchId ? await matchOutcome(admin, opts.finalizedMatchId, opts.captains) : null;
-    entries = rows
-      .map((r) => ({
-        userId: r.user_id,
-        name: nameMap.get(r.user_id) ?? "Jogador",
-        avatarUrl: avatars.get(r.user_id)?.avatarUrl ?? null,
-        prediction: toPrediction(r),
-        score: outcome ? scorePrediction(toPrediction(r), outcome) : null,
-      }))
-      .sort((a, b) => (b.score?.points ?? 0) - (a.score?.points ?? 0) || a.name.localeCompare(b.name));
-  }
+  // Os palpites ficam à mostra desde o início (a resenha começa antes do mix).
+  outcome = opts.finalizedMatchId ? await matchOutcome(admin, opts.finalizedMatchId, opts.captains) : null;
+  entries = rows
+    .map((r) => ({
+      userId: r.user_id,
+      name: nameMap.get(r.user_id) ?? "Jogador",
+      avatarUrl: avatars.get(r.user_id)?.avatarUrl ?? null,
+      prediction: toPrediction(r),
+      score: outcome ? scorePrediction(toPrediction(r), outcome) : null,
+    }))
+    // Aberto: na ordem dos palpites; conferido: por pontos.
+    .sort((a, b) => (outcome ? (b.score?.points ?? 0) - (a.score?.points ?? 0) || a.name.localeCompare(b.name) : 0));
 
   return {
     status,

@@ -30,9 +30,9 @@
   `is_lanterna` da finalização). Corrigir ou excluir o mix corrige o bolão sozinho. O vencedor é
   conferido pelo time em que o capitão jogou, então trocar as letras A/B na finalização não erra
   os pontos.
-- **Privacidade:** os palpites ficam numa tabela sem acesso pela API (`mix_predictions`, RLS sem
-  políticas). Enquanto o bolão está aberto, cada um vê só o próprio palpite e a divisão entre os
-  times; depois de fechar, todos aparecem.
+- **Palpites à mostra:** os palpites de todos aparecem no painel desde o início, com o bolão ainda
+  aberto (para a resenha antes do mix); dá para mudar o seu até fechar. A tabela continua sem acesso
+  direto pela API (`mix_predictions`, RLS sem políticas): quem mostra é o site.
 - **Onde aparece:** no Dashboard (junto do PICK), na página do mix finalizado e em **/bolao**
   (ranking geral: pontos; desempate por tipos certos, MVPs certos e menos palpites).
 
