@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2, LogIn, UserMinus, UserPlus } from "lucide-react";
+import { AlertTriangle, Loader2, LogIn, UserMinus, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { joinMix, leaveMix } from "@/app/(app)/inscricoes/actions";
 import { useServerClock, useTick } from "@/hooks/use-server-clock";
+import { isLateLeave, STRIKES_TO_SUSPEND, SUSPENSION_MIXES } from "@/lib/strikes";
 import { Button } from "../ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "../ui/dialog";
 
@@ -59,6 +60,9 @@ export function JoinButton({
   opensAt,
   eventAt,
   penaltyDelay,
+  classified = false,
+  strikes = 0,
+  suspension = null,
   autoJoin = false,
   loginNext = "/dashboard",
 }: {
@@ -70,6 +74,12 @@ export function JoinButton({
   eventAt: number;
   /** Atraso (s) de uma punição ativa: a inscrição libera em opensAt + atraso. */
   penaltyDelay: number | null;
+  /** Está entre os classificados (sair a menos de 3h conta falta). */
+  classified?: boolean;
+  /** Faltas ativas na liga do mix. */
+  strikes?: number;
+  /** Suspensão em andamento: só entra como reserva. */
+  suspension?: { mixes: number; served: number } | null;
   /** Inscreve sozinho ao abrir a página, se as inscrições já estiverem abertas (link de 1 toque). */
   autoJoin?: boolean;
   /** Para onde voltar depois do login. */
@@ -204,6 +214,15 @@ export function JoinButton({
           title="Deseja sair do mix?"
           description="Você perde a sua vaga na lista. Se entrar de novo, volta para o fim da fila e pode ficar como reserva."
         >
+          {isLateLeave(classified, eventAt, serverNow) && (
+            <div className="flex gap-2 rounded-md border border-loss/40 bg-loss/10 px-3 py-2 text-sm text-loss">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <p>
+                Faltam menos de 3h. Sair agora conta <strong>1 falta</strong> (você tem {strikes}/{STRIKES_TO_SUSPEND}
+                ). Com {STRIKES_TO_SUSPEND} faltas, você fica <strong>{SUSPENSION_MIXES} mixes só como reserva</strong>.
+              </p>
+            </div>
+          )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <DialogClose asChild>
               <Button variant="secondary">Continuar no mix</Button>
@@ -261,25 +280,47 @@ export function JoinButton({
   }
 
   if (msToOpen > EARLY_TOLERANCE_MS) {
-    return (
+    const button = (
       <Button variant="secondary" size="lg" className="w-full tabular" disabled>
         Inscrições abrem em {countdown(opensAt - serverNow)}
         {penaltyDelay ? ` (+${penaltyDelay}s de punição)` : ""}
       </Button>
     );
+    if (suspension)
+      return (
+        <div className="space-y-2">
+          {button}
+          <SuspensionNote suspension={suspension} />
+        </div>
+      );
+    return button;
   }
 
   return (
-    <Button
-      variant="primary"
-      size="lg"
-      className="w-full"
-      onClick={() => {
-        writeQueue({ scheduleId, date, device: detectDevice(), attempt: 0, nextAt: 0 });
-        void attempt();
-      }}
-    >
-      <UserPlus /> Quero participar
-    </Button>
+    <div className="space-y-2">
+      <Button
+        variant="primary"
+        size="lg"
+        className="w-full"
+        onClick={() => {
+          writeQueue({ scheduleId, date, device: detectDevice(), attempt: 0, nextAt: 0 });
+          void attempt();
+        }}
+      >
+        <UserPlus /> {suspension ? "Entrar como reserva" : "Quero participar"}
+      </Button>
+      <SuspensionNote suspension={suspension} />
+    </div>
+  );
+}
+
+function SuspensionNote({ suspension }: { suspension: { mixes: number; served: number } | null }) {
+  if (!suspension) return null;
+  const left = suspension.mixes - suspension.served;
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-loss">
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+      Suspenso por faltas: você só entra como reserva (atrás de todos) por mais {left} {left === 1 ? "mix" : "mixes"}.
+    </p>
   );
 }

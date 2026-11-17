@@ -282,6 +282,9 @@ export async function NextMixPanel() {
             opensAt={occurrence.opensAt.getTime()}
             eventAt={occurrence.eventAt.getTime()}
             penaltyDelay={result.mix.myPenaltyDelay}
+            classified={mine?.status === "classified"}
+            strikes={result.mix.myStrikes}
+            suspension={result.mix.mySuspension}
           />
         </div>
       </Card>
@@ -342,7 +345,7 @@ export async function NextMixPanel() {
       <Card>
         <CardHeader
           title={`Jogadores inscritos (${classified}/${schedule.maxPlayers} classificados)`}
-          description="Lista ordenada por horário de inscrição. Após as vagas, os inscritos entram como reservas."
+          description="Lista ordenada por horário de inscrição. Após as vagas, os inscritos entram como reservas; suspensos por faltas ficam por último."
         />
         {registrations.length || departures.length ? (
           <Table>
@@ -381,6 +384,15 @@ export async function NextMixPanel() {
                       <Badge variant="win">Classificado</Badge>
                     ) : (
                       <Badge variant="neutral">Reserva</Badge>
+                    )}
+                    {r.reserveOnly && (
+                      <Badge
+                        variant="loss"
+                        className="ml-1"
+                        title="Suspenso por faltas: entra só como reserva, atrás de todos"
+                      >
+                        Suspenso
+                      </Badge>
                     )}
                   </TD>
                   <TD className="text-center text-muted">

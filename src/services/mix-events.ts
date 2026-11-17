@@ -1,4 +1,6 @@
 import "server-only";
+import { viewerDiscipline } from "@/services/strikes";
+import { queueOrder } from "@/lib/strikes";
 import { currentOccurrence, describeRecurrence, type Occurrence } from "@/lib/mix-schedule";
 import { isAuthConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -75,6 +77,8 @@ export interface Registration {
   captainVotesReceived: number;
   /** Punição ativa (mostrada com ícone na lista). */
   penalty: { reason: string; delaySeconds: number } | null;
+  /** Suspenso por faltas: só entra como reserva. */
+  reserveOnly: boolean;
 }
 
 /** Saída da lista (cancelou ou foi removido por um admin). */
@@ -154,6 +158,10 @@ export interface NextMix {
   tiebreaker: TiebreakerView;
   /** Atraso (s) da punição ativa de quem está vendo, se houver. */
   myPenaltyDelay: number | null;
+  /** Faltas ativas de quem está vendo na liga do mix (2 = suspensão). */
+  myStrikes: number;
+  /** Suspensão em andamento de quem está vendo (só entra como reserva). */
+  mySuspension: { mixes: number; served: number } | null;
   /** Partida finalizada desta ocorrência, se houver. */
   finalizedMatchId: string | null;
   /** Sugestão de times balanceados (seção 7), se ligada. */
@@ -216,7 +224,7 @@ export async function listRegistrations(
   const match = { schedule_id: scheduleId, event_date: date };
 
   const [regs, mapVotes, captainVotes, maps, cancels] = await Promise.all([
-    supabase.from("mix_registrations").select("id, user_id, created_at, device").match(match).order("created_at"),
+    supabase.from("mix_registrations").select("*").match(match).order("created_at"),
     supabase.from("map_votes").select("user_id, map_id").match(match),
     supabase.from("captain_votes").select("voter_id, candidate_id").match(match),
     listAllMaps().then((all) => ({ data: all.filter((m) => m.active).map((m) => ({ id: m.id, name: m.name })) })),
@@ -228,7 +236,8 @@ export async function listRegistrations(
   ]);
   if (regs.error) throw new Error(`Falha ao carregar inscrições: ${regs.error.message}`);
 
-  const rows = regs.data;
+  // Suspensos (só reserva) ficam depois de todos os outros.
+  const rows = queueOrder(regs.data);
   const leftRows = cancels.data ?? []; // falha = sem o registro de saídas
   const classified = new Set(rows.slice(0, maxPlayers).map((r) => r.user_id as string));
   const people = [...new Set([...rows, ...leftRows].map((r) => r.user_id as string))];
@@ -261,6 +270,7 @@ export async function listRegistrations(
       captainVotesGiven: capRows.filter((v) => v.voter_id === uid).length,
       captainVotesReceived: capRows.filter((v) => v.candidate_id === uid).length,
       penalty: null,
+      reserveOnly: !!r.reserve_only,
     };
   });
 
@@ -380,7 +390,7 @@ export async function getNextMix(
       : firstDraft;
   const ids = [...new Set([...registrations.map((r) => r.userId), ...(viewerId ? [viewerId] : [])])];
   const reviewClient = await createSupabaseServerClient();
-  const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA, review] = await Promise.all([
+  const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA, review, discipline] = await Promise.all([
     activePenalties(ids),
     loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId),
     loadFinalizedMatch(next.schedule.id, next.occurrence.date),
@@ -389,6 +399,7 @@ export async function getNextMix(
     draft?.status === "completed" && reviewClient
       ? loadReview(reviewClient, next.schedule.id, next.occurrence.date)
       : null,
+    viewerDiscipline(viewerId, next.schedule.id),
   ]);
   for (const r of registrations) {
     const p = penalties.get(r.userId);
@@ -405,6 +416,8 @@ export async function getNextMix(
       draft,
       tiebreaker,
       myPenaltyDelay: viewerId ? (penalties.get(viewerId)?.delaySeconds ?? null) : null,
+      myStrikes: discipline.points,
+      mySuspension: discipline.suspension,
       finalizedMatchId,
       suggestion,
       draftProbA,

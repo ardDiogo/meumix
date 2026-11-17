@@ -17,6 +17,8 @@ import {
   Network,
   UsersRound,
 } from "lucide-react";
+import { StrikesPanel } from "@/components/admin/strikes-panel";
+import { activeSuspensions, profileNames, recentStrikes } from "@/services/strikes";
 import type { Metadata } from "next";
 import { cache } from "react";
 import { BulkUsersForm } from "@/components/admin/bulk-users-form";
@@ -198,6 +200,7 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       {tab === "usuarios" && (
         <div className="space-y-4">
           {canManageAdmins && <BulkUsersForm />}
+          <StrikesSection />
           <UsersPanel canManageAdmins={canManageAdmins} currentUserId={session!.id} />
         </div>
       )}
@@ -277,6 +280,38 @@ async function LeagueTab({ viewerId }: { viewerId: string }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** Faltas (60 dias) e suspensões das ligas que a pessoa administra. */
+async function StrikesSection() {
+  const leagues = await manageableLeagues();
+  const ids = leagues.map((l) => l.id);
+  const [strikes, suspensions] = await Promise.all([recentStrikes(ids), activeSuspensions()]);
+  const mine = suspensions.filter((s) => ids.includes(s.leagueId));
+  const names = await profileNames([...new Set([...strikes, ...mine].map((s) => s.userId))]);
+  const league = (id: string) => leagues.find((l) => l.id === id)?.name ?? "Liga";
+  return (
+    <StrikesPanel
+      suspensions={mine.map((s) => ({
+        id: s.id,
+        userName: names.get(s.userId) ?? "Jogador",
+        league: league(s.leagueId),
+        left: s.mixes - s.served,
+        since: s.createdAt,
+      }))}
+      strikes={strikes.map((s) => ({
+        id: s.id,
+        userName: names.get(s.userId) ?? "Jogador",
+        league: league(s.leagueId),
+        date: s.date,
+        kind: s.kind,
+        points: s.points,
+        expiresAt: s.expiresAt,
+        pardoned: s.pardoned,
+        suspended: s.suspended,
+      }))}
+    />
   );
 }
 

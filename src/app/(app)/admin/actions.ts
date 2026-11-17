@@ -317,3 +317,72 @@ export async function setGcLevel(userId: string, gcLevel: number): Promise<RoleC
   revalidatePath("/rankings");
   return { ok: true, message: `Nível GC ${gcLevel} → ELO inicial ${elo} (nível ${level}).` };
 }
+
+/* --------------------------- Faltas e suspensões -------------------------- */
+
+/** A liga é uma das que a pessoa logada administra. */
+async function managesLeague(leagueId: string) {
+  const session = await getSession();
+  if (!session) return null;
+  const leagues = await manageableLeagues();
+  return leagues.some((l) => l.id === leagueId) ? session : null;
+}
+
+/** Admin da liga: perdoa uma falta (imprevisto justificado). */
+export async function pardonStrike(strikeId: number): Promise<RoleChangeResult> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
+  const { data: strike } = await admin.from("mix_strikes").select("*").eq("id", strikeId).maybeSingle();
+  if (!strike) return { ok: false, message: "Falta não encontrada." };
+  const session = await managesLeague(strike.league_id as string);
+  if (!session) return { ok: false, message: "Apenas administradores da liga podem perdoar faltas." };
+  if (strike.suspension_id !== null)
+    return { ok: false, message: "Esta falta já gerou uma suspensão: encerre a suspensão." };
+  const { error } = await admin
+    .from("mix_strikes")
+    .update({ pardoned_at: new Date().toISOString(), pardoned_by: session.id })
+    .eq("id", strikeId);
+  if (error) return { ok: false, message: "Não foi possível perdoar a falta." };
+  await audit({
+    action: "admin.strike_pardon",
+    outcome: "success",
+    actorId: session.id,
+    detail: { strike_id: strikeId, user_id: strike.user_id },
+  });
+  revalidatePath("/admin");
+  return { ok: true, message: "Falta perdoada." };
+}
+
+/** Admin da liga: encerra uma suspensão antes do fim (volta a entrar normalmente). */
+export async function endSuspension(suspensionId: number): Promise<RoleChangeResult> {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
+  const { data: susp } = await admin.from("mix_suspensions").select("*").eq("id", suspensionId).maybeSingle();
+  if (!susp) return { ok: false, message: "Suspensão não encontrada." };
+  const session = await managesLeague(susp.league_id as string);
+  if (!session) return { ok: false, message: "Apenas administradores da liga podem encerrar suspensões." };
+  const { error } = await admin
+    .from("mix_suspensions")
+    .update({ ended_at: new Date().toISOString(), ended_by: session.id })
+    .eq("id", suspensionId);
+  if (error) return { ok: false, message: "Não foi possível encerrar a suspensão." };
+  // Inscrições abertas dele nessa liga voltam à ordem normal de chegada.
+  const { data: regs } = await admin
+    .from("mix_registrations")
+    .select("id, schedule_id")
+    .eq("user_id", susp.user_id as string)
+    .eq("reserve_only", true);
+  for (const r of regs ?? []) {
+    const { data: league } = await admin.rpc("league_of_schedule", { p_schedule: r.schedule_id as string });
+    if (league === susp.league_id) await admin.from("mix_registrations").update({ reserve_only: false }).eq("id", r.id);
+  }
+  await audit({
+    action: "admin.suspension_end",
+    outcome: "success",
+    actorId: session.id,
+    detail: { suspension_id: suspensionId, user_id: susp.user_id },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/dashboard");
+  return { ok: true, message: "Suspensão encerrada." };
+}

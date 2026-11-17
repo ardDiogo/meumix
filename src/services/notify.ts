@@ -1,4 +1,5 @@
 import "server-only";
+import { queueOrder } from "@/lib/strikes";
 import { currentOccurrence } from "@/lib/mix-schedule";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { bolaoPointsForMatch } from "./bolao";
@@ -49,11 +50,13 @@ async function classifiedOf(scheduleId: string, date: string) {
     admin.from("mix_schedules").select("max_players").eq("id", scheduleId).maybeSingle(),
     admin
       .from("mix_registrations")
-      .select("user_id")
+      .select("*")
       .match({ schedule_id: scheduleId, event_date: date })
       .order("created_at"),
   ]);
-  return (regs ?? []).slice(0, (schedule?.max_players as number) ?? 10).map((r) => r.user_id as string);
+  return queueOrder(regs ?? [])
+    .slice(0, (schedule?.max_players as number) ?? 10)
+    .map((r) => r.user_id as string);
 }
 
 /**
@@ -336,14 +339,18 @@ export async function runScheduledNotices(now = new Date()) {
     // Lembretes de voto (só para quem ainda não votou): 1h depois de a lista fechar e 2h
     // antes do mix (este, se a lista fechou há pelo menos 30 min).
     if (toStart > 0) {
-      const { data: regs } = await admin
+      const { data: all } = await admin
         .from("mix_registrations")
-        .select("user_id, created_at")
+        .select("*")
         .match({ schedule_id: schedule.id, event_date: o.date })
-        .order("created_at")
-        .limit(schedule.maxPlayers);
-      const classified = (regs ?? []).map((r) => r.user_id as string);
-      const fullAt = classified.length >= schedule.maxPlayers ? new Date(regs!.at(-1)!.created_at as string) : null;
+        .order("created_at");
+      const regs = queueOrder(all ?? []).slice(0, schedule.maxPlayers);
+      const classified = regs.map((r) => r.user_id as string);
+      // A lista fechou quando o último dos classificados entrou.
+      const fullAt =
+        classified.length >= schedule.maxPlayers
+          ? new Date(Math.max(...regs.map((r) => new Date(r.created_at as string).getTime())))
+          : null;
       if (fullAt) {
         const sinceFull = now.getTime() - fullAt.getTime();
         const slots = [

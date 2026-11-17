@@ -58,7 +58,8 @@ c(migracao, ok) as (values
   ('0049_league_access', to_regclass('public.league_codes') is not null),
   ('0050_draft_review', to_regclass('public.mix_draft_reviews') is not null),
   ('0051_bolao_outcome', exists (select 1 from col where t = 'mix_predictions' and c = 'kind')),
-  ('0052_badges_dedupe', exists (select 1 from pg_proc where proname = 'sync_auto_badges_league' and prosrc like '%só ganha o%'))
+  ('0052_badges_dedupe', exists (select 1 from pg_proc where proname = 'sync_auto_badges_league' and prosrc like '%só ganha o%')),
+  ('0053_mix_strikes', to_regclass('public.mix_strikes') is not null)
 )
 select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
 from c

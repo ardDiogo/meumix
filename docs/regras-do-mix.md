@@ -31,6 +31,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 
 - Os **10 primeiros** inscritos (pela ordem exata de chegada no servidor) são **classificados**; do 11º em diante são **reserva**.
 - Se alguém cancela, a lista é reordenada automaticamente e o primeiro reserva sobe para classificado.
+- Jogador **suspenso por faltas** fica atrás de todos os outros (ver "Faltas e suspensão" abaixo).
 
 **Validações no servidor a cada inscrição**
 
@@ -52,6 +53,17 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 
 - Renova a sessão de login a cada 5 min; nos últimos 2 min, a cada 5s; garante uma renovação final nos últimos 10s.
 - "Acorda" o servidor de inscrição com pings nos últimos 30s antes de abrir (~a cada 10s) e a cada 45s com o mix aberto, para evitar lentidão de 2–10s no primeiro clique.
+
+**Faltas e suspensão (automático, por liga)**
+
+- **Saída tardia = 1 falta:** um dos **classificados** cancela a inscrição faltando **menos de 3h** para o mix. Reserva que sai não leva falta; sair antes das 3h também não. O aviso "Deseja sair do mix?" mostra o alerta e quantas faltas a pessoa já tem.
+- **Não comparecer = 2 faltas:** o admin remove o jogador com **"Não compareceu"** (o "Só remover" não gera falta). É suspensão direta.
+- Uma falta por mix: sair e voltar várias vezes no mesmo mix conta 1; "não compareceu" substitui a saída tardia do mesmo mix.
+- Cada falta vale **60 dias**. Com **2 faltas** na mesma liga (Lanterna e Jantinha são separados), o jogador fica **suspenso nos 2 próximos mixes da liga** — contam os mixes que acontecem (finalizados) depois do mix da falta.
+- **Suspenso entra só como reserva:** pode se inscrever, mas fica atrás de todos os não suspensos (só joga se faltar gente). Na lista aparece o selo "Suspenso".
+- Ao fim da suspensão, as faltas que a geraram **zeram**.
+- Admin da liga (Admin → Jogadores → Faltas e suspensões) pode **perdoar uma falta** e **encerrar uma suspensão**; tudo fica no log.
+- O jogador recebe aviso no celular da falta e da suspensão. A regra vale a partir da migração 0053 (saídas antigas não contam).
 
 ## 3) Votação de mapas
 

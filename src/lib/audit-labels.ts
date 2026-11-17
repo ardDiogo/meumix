@@ -75,6 +75,8 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.bulk_create_users": "Cadastro em lote",
   "admin.penalty_create": "Aplicou punição",
   "admin.penalty_deactivate": "Removeu punição",
+  "admin.strike_pardon": "Perdoou falta",
+  "admin.suspension_end": "Encerrou suspensão",
   "admin.feature_toggle": "Ligou/desligou funcionalidade",
   "admin.music": "Alterou a música de fundo",
   "admin.map_add": "Adicionou mapa",

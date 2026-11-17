@@ -1,5 +1,7 @@
 "use server";
 
+import { isLateLeave, queueOrder, STRIKES_TO_SUSPEND, SUSPENSION_MIXES } from "@/lib/strikes";
+import { addStrike, notifyStrike } from "@/services/strikes";
 import { canJoinScheduleLeague, canManageLeagueOf } from "@/services/league";
 import { reconcileTeams } from "@/services/draft-review";
 import { revalidatePath } from "next/cache";
@@ -70,11 +72,11 @@ async function orderedRegistrations(
 ) {
   const { data } = await admin
     .from("mix_registrations")
-    .select("user_id, created_at")
+    .select("*")
     .eq("schedule_id", scheduleId)
     .eq("event_date", date)
     .order("created_at", { ascending: true });
-  return (data ?? []).map((r) => r.user_id as string);
+  return queueOrder(data ?? []).map((r) => r.user_id as string);
 }
 
 /* ------------------------------- Inscrição ------------------------------- */
@@ -161,12 +163,16 @@ export async function joinMix(
   }
 
   // 4. Cliques simultâneos: a chave única do banco impede duplicidade.
-  const { error } = await ctx.admin.from("mix_registrations").insert({
-    schedule_id: scheduleId,
-    event_date: date,
-    user_id: userId,
-    device: device === "mobile" || device === "desktop" ? device : null,
-  });
+  const { data: inserted, error } = await ctx.admin
+    .from("mix_registrations")
+    .insert({
+      schedule_id: scheduleId,
+      event_date: date,
+      user_id: userId,
+      device: device === "mobile" || device === "desktop" ? device : null,
+    })
+    .select("*")
+    .maybeSingle();
   if (error?.code === "23505") {
     await audit({ ...base, outcome: "already_registered", detail: meta });
     return { ok: true, message: "Você já está inscrito neste mix." };
@@ -180,6 +186,9 @@ export async function joinMix(
   // Vaga aberta no time tirado (alguém saiu sem reserva): quem entrou ocupa a vaga.
   await afterRosterChange(ctx.admin, scheduleId, date);
   refresh();
+  // Suspenso por faltas: a inscrição vale, mas atrás de todos os outros.
+  if (inserted?.reserve_only)
+    return { ok: true, message: "Inscrição confirmada como reserva: você está suspenso por faltas." };
   return { ok: true, message: "Inscrição confirmada!" };
 }
 
@@ -239,16 +248,43 @@ export async function leaveMix(scheduleId: string, date: string): Promise<Action
   if ("error" in ctx) return fail(ctx.error!, "unavailable");
   if (ctx.window === "closed") return fail("O mix já começou; a inscrição não pode mais ser cancelada.", "closed");
 
+  // Classificado saindo a menos de 3h do mix: 1 falta (2 faltas = só reserva por 2 mixes).
+  const order = await orderedRegistrations(ctx.admin, scheduleId, date);
+  const late = isLateLeave(
+    order.slice(0, ctx.schedule.maxPlayers).includes(userId),
+    ctx.occurrence.eventAt.getTime(),
+    Date.now(),
+  );
+
   const result = await deleteRegistration(ctx.admin, { scheduleId, date, userId }, userId);
   if (result.found && "error" in result) return fail("Não foi possível cancelar a inscrição.", "error");
-  await audit({ action: "registration.leave", outcome: "success", actorId: userId, scheduleId, eventDate: date });
+  await audit({
+    action: "registration.leave",
+    outcome: "success",
+    actorId: userId,
+    scheduleId,
+    eventDate: date,
+    detail: late ? { late_leave: true } : undefined,
+  });
+
+  let message = "Inscrição cancelada.";
+  if (late && result.found) {
+    const strike = { userId, scheduleId, date, kind: "late_leave" as const };
+    const r = await addStrike({ ...strike, by: userId });
+    if (r) {
+      after(() => notifyStrike(strike, r));
+      message = r.suspended
+        ? `Inscrição cancelada. Saída a menos de 3h: com ${STRIKES_TO_SUSPEND} faltas, você entra só como reserva nos próximos ${SUSPENSION_MIXES} mixes.`
+        : `Inscrição cancelada. Saída a menos de 3h: falta registrada (${r.points}/${STRIKES_TO_SUSPEND}).`;
+    }
+  }
 
   refresh();
-  return { ok: true, message: "Inscrição cancelada." };
+  return { ok: true, message };
 }
 
-/** Admin: remove um inscrito. */
-export async function removeRegistration(registrationId: string): Promise<ActionResult> {
+/** Admin: remove um inscrito. Com `noShow`, ele não compareceu: 2 faltas (suspensão direta). */
+export async function removeRegistration(registrationId: string, noShow = false): Promise<ActionResult> {
   const session = await getSession();
   if (!canManageMixes(session) || !(await canManageLeagueOf({ registrationId })))
     return fail("Apenas administradores da liga podem remover inscritos.", "denied");
@@ -263,8 +299,26 @@ export async function removeRegistration(registrationId: string): Promise<Action
     actorId: session!.id,
     scheduleId: result.found && "reg" in result ? result.reg!.schedule_id : null,
     eventDate: result.found && "reg" in result ? result.reg!.event_date : null,
-    detail: { user_id: result.found && "reg" in result ? result.reg!.user_id : null },
+    detail: { user_id: result.found && "reg" in result ? result.reg!.user_id : null, no_show: noShow || undefined },
   });
+  if (noShow && result.found && "reg" in result && result.reg) {
+    const strike = {
+      userId: result.reg.user_id as string,
+      scheduleId: result.reg.schedule_id as string,
+      date: result.reg.event_date as string,
+      kind: "no_show" as const,
+    };
+    const r = await addStrike({ ...strike, by: session!.id });
+    refresh();
+    if (!r) return { ok: true, message: "Inscrito removido, mas não foi possível registrar a falta." };
+    after(() => notifyStrike(strike, r));
+    return {
+      ok: true,
+      message: r.suspended
+        ? `Removido por não comparecer: suspenso (só reserva) nos próximos ${SUSPENSION_MIXES} mixes.`
+        : `Removido por não comparecer: ${r.points} falta(s).`,
+    };
+  }
   refresh();
   return { ok: true, message: "Inscrito removido." };
 }

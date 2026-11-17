@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown, Loader2, Play, RotateCcw, Search, Trash2, UserPlus } from "lucide-react";
+import { Crown, Loader2, Play, RotateCcw, Search, Trash2, UserPlus, UserX } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { setCaptains, startDraft } from "@/app/(app)/draft/actions";
@@ -46,19 +46,40 @@ export function ResetButton({ scheduleId, date }: { scheduleId: string; date: st
 
 export function RemoveButton({ registrationId, name }: { registrationId: string; name: string }) {
   const [pending, run] = useAction();
+  const [open, setOpen] = useState(false);
+  const remove = (noShow: boolean) =>
+    run(async () => {
+      const r = await removeRegistration(registrationId, noShow);
+      setOpen(false);
+      return r;
+    });
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="size-8 text-muted hover:text-loss"
-      disabled={pending}
-      aria-label={`Remover ${name}`}
-      onClick={() => {
-        if (confirm(`Remover ${name} da lista?`)) run(() => removeRegistration(registrationId));
-      }}
-    >
-      {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-    </Button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted hover:text-loss"
+          disabled={pending}
+          aria-label={`Remover ${name}`}
+        >
+          {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        title={`Remover ${name} da lista?`}
+        description="Se ele não compareceu, marque como falta: são 2 faltas, e ele fica só como reserva nos próximos 2 mixes da liga."
+      >
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button variant="secondary" disabled={pending} onClick={() => remove(false)}>
+            <Trash2 /> Só remover
+          </Button>
+          <Button variant="danger" disabled={pending} onClick={() => remove(true)}>
+            {pending ? <Loader2 className="animate-spin" /> : <UserX />} Não compareceu (2 faltas)
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

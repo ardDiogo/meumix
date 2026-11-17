@@ -1,5 +1,6 @@
 "use server";
 
+import { queueOrder } from "@/lib/strikes";
 import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -21,13 +22,15 @@ async function context(scheduleId: string, date: string) {
   const match = { schedule_id: scheduleId, event_date: date };
   const [{ data: schedule }, { data: regs }, { data: suggestion, error }, { data: draft }] = await Promise.all([
     admin.from("mix_schedules").select("max_players").eq("id", scheduleId).maybeSingle(),
-    admin.from("mix_registrations").select("user_id").match(match).order("created_at"),
+    admin.from("mix_registrations").select("*").match(match).order("created_at"),
     admin.from("mix_team_suggestions").select("*").match(match).maybeSingle(),
     admin.from("mix_draft_state").select("status").match(match).maybeSingle(),
   ]);
   if (error) return { error: "Rode a migração 0014_team_suggestion.sql no Supabase." } as const;
   if (!schedule) return { error: "Mix não encontrado." } as const;
-  const classified = (regs ?? []).slice(0, schedule.max_players as number).map((r) => r.user_id as string);
+  const classified = queueOrder(regs ?? [])
+    .slice(0, schedule.max_players as number)
+    .map((r) => r.user_id as string);
   return { admin, match, classified, suggestion, draft } as const;
 }
 
