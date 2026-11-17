@@ -160,6 +160,8 @@ export interface NextMix {
   myPenaltyDelay: number | null;
   /** Faltas ativas de quem está vendo na liga do mix (2 = suspensão). */
   myStrikes: number;
+  /** Regras de falta ligadas (Admin → Configurações → Punições). */
+  strikeRules: { lateLeave: boolean; noShow: boolean };
   /** Suspensão em andamento de quem está vendo (só entra como reserva). */
   mySuspension: { mixes: number; served: number } | null;
   /** Partida finalizada desta ocorrência, se houver. */
@@ -417,6 +419,7 @@ export async function getNextMix(
       tiebreaker,
       myPenaltyDelay: viewerId ? (penalties.get(viewerId)?.delaySeconds ?? null) : null,
       myStrikes: discipline.points,
+      strikeRules: { lateLeave: features.strike_late_leave, noShow: features.strike_no_show },
       mySuspension: discipline.suspension,
       finalizedMatchId,
       suggestion,

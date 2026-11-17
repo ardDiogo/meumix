@@ -284,6 +284,7 @@ export async function NextMixPanel() {
             penaltyDelay={result.mix.myPenaltyDelay}
             classified={mine?.status === "classified"}
             strikes={result.mix.myStrikes}
+            lateLeaveRule={result.mix.strikeRules.lateLeave}
             suspension={result.mix.mySuspension}
           />
         </div>
@@ -438,7 +439,7 @@ export async function NextMixPanel() {
                   </TD>
                   {canManageMixes && (
                     <TD className="text-right">
-                      <RemoveButton registrationId={r.id} name={r.displayName} />
+                      <RemoveButton registrationId={r.id} name={r.displayName} noShow={result.mix.strikeRules.noShow} />
                     </TD>
                   )}
                 </TR>

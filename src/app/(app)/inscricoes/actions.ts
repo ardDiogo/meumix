@@ -15,6 +15,7 @@ import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
+import { getFeatures } from "@/services/features";
 import { notifyCaptains, notifyDraftReview, notifyRepick, notifyVoteCall } from "@/services/notify";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
@@ -249,12 +250,10 @@ export async function leaveMix(scheduleId: string, date: string): Promise<Action
   if (ctx.window === "closed") return fail("O mix já começou; a inscrição não pode mais ser cancelada.", "closed");
 
   // Classificado saindo a menos de 3h do mix: 1 falta (2 faltas = só reserva por 2 mixes).
-  const order = await orderedRegistrations(ctx.admin, scheduleId, date);
-  const late = isLateLeave(
-    order.slice(0, ctx.schedule.maxPlayers).includes(userId),
-    ctx.occurrence.eventAt.getTime(),
-    Date.now(),
-  );
+  const [order, features] = await Promise.all([orderedRegistrations(ctx.admin, scheduleId, date), getFeatures()]);
+  const late =
+    features.strike_late_leave &&
+    isLateLeave(order.slice(0, ctx.schedule.maxPlayers).includes(userId), ctx.occurrence.eventAt.getTime(), Date.now());
 
   const result = await deleteRegistration(ctx.admin, { scheduleId, date, userId }, userId);
   if (result.found && "error" in result) return fail("Não foi possível cancelar a inscrição.", "error");
@@ -286,6 +285,8 @@ export async function leaveMix(scheduleId: string, date: string): Promise<Action
 /** Admin: remove um inscrito. Com `noShow`, ele não compareceu: 2 faltas (suspensão direta). */
 export async function removeRegistration(registrationId: string, noShow = false): Promise<ActionResult> {
   const session = await getSession();
+  if (noShow && !(await getFeatures()).strike_no_show)
+    return fail("A punição por não comparecer está desligada (Admin → Configurações → Punições).", "denied");
   if (!canManageMixes(session) || !(await canManageLeagueOf({ registrationId })))
     return fail("Apenas administradores da liga podem remover inscritos.", "denied");
   const admin = createSupabaseAdminClient();

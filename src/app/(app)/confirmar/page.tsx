@@ -114,6 +114,7 @@ export default async function ConfirmarPage({ searchParams }: PageProps<"/confir
             penaltyDelay={result.mix.myPenaltyDelay}
             classified={mine?.status === "classified"}
             strikes={result.mix.myStrikes}
+            lateLeaveRule={result.mix.strikeRules.lateLeave}
             suspension={result.mix.mySuspension}
             autoJoin
             loginNext="/confirmar"

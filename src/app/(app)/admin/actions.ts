@@ -198,12 +198,12 @@ export async function deactivatePenalty(penaltyId: string): Promise<RoleChangeRe
 
 /** Liga/desliga uma funcionalidade (admin). */
 export async function setFeature(
-  key: "map_tiebreaker" | "team_suggestion",
+  key: "map_tiebreaker" | "team_suggestion" | "strike_late_leave" | "strike_no_show",
   enabled: boolean,
 ): Promise<RoleChangeResult> {
   const session = await getSession();
   if (!isPlatformAdmin(session)) return { ok: false, message: "Apenas administradores podem alterar funcionalidades." };
-  if (key !== "map_tiebreaker" && key !== "team_suggestion") {
+  if (!["map_tiebreaker", "team_suggestion", "strike_late_leave", "strike_no_show"].includes(key)) {
     return { ok: false, message: "Funcionalidade ainda não disponível." };
   }
   const admin = createSupabaseAdminClient();

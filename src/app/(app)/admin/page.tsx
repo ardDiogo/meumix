@@ -17,6 +17,7 @@ import {
   Network,
   UsersRound,
 } from "lucide-react";
+import { PunishmentRules } from "@/components/admin/punishment-rules";
 import { StrikesPanel } from "@/components/admin/strikes-panel";
 import { activeSuspensions, profileNames, recentStrikes } from "@/services/strikes";
 import type { Metadata } from "next";
@@ -449,8 +450,13 @@ async function SettingsTab({ canManageAdmins }: { canManageAdmins: boolean }) {
           <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-bold">
             <ShieldAlert className="size-5 text-loss" aria-hidden /> Punições
           </h2>
-          <p className="mb-3 text-sm text-muted">Aplique um delay de inscrição como punição a jogadores específicos.</p>
-          <PenaltiesSection />
+          <p className="mb-3 text-sm text-muted">
+            Regras automáticas de falta e suspensão, e o atraso de inscrição aplicado à mão.
+          </p>
+          <div className="space-y-4">
+            <PunishmentRulesSection features={features} />
+            <PenaltiesSection />
+          </div>
         </div>
       )}
       <Card>
@@ -530,6 +536,20 @@ async function PushAdminStatus() {
         <code>/api/cron/avisos</code> a cada 5 minutos.
       </p>
     </CardContent>
+  );
+}
+
+async function PunishmentRulesSection({ features }: { features: Awaited<ReturnType<typeof getFeatures>> }) {
+  const leagues = await manageableLeagues();
+  const [strikes, suspensions] = await Promise.all([recentStrikes(leagues.map((l) => l.id)), activeSuspensions()]);
+  return (
+    <PunishmentRules
+      values={{ strike_late_leave: features.strike_late_leave, strike_no_show: features.strike_no_show }}
+      counts={{
+        strikes: strikes.filter((s) => !s.pardoned && !s.suspended).length,
+        suspensions: suspensions.length,
+      }}
+    />
   );
 }
 

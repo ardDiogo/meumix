@@ -44,7 +44,16 @@ export function ResetButton({ scheduleId, date }: { scheduleId: string; date: st
   );
 }
 
-export function RemoveButton({ registrationId, name }: { registrationId: string; name: string }) {
+export function RemoveButton({
+  registrationId,
+  name,
+  noShow = true,
+}: {
+  registrationId: string;
+  name: string;
+  /** Regra "não compareceu" ligada: oferece remover com 2 faltas. */
+  noShow?: boolean;
+}) {
   const [pending, run] = useAction();
   const [open, setOpen] = useState(false);
   const remove = (noShow: boolean) =>
@@ -68,15 +77,21 @@ export function RemoveButton({ registrationId, name }: { registrationId: string;
       </DialogTrigger>
       <DialogContent
         title={`Remover ${name} da lista?`}
-        description="Se ele não compareceu, marque como falta: são 2 faltas, e ele fica só como reserva nos próximos 2 mixes da liga."
+        description={
+          noShow
+            ? "Se ele não compareceu, marque como falta: são 2 faltas, e ele fica só como reserva nos próximos 2 mixes da liga."
+            : "Ele sai da lista e o primeiro reserva sobe."
+        }
       >
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <Button variant="secondary" disabled={pending} onClick={() => remove(false)}>
-            <Trash2 /> Só remover
+            <Trash2 /> {noShow ? "Só remover" : "Remover"}
           </Button>
-          <Button variant="danger" disabled={pending} onClick={() => remove(true)}>
-            {pending ? <Loader2 className="animate-spin" /> : <UserX />} Não compareceu (2 faltas)
-          </Button>
+          {noShow && (
+            <Button variant="danger" disabled={pending} onClick={() => remove(true)}>
+              {pending ? <Loader2 className="animate-spin" /> : <UserX />} Não compareceu (2 faltas)
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

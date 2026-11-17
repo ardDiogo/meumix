@@ -62,6 +62,7 @@ export function JoinButton({
   penaltyDelay,
   classified = false,
   strikes = 0,
+  lateLeaveRule = true,
   suspension = null,
   autoJoin = false,
   loginNext = "/dashboard",
@@ -78,6 +79,8 @@ export function JoinButton({
   classified?: boolean;
   /** Faltas ativas na liga do mix. */
   strikes?: number;
+  /** Regra da saída tardia ligada. */
+  lateLeaveRule?: boolean;
   /** Suspensão em andamento: só entra como reserva. */
   suspension?: { mixes: number; served: number } | null;
   /** Inscreve sozinho ao abrir a página, se as inscrições já estiverem abertas (link de 1 toque). */
@@ -214,7 +217,7 @@ export function JoinButton({
           title="Deseja sair do mix?"
           description="Você perde a sua vaga na lista. Se entrar de novo, volta para o fim da fila e pode ficar como reserva."
         >
-          {isLateLeave(classified, eventAt, serverNow) && (
+          {lateLeaveRule && isLateLeave(classified, eventAt, serverNow) && (
             <div className="flex gap-2 rounded-md border border-loss/40 bg-loss/10 px-3 py-2 text-sm text-loss">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
               <p>

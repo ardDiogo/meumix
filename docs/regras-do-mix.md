@@ -63,6 +63,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 - **Suspenso entra só como reserva:** pode se inscrever, mas fica atrás de todos os não suspensos (só joga se faltar gente). Na lista aparece o selo "Suspenso".
 - Ao fim da suspensão, as faltas que a geraram **zeram**.
 - Admin da liga (Admin → Jogadores → Faltas e suspensões) pode **perdoar uma falta** e **encerrar uma suspensão**; tudo fica no log.
+- Em Admin → Configurações → Punições ficam as regras cadastradas (automáticas ou manuais); "Saída tardia" e "Não compareceu" podem ser ligadas e desligadas.
 - O jogador recebe aviso no celular da falta e da suspensão. A regra vale a partir da migração 0053 (saídas antigas não contam).
 
 ## 3) Votação de mapas
