@@ -54,6 +54,13 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 - Renova a sessão de login a cada 5 min; nos últimos 2 min, a cada 5s; garante uma renovação final nos últimos 10s.
 - "Acorda" o servidor de inscrição com pings nos últimos 30s antes de abrir (~a cada 10s) e a cada 45s com o mix aberto, para evitar lentidão de 2–10s no primeiro clique.
 
+**Titulares primeiro (por liga)**
+
+- O admin marca os **titulares** de cada liga (estrela na aba Comunidade → Jogadores cadastrados).
+- Cada liga tem um **atraso para quem não é titular** (aba Comunidade, no quadro da liga): desligado, 30 min, 1h … 8h.
+- Com o atraso ligado, os titulares se inscrevem na abertura (ex.: 8h) e os demais só depois do atraso (ex.: 12h); a ordem de chegada vale dentro de cada grupo. Uma punição de atraso soma com esse atraso.
+- O aviso no celular "inscrições abrem" sai para os titulares antes da abertura e para os outros antes do horário deles.
+
 **Faltas e suspensão (automático, por liga)**
 
 - **Saída tardia = 1 falta:** um dos **classificados** cancela a inscrição faltando **menos de 3h** para o mix. Reserva que sai não leva falta; sair antes das 3h também não. O aviso "Deseja sair do mix?" mostra o alerta e quantas faltas a pessoa já tem.

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, KeyRound, Link2, Loader2, Plus, Search, ShieldCheck, Trash2, Trophy } from "lucide-react";
+import { Check, Copy, KeyRound, Link2, Loader2, Plus, Search, ShieldCheck, Star, Trash2, Trophy } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -11,6 +11,8 @@ import {
   regenerateLeagueCode,
   setLeagueAdmin,
   setLeagueMember,
+  setLeagueStarter,
+  setStarterDelay,
 } from "@/app/(app)/liga/actions";
 import { leagueDayLabel } from "@/lib/league";
 import { cn } from "@/lib/utils";
@@ -18,6 +20,11 @@ import type { CommunityLeague, CommunityPlayer } from "@/services/league";
 import { Avatar } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Input, Select } from "../ui/input";
+
+/** Atrasos oferecidos para quem não é titular (minutos). */
+const DELAYS = [0, 30, 60, 120, 180, 240, 300, 360, 480];
+const delayLabel = (m: number) =>
+  m === 0 ? "junto (desligado)" : m < 60 || m % 60 ? `${m} min depois` : `${m / 60}h depois`;
 
 const WEEKDAY = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 type Result = { ok: boolean; message: string };
@@ -73,10 +80,11 @@ export function CommunityLeagues({ leagues }: { leagues: CommunityLeague[] }) {
                 </Button>
               )}
             </div>
-            <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <dl className="mt-3 grid grid-cols-4 gap-2 text-center">
               {[
                 ["Membros", l.members],
                 ["Admins", l.admins],
+                ["Titulares", l.starters],
                 ["Mixes", l.mixes],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-md bg-surface-2/60 py-1.5">
@@ -85,6 +93,34 @@ export function CommunityLeagues({ leagues }: { leagues: CommunityLeague[] }) {
                 </div>
               ))}
             </dl>
+            <label className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+              <span className="flex items-center gap-1.5">
+                <Star className="size-3.5 text-draw" aria-hidden /> Quem não é titular se inscreve
+              </span>
+              <Select
+                aria-label={`Atraso de quem não é titular no ${l.name}`}
+                className="h-8 w-40 text-xs"
+                disabled={pending}
+                value={String(l.starterDelayMinutes)}
+                onChange={(e) => {
+                  const minutes = Number(e.target.value);
+                  run(
+                    () => setStarterDelay(minutes, l.id),
+                    minutes && !l.starters
+                      ? `Nenhum titular marcado no ${l.name}: TODOS vão esperar o atraso. Continuar?`
+                      : undefined,
+                  );
+                }}
+              >
+                {[...new Set([...DELAYS, l.starterDelayMinutes])]
+                  .sort((a, b) => a - b)
+                  .map((m) => (
+                    <option key={m} value={m}>
+                      {delayLabel(m)}
+                    </option>
+                  ))}
+              </Select>
+            </label>
             <InviteRow leagueId={l.id} />
           </li>
         ))}
@@ -302,6 +338,30 @@ export function CommunityPlayers({
                             <ShieldCheck className="size-3.5" />
                           </button>
                         )}
+                        {role && (
+                          <button
+                            type="button"
+                            disabled={pending}
+                            aria-pressed={!!p.starters[l.id]}
+                            aria-label={`${p.starters[l.id] ? "Tirar titular" : "Marcar titular"}: ${p.name} no ${l.name}`}
+                            title={
+                              p.starters[l.id]
+                                ? "Titular: entra na abertura. Clique para tirar"
+                                : l.starterDelayMinutes
+                                  ? `Não titular: se inscreve ${delayLabel(l.starterDelayMinutes)}. Clique para marcar titular`
+                                  : "Marcar titular"
+                            }
+                            onClick={() => run(() => setLeagueStarter(p.id, !p.starters[l.id], l.id))}
+                            className={cn(
+                              "flex size-7 items-center justify-center rounded-md border transition-colors",
+                              p.starters[l.id]
+                                ? "border-draw/60 bg-draw/15 text-draw"
+                                : "border-border text-subtle hover:text-fg",
+                            )}
+                          >
+                            <Star className={cn("size-3.5", p.starters[l.id] && "fill-current")} />
+                          </button>
+                        )}
                       </span>
                     </td>
                   );
@@ -312,8 +372,9 @@ export function CommunityPlayers({
         </table>
       </div>
       <p className="text-xs text-subtle">
-        ✓ = membro (vê a liga e se inscreve nos mixes dela) · escudo laranja = admin da liga. Quem sai da liga mantém o
-        histórico e volta pelo convite.
+        ✓ = membro (vê a liga e se inscreve nos mixes dela) · escudo laranja = admin da liga · estrela = titular (entra
+        na abertura; com o atraso da liga ligado, os outros esperam). Quem sai da liga mantém o histórico e volta pelo
+        convite.
       </p>
     </div>
   );

@@ -330,6 +330,10 @@ export interface CommunityLeague {
   admins: number;
   mixes: number;
   schedules: number;
+  /** Titulares marcados. */
+  starters: number;
+  /** Atraso de inscrição de quem não é titular (min; 0 = desligado). */
+  starterDelayMinutes: number;
 }
 
 export interface CommunityPlayer {
@@ -338,6 +342,8 @@ export interface CommunityPlayer {
   avatarUrl: string | null;
   /** Por liga: papel de quem é membro ativo. */
   leagues: Record<string, "admin" | "player">;
+  /** Por liga: é titular (entra na abertura; os outros esperam o atraso da liga). */
+  starters: Record<string, boolean>;
 }
 
 /** Tela Comunidade (super admin): todas as ligas e todos os jogadores cadastrados. */
@@ -345,13 +351,18 @@ export async function communityOverview(): Promise<{ leagues: CommunityLeague[];
   const admin = createSupabaseAdminClient();
   const leagues = await listLeagues();
   if (!admin || !leagues) return null;
-  const [members, profiles, matches, schedules] = await Promise.all([
-    admin.from("league_members").select("league_id, user_id, role, active").limit(20000),
+  const [members, profiles, matches, schedules, config] = await Promise.all([
+    // "*": com ou sem a coluna starter (migração 0054).
+    admin.from("league_members").select("*").limit(20000),
     admin.from("profiles").select("id, display_name").order("display_name"),
     admin.from("mix_matches").select("league_id").limit(20000),
     admin.from("mix_schedules").select("community_id, active"),
+    admin.from("communities").select("*"),
   ]);
   if (members.error) return null;
+  const delay = new Map(
+    (config.data ?? []).map((c) => [c.id as string, Number(c.non_starter_delay_minutes ?? 0) || 0]),
+  );
   const active = (members.data ?? []).filter((m) => m.active !== false);
   const avatars = await profileAvatars((profiles.data ?? []).map((p) => p.id as string));
   const count = <T>(rows: T[] | null | undefined, test: (r: T) => boolean) => (rows ?? []).filter(test).length;
@@ -362,6 +373,8 @@ export async function communityOverview(): Promise<{ leagues: CommunityLeague[];
       admins: count(active, (m) => m.league_id === l.id && m.role === "admin"),
       mixes: count(matches.data, (m) => m.league_id === l.id),
       schedules: count(schedules.data, (s) => s.community_id === l.id && s.active !== false),
+      starters: count(active, (m) => m.league_id === l.id && m.starter === true),
+      starterDelayMinutes: delay.get(l.id) ?? 0,
     })),
     players: (profiles.data ?? []).map((p) => ({
       id: p.id as string,
@@ -372,6 +385,9 @@ export async function communityOverview(): Promise<{ leagues: CommunityLeague[];
           .filter((m) => m.user_id === p.id)
           .map((m) => [m.league_id as string, m.role === "admin" ? "admin" : "player"]),
       ) as Record<string, "admin" | "player">,
+      starters: Object.fromEntries(
+        active.filter((m) => m.user_id === p.id && m.starter === true).map((m) => [m.league_id as string, true]),
+      ) as Record<string, boolean>,
     })),
   };
 }

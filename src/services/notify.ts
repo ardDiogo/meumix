@@ -1,4 +1,5 @@
 import "server-only";
+import { starterRule } from "@/services/starters";
 import { queueOrder } from "@/lib/strikes";
 import { currentOccurrence } from "@/lib/mix-schedule";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -324,10 +325,32 @@ export async function runScheduledNotices(now = new Date()) {
     const toOpen = o.opensAt.getTime() - now.getTime();
     const toStart = o.eventAt.getTime() - now.getTime();
 
-    // Inscrições abrem em até 15 minutos.
-    if (toOpen > 0 && toOpen <= 15 * MIN) {
+    // Titulares entram na abertura; com o atraso da liga ligado, os outros recebem o
+    // aviso perto do horário deles.
+    const starters = await starterRule(leagueId);
+    const delayMs = starters.delayMinutes * MIN;
+    const toOpenOthers = toOpen + delayMs;
+    if (delayMs > 0 && toOpenOthers > 0 && toOpenOthers <= 15 * MIN) {
+      const others = new Date(o.opensAt.getTime() + delayMs);
       sent += await sendPush(
-        { topic: "inscricoes", once: `abre:${key}`, leagueId },
+        { topic: "inscricoes", once: `abre-geral:${key}`, leagueId, exclude: [...starters.starters] },
+        {
+          title: `Inscrições abrem às ${hourMin(others)} ⏰`,
+          body: `Mix de ${dayMonth(o.date)} às ${hourMin(o.eventAt)}. Os titulares já entraram; as vagas que sobraram vão por ordem de chegada.`,
+          tag: `inscricoes:${o.date}`,
+        },
+      );
+    }
+
+    // Inscrições abrem em até 15 minutos.
+    if (toOpen > 0 && toOpen <= 15 * MIN && (delayMs === 0 || starters.starters.size > 0)) {
+      sent += await sendPush(
+        {
+          topic: "inscricoes",
+          once: `abre:${key}`,
+          leagueId,
+          ...(delayMs > 0 ? { userIds: [...starters.starters] } : {}),
+        },
         {
           title: `Inscrições abrem às ${hourMin(o.opensAt)} ⏰`,
           body: `Mix de ${dayMonth(o.date)} às ${hourMin(o.eventAt)}. Fique pronto: as vagas vão por ordem de chegada.`,

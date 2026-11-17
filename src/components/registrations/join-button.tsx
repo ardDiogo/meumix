@@ -62,6 +62,7 @@ export function JoinButton({
   penaltyDelay,
   classified = false,
   strikes = 0,
+  starterDelay = 0,
   lateLeaveRule = true,
   suspension = null,
   autoJoin = false,
@@ -79,6 +80,8 @@ export function JoinButton({
   classified?: boolean;
   /** Faltas ativas na liga do mix. */
   strikes?: number;
+  /** Atraso (s) por não ser titular da liga: abre depois dos titulares. */
+  starterDelay?: number;
   /** Regra da saída tardia ligada. */
   lateLeaveRule?: boolean;
   /** Suspensão em andamento: só entra como reserva. */
@@ -96,7 +99,7 @@ export function JoinButton({
   const inFlight = useRef(false);
 
   const serverNow = now();
-  const releaseAt = opensAt + (penaltyDelay ?? 0) * 1000;
+  const releaseAt = opensAt + ((penaltyDelay ?? 0) + starterDelay) * 1000;
   const msToOpen = releaseAt - serverNow;
   const penaltyRunning = !!penaltyDelay && serverNow >= opensAt - EARLY_TOLERANCE_MS;
   const started = serverNow >= eventAt;
@@ -274,6 +277,24 @@ export function JoinButton({
     );
   }
 
+  // Não titular: a lista já abriu para os titulares; a dele abre depois do atraso da liga.
+  if (msToOpen > EARLY_TOLERANCE_MS && starterDelay > 0 && serverNow >= opensAt - EARLY_TOLERANCE_MS) {
+    const at = new Date(releaseAt).toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    });
+    return (
+      <div className="space-y-2">
+        <Button variant="secondary" size="lg" className="w-full tabular" disabled>
+          Titulares primeiro — sua inscrição abre em {countdown(msToOpen)}
+        </Button>
+        <p className="text-xs text-muted">Inscrição para quem não é titular a partir das {at}.</p>
+        <SuspensionNote suspension={suspension} />
+      </div>
+    );
+  }
+
   if (msToOpen > EARLY_TOLERANCE_MS && penaltyRunning) {
     return (
       <Button variant="secondary" size="lg" className="w-full border-loss/40 text-loss tabular" disabled>
@@ -287,12 +308,24 @@ export function JoinButton({
       <Button variant="secondary" size="lg" className="w-full tabular" disabled>
         Inscrições abrem em {countdown(opensAt - serverNow)}
         {penaltyDelay ? ` (+${penaltyDelay}s de punição)` : ""}
+        {starterDelay ? " para os titulares" : ""}
       </Button>
     );
-    if (suspension)
+    if (suspension || starterDelay)
       return (
         <div className="space-y-2">
           {button}
+          {starterDelay > 0 && (
+            <p className="text-xs text-muted">
+              Você não é titular desta liga: sua inscrição abre às{" "}
+              {new Date(releaseAt).toLocaleTimeString("pt-BR", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "America/Sao_Paulo",
+              })}
+              .
+            </p>
+          )}
           <SuspensionNote suspension={suspension} />
         </div>
       );

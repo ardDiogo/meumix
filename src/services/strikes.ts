@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { sendPush } from "@/services/push";
+import { starterDelaySeconds } from "@/services/starters";
 
 import { STRIKES_TO_SUSPEND, type StrikeKind } from "@/lib/strikes";
 
@@ -157,18 +158,19 @@ export async function recentStrikes(leagueIds: string[]): Promise<StrikeRow[]> {
 export async function viewerDiscipline(
   userId: string | null,
   scheduleId: string,
-): Promise<{ points: number; suspension: { mixes: number; served: number } | null }> {
-  const none = { points: 0, suspension: null };
+): Promise<{ points: number; suspension: { mixes: number; served: number } | null; starterDelay: number }> {
+  const none = { points: 0, suspension: null, starterDelay: 0 };
   const admin = createSupabaseAdminClient();
   if (!admin || !userId) return none;
   const { data: leagueId, error } = await admin.rpc("league_of_schedule", { p_schedule: scheduleId });
   if (error || !leagueId) return none;
-  const [points, suspensions] = await Promise.all([
+  const [points, suspensions, starterDelay] = await Promise.all([
     strikePoints(userId, leagueId as string),
     activeSuspensions([userId]),
+    starterDelaySeconds(leagueId as string, userId),
   ]);
   const s = suspensions.find((x) => x.leagueId === leagueId);
-  return { points, suspension: s ? { mixes: s.mixes, served: s.served } : null };
+  return { points, suspension: s ? { mixes: s.mixes, served: s.served } : null, starterDelay };
 }
 
 /** Nomes dos jogadores (para o painel). */

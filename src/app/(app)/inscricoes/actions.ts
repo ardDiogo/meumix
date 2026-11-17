@@ -16,6 +16,7 @@ import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
 import { getFeatures } from "@/services/features";
+import { starterDelaySeconds } from "@/services/starters";
 import { notifyCaptains, notifyDraftReview, notifyRepick, notifyVoteCall } from "@/services/notify";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
@@ -62,7 +63,8 @@ async function loadOccurrence(scheduleId: string, date: string) {
   const now = new Date();
   const occurrence = currentOccurrence(schedule, now);
   if (!occurrence || occurrence.date !== date) return { error: "Este mix não está mais disponível." } as const;
-  return { admin, schedule, occurrence, now, window: registrationWindow(occurrence, now) } as const;
+  const leagueId = ((data as { community_id?: string | null }).community_id ?? null) as string | null;
+  return { admin, schedule, occurrence, now, leagueId, window: registrationWindow(occurrence, now) } as const;
 }
 
 /** Lista os inscritos em ordem de chegada (para saber quem é classificado). */
@@ -135,8 +137,29 @@ export async function joinMix(
   }
 
   // 2. Punição ativa: atraso a partir do horário de liberação (fail-open em erro).
-  const penalty = (await activePenalties([userId])).get(userId);
-  if (penalty) {
+  //    Quem não é titular da liga (com o atraso ligado) abre depois; a punição soma.
+  const [penalties, starterDelay] = await Promise.all([
+    activePenalties([userId]),
+    starterDelaySeconds(ctx.leagueId, userId),
+  ]);
+  const penalty = penalties.get(userId);
+  if (starterDelay > 0) {
+    const releaseAt = ctx.occurrence.opensAt.getTime() + (starterDelay + (penalty?.delaySeconds ?? 0)) * 1000;
+    const remaining = releaseAt - ctx.now.getTime();
+    if (remaining > EARLY_TOLERANCE_MS) {
+      await audit({
+        ...base,
+        outcome: "too_early",
+        detail: { ...meta, reason: "not_starter", seconds_remaining: Math.ceil(remaining / 1000) },
+      });
+      const at = new Date(releaseAt).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Sao_Paulo",
+      });
+      return fail(`Os titulares entram primeiro. Sua inscrição abre às ${at}.`, "too_early");
+    }
+  } else if (penalty) {
     const releaseAt = ctx.occurrence.opensAt.getTime() + penalty.delaySeconds * 1000;
     const remaining = releaseAt - ctx.now.getTime();
     if (remaining > 0) {

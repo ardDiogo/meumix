@@ -284,6 +284,7 @@ export async function NextMixPanel() {
             penaltyDelay={result.mix.myPenaltyDelay}
             classified={mine?.status === "classified"}
             strikes={result.mix.myStrikes}
+            starterDelay={result.mix.myStarterDelay}
             lateLeaveRule={result.mix.strikeRules.lateLeave}
             suspension={result.mix.mySuspension}
           />

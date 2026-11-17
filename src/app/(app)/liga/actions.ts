@@ -295,3 +295,61 @@ export async function deleteLeague(id: string): Promise<Result> {
   refreshAll();
   return { ok: true, message: `Liga excluída: ${league.name}.` };
 }
+
+/* ------------------------------ Titulares ------------------------------ */
+
+const STARTERS_MIGRATION = "Rode a migração 0054_league_starters.sql no Supabase.";
+
+/** Marca (ou desmarca) um membro como titular da liga: entra na abertura das inscrições. */
+export async function setLeagueStarter(userId: string, on: boolean, leagueId?: string): Promise<Result> {
+  const r = await leagueManager(leagueId);
+  if ("error" in r) return { ok: false, message: r.error ?? "Sem permissão." };
+  if (!validId(userId)) return { ok: false, message: "Jogador inválido." };
+  const { data, error } = await r.admin
+    .from("league_members")
+    .update({ starter: on })
+    .eq("league_id", r.league.id)
+    .eq("user_id", userId)
+    .eq("active", true)
+    .select("user_id");
+  if (error) return { ok: false, message: error.code === "42703" ? STARTERS_MIGRATION : "Não foi possível salvar." };
+  if (!data?.length) return { ok: false, message: "A pessoa precisa ser membro da liga." };
+  await audit({
+    action: on ? "league.starter_add" : "league.starter_remove",
+    outcome: "success",
+    actorId: r.session.id,
+    detail: { liga: r.league.slug, userId },
+  });
+  refreshAll();
+  return {
+    ok: true,
+    message: on ? `Agora é titular do ${r.league.name}.` : `Deixou de ser titular do ${r.league.name}.`,
+  };
+}
+
+/** Atraso da inscrição de quem não é titular, em minutos (0 = todos abrem juntos). */
+export async function setStarterDelay(minutes: number, leagueId?: string): Promise<Result> {
+  const r = await leagueManager(leagueId);
+  if ("error" in r) return { ok: false, message: r.error ?? "Sem permissão." };
+  if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1440)
+    return { ok: false, message: "Atraso inválido (0 a 24h)." };
+  const { error } = await r.admin
+    .from("communities")
+    .update({ non_starter_delay_minutes: minutes })
+    .eq("id", r.league.id);
+  if (error) return { ok: false, message: error.code === "42703" ? STARTERS_MIGRATION : "Não foi possível salvar." };
+  await audit({
+    action: "league.starter_delay",
+    outcome: "success",
+    actorId: r.session.id,
+    detail: { liga: r.league.slug, minutes },
+  });
+  refreshAll();
+  const h = minutes % 60 ? `${minutes} min` : `${minutes / 60}h`;
+  return {
+    ok: true,
+    message: minutes
+      ? `Quem não é titular do ${r.league.name} se inscreve ${h} depois da abertura.`
+      : `Atraso desligado: todos do ${r.league.name} abrem juntos.`,
+  };
+}
