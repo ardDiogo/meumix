@@ -1,10 +1,12 @@
 import { CalendarDays, ChevronRight, Coins, LogIn, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 import { formatMoney, PLAYOFF_TEAMS, prizeDistribution } from "@/lib/championship";
+import { championshipShareText } from "@/lib/championship-share";
 import type { HomeChampionship } from "@/services/championship-home";
 import { Button } from "../ui/button";
 import { formatDateRange } from "./format";
 import { OpenRegistrationsButton, RegisterButton } from "./register-button";
+import { ShareChampionshipButton } from "./share-championship";
 import { ChampionshipStatusBadge } from "./status-badge";
 
 /** Campeonatos em destaque no Dashboard, com o botão de inscrição. */
@@ -138,6 +140,19 @@ function ChampionshipCard({ item, loggedIn }: { item: HomeChampionship; loggedIn
                 Ver campeonato <ChevronRight />
               </Link>
             </Button>
+            {!soon && (
+              <ShareChampionshipButton
+                path={`${href}/inscrever`}
+                message={championshipShareText(c, {
+                  registered,
+                  vagas,
+                  firstPrize: prize?.prizes[0] ?? null,
+                  url: "{link}",
+                })}
+                bannerUrl={c.hasBanner ? `/api/campeonatos/${c.id}/banner?v=${encodeURIComponent(c.updatedAt)}` : null}
+                fileName={`${c.slug}.jpg`}
+              />
+            )}
           </div>
         </div>
       </div>

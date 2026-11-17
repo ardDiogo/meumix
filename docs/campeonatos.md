@@ -250,3 +250,9 @@ prêmio do 1º lugar (com as vagas cheias), a barra de inscritos e o botão:
 
 A visão geral do campeonato mostra o mesmo bloco "Inscrições abertas". Ações em
 `campeonatos/register-actions.ts` (`registerSelf`, `unregisterSelf`), registradas no log.
+
+## Compartilhar e inscrição em 1 toque
+
+- O card do campeonato (Dashboard) e a página `/campeonatos/<slug>/inscrever` têm o botão **Compartilhar**: no celular abre o menu de compartilhar com a capa e a mensagem; no computador abre o WhatsApp com a mensagem (e a copia).
+- O link da mensagem é `/campeonatos/<slug>/inscrever`: quem já está logado é inscrito sozinho ao abrir (campeonato por draft, com inscrições abertas e vagas); quem não está logado entra (ou cria a conta) e volta para o link, que inscreve.
+- A página mostra também como funciona (formato, draft, classificatória, playoffs e premiação) e a lista de inscritos.
