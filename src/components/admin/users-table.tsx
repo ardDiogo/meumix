@@ -1,6 +1,9 @@
 "use client";
 
 import {
+  Bell,
+  BellOff,
+  BellRing,
   ChevronDown,
   Copy,
   HelpCircle,
@@ -58,6 +61,23 @@ export function UsersTable({
 
   return (
     <>
+      {users.some((u) => u.push) && (
+        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-4 py-2 text-xs text-muted">
+          <span className="flex items-center gap-1">
+            <BellRing className="size-3.5 text-win" />
+            {users.filter((u) => u.push?.devices && u.push.voting).length} recebem avisos de votação
+          </span>
+          <span className="flex items-center gap-1">
+            <Bell className="size-3.5 text-amber-400" />
+            {users.filter((u) => u.push?.devices && !u.push.voting).length} com o aviso de votação desligado
+          </span>
+          <span className="flex items-center gap-1">
+            <BellOff className="size-3.5 text-subtle" />
+            {users.filter((u) => u.push && !u.push.devices).length} sem avisos no celular
+          </span>
+          <span className="text-subtle">Passe o mouse no sino para ver os aparelhos e o último aviso.</span>
+        </p>
+      )}
       <div className="overflow-x-auto">
         <Table>
           <THead>
@@ -82,7 +102,10 @@ export function UsersTable({
                     <div className="flex items-center gap-2.5">
                       <Avatar name={u.displayName} src={u.avatarUrl} size="sm" />
                       <div className="min-w-0">
-                        <div className="font-medium">{u.displayName}</div>
+                        <div className="flex items-center gap-1.5 font-medium">
+                          {u.displayName}
+                          <PushIcon push={u.push} />
+                        </div>
                         <div className="truncate text-xs text-muted">
                           {u.fullName ? `${u.fullName} · ` : ""}
                           {u.email}
@@ -553,5 +576,49 @@ function DeleteDialog({ user, onDone }: { user: ManagedUser; onDone: () => void 
         onConfirm={() => run(() => deleteUser(user.id))}
       />
     </DialogContent>
+  );
+}
+
+/**
+ * Avisos no celular do jogador: verde = recebe (aviso de votação ligado); amarelo = ativou,
+ * mas desligou o aviso de votação; apagado = não ativou (não recebe nada).
+ */
+function PushIcon({ push }: { push: ManagedUser["push"] }) {
+  if (!push) return null;
+  const last = push.lastSentAt
+    ? new Date(push.lastSentAt).toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "America/Sao_Paulo",
+      })
+    : null;
+  if (!push.devices) {
+    return (
+      <span title="Não ativou os avisos no celular: não recebe nada" aria-label="Sem avisos no celular">
+        <BellOff className="size-3.5 text-subtle" />
+      </span>
+    );
+  }
+  const title = [
+    `${push.devices} ${push.devices === 1 ? "aparelho" : "aparelhos"} com avisos (${push.kinds.join(", ")})`,
+    push.voting ? "aviso de votação ligado" : "aviso de votação DESLIGADO",
+    last ? `último aviso entregue: ${last}` : "nenhum aviso entregue ainda",
+  ].join(" · ");
+  return push.voting ? (
+    <span title={title} aria-label={`Recebe avisos: ${title}`} className="flex items-center gap-0.5 text-win">
+      <BellRing className="size-3.5" />
+      {push.devices > 1 && <span className="text-[10px] font-semibold">{push.devices}</span>}
+    </span>
+  ) : (
+    <span
+      title={title}
+      aria-label={`Avisos sem votação: ${title}`}
+      className="flex items-center gap-0.5 text-amber-400"
+    >
+      <Bell className="size-3.5" />
+      {push.devices > 1 && <span className="text-[10px] font-semibold">{push.devices}</span>}
+    </span>
   );
 }
