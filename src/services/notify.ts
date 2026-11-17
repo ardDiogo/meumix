@@ -56,17 +56,63 @@ async function classifiedOf(scheduleId: string, date: string) {
   return (regs ?? []).slice(0, (schedule?.max_players as number) ?? 10).map((r) => r.user_id as string);
 }
 
-/** Lista fechou (10 classificados): chama todos para votar em capitães e mapas. */
-export async function notifyListFull(scheduleId: string, date: string) {
-  const classified = await classifiedOf(scheduleId, date);
-  await sendPush(
-    { topic: "pick", userIds: classified, once: `lista-cheia:${scheduleId}:${date}` },
-    {
-      title: "Lista fechada! Hora de votar 🗳️",
-      body: `${classified.length} classificados para o mix de ${dayMonth(date)}. Vote nos capitães e nos mapas.`,
-      tag: `votacao:${date}`,
-    },
+/**
+ * Lista cheia: chama para votar cada classificado que ainda não foi chamado neste mix.
+ * Na 1ª vez, os 10; depois, quem entrou na lista (reserva que subiu ou quem ocupou uma
+ * vaga aberta). Um aviso por pessoa e por mix, mesmo com inscrições ao mesmo tempo.
+ */
+export async function notifyVoteCall(scheduleId: string, date: string) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return;
+  const [{ data: schedule }, classified, draft] = await Promise.all([
+    admin.from("mix_schedules").select("max_players").eq("id", scheduleId).maybeSingle(),
+    classifiedOf(scheduleId, date),
+    draftOf(scheduleId, date),
+  ]);
+  const max = (schedule?.max_players as number) ?? 10;
+  if (classified.length < max) return;
+  // Com a seleção de equipes já começada, os votos de capitão estão encerrados: só mapas.
+  const body = draft
+    ? `Você está na lista do mix de ${dayMonth(date)}. Vote nos mapas.`
+    : `Você está entre os ${max} do mix de ${dayMonth(date)}. Vote nos capitães e nos mapas.`;
+  await Promise.all(
+    classified.map((userId) =>
+      sendPush(
+        { topic: "pick", userIds: [userId], once: `votar:${scheduleId}:${date}:${userId}` },
+        { title: "Lista fechada! Hora de votar 🗳️", body, tag: `votacao:${date}` },
+      ),
+    ),
   );
+}
+
+/** Classificados que ainda não votaram: nos capitães (antes da seleção começar) e/ou nos mapas. */
+async function pendingVoters(scheduleId: string, date: string, classified: string[], draftStarted: boolean) {
+  const admin = createSupabaseAdminClient();
+  if (!admin || !classified.length) return [];
+  const match = { schedule_id: scheduleId, event_date: date };
+  const [{ data: caps }, { data: maps }] = await Promise.all([
+    admin.from("captain_votes").select("voter_id").match(match),
+    admin.from("map_votes").select("user_id").match(match),
+  ]);
+  const capVoters = new Set((caps ?? []).map((v) => v.voter_id as string));
+  const mapVoters = new Set((maps ?? []).map((v) => v.user_id as string));
+  return classified
+    .map((userId) => ({
+      userId,
+      captains: !draftStarted && !capVoters.has(userId),
+      maps: !mapVoters.has(userId),
+    }))
+    .filter((p) => p.captains || p.maps);
+}
+
+/** Texto do lembrete conforme o que falta votar. */
+function voteReminder(p: { captains: boolean; maps: boolean }, eventAt: Date) {
+  const what = p.captains && p.maps ? "nos capitães e nos mapas" : p.captains ? "nos capitães" : "nos mapas";
+  const why = p.captains ? " A seleção de equipes só começa quando todos os classificados votarem." : "";
+  return {
+    title: "Falta o seu voto 🗳️",
+    body: `Vote ${what} do mix das ${hourMin(eventAt)}.${why}`,
+  };
 }
 
 /** Disputa de capitães começou: avisa os dois capitães e conta para o resto do mix. */
@@ -285,6 +331,36 @@ export async function runScheduledNotices(now = new Date()) {
           tag: `inscricoes:${o.date}`,
         },
       );
+    }
+
+    // Lembretes de voto (só para quem ainda não votou): 1h depois de a lista fechar e 2h
+    // antes do mix (este, se a lista fechou há pelo menos 30 min).
+    if (toStart > 0) {
+      const { data: regs } = await admin
+        .from("mix_registrations")
+        .select("user_id, created_at")
+        .match({ schedule_id: schedule.id, event_date: o.date })
+        .order("created_at")
+        .limit(schedule.maxPlayers);
+      const classified = (regs ?? []).map((r) => r.user_id as string);
+      const fullAt = classified.length >= schedule.maxPlayers ? new Date(regs!.at(-1)!.created_at as string) : null;
+      if (fullAt) {
+        const sinceFull = now.getTime() - fullAt.getTime();
+        const slots = [
+          { key: "lembrete-1h", due: sinceFull >= 60 * MIN },
+          { key: "lembrete-2h", due: toStart <= 120 * MIN && sinceFull >= 30 * MIN },
+        ].filter((x) => x.due);
+        if (slots.length) {
+          const draftStarted = !!(await draftOf(schedule.id, o.date));
+          const pending = await pendingVoters(schedule.id, o.date, classified, draftStarted);
+          for (const slot of slots)
+            for (const p of pending)
+              sent += await sendPush(
+                { topic: "pick", userIds: [p.userId], once: `${slot.key}:${key}:${p.userId}` },
+                { ...voteReminder(p, o.eventAt), tag: `votacao:${o.date}` },
+              );
+        }
+      }
     }
 
     if (toStart <= 0 || toStart > 60 * MIN) continue;

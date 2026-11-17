@@ -13,7 +13,7 @@ import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
-import { notifyCaptains, notifyDraftReview, notifyListFull, notifyRepick } from "@/services/notify";
+import { notifyCaptains, notifyDraftReview, notifyRepick, notifyVoteCall } from "@/services/notify";
 import { toSchedule, type ScheduleRow } from "@/services/mix-events";
 
 /**
@@ -179,13 +179,6 @@ export async function joinMix(
   await audit({ ...base, outcome: "success", detail: meta });
   // Vaga aberta no time tirado (alguém saiu sem reserva): quem entrou ocupa a vaga.
   await afterRosterChange(ctx.admin, scheduleId, date);
-  // Fechou a lista (10 classificados): chama todos para votar.
-  const { count } = await ctx.admin
-    .from("mix_registrations")
-    .select("id", { count: "exact", head: true })
-    .eq("schedule_id", scheduleId)
-    .eq("event_date", date);
-  if (count === ctx.schedule.maxPlayers) after(() => notifyListFull(scheduleId, date));
   refresh();
   return { ok: true, message: "Inscrição confirmada!" };
 }
@@ -196,6 +189,8 @@ async function afterRosterChange(
   scheduleId: string,
   date: string,
 ) {
+  // Lista cheia: chama para votar quem ainda não foi chamado (os 10, o reserva que subiu…).
+  after(() => notifyVoteCall(scheduleId, date));
   try {
     const r = await reconcileTeams(admin, scheduleId, date);
     if (r?.kind === "review") after(() => notifyDraftReview(scheduleId, date, r.captains, r.changes));
@@ -317,7 +312,6 @@ export async function addPlayerToMix(scheduleId: string, date: string, userId: s
     .from("mix_registrations")
     .select("id", { count: "exact", head: true })
     .match({ schedule_id: scheduleId, event_date: date });
-  if (count === ctx.schedule.maxPlayers) after(() => notifyListFull(scheduleId, date));
   refresh();
   const reserve = (count ?? 0) > ctx.schedule.maxPlayers;
   return { ok: true, message: `${name} incluído na lista${reserve ? " como reserva" : ""}.` };

@@ -40,18 +40,20 @@
 
 Cada jogador ativa em **Configurações → Avisos no celular**, por aparelho, e escolhe os tipos:
 
-| Tipo           | Quando                                                               | Para quem                       |
-| -------------- | -------------------------------------------------------------------- | ------------------------------- |
-| Inscrições     | Lista abre em até 15 min; falta 1 h para o mix e ainda há vaga       | Todos (vagas: quem não entrou)  |
-| Capitão e PICK | Disputa de capitães começou; você foi escolhido                      | Os capitães; o escolhido        |
-| Bolão          | Times definidos (bolão aberto); falta 1 h e você não palpitou        | Todos                           |
-| Resultado      | Mix finalizado: vitória/derrota, ELO antes → depois; pontos do bolão | Quem jogou; quem palpitou       |
-| Ao vivo        | Um jogador com Twitch cadastrada abriu a live                        | Todos (menos quem está ao vivo) |
+| Tipo           | Quando                                                               | Para quem                                         |
+| -------------- | -------------------------------------------------------------------- | ------------------------------------------------- |
+| Inscrições     | Lista abre em até 15 min; falta 1 h para o mix e ainda há vaga       | Todos (vagas: quem não entrou)                    |
+| Capitão e PICK | Disputa de capitães começou; você foi escolhido                      | Os capitães; o escolhido                          |
+| Votação        | Lista fechada: hora de votar (uma vez por pessoa e por mix)          | Cada classificado (inclusive o reserva que subiu) |
+| Votação        | Lembrete: 1 h depois de a lista fechar e 2 h antes do mix            | Só os classificados que não votaram               |
+| Bolão          | Times definidos (bolão aberto); falta 1 h e você não palpitou        | Todos                                             |
+| Resultado      | Mix finalizado: vitória/derrota, ELO antes → depois; pontos do bolão | Quem jogou; quem palpitou                         |
+| Ao vivo        | Um jogador com Twitch cadastrada abriu a live                        | Todos (menos quem está ao vivo)                   |
 
 - **iPhone:** só funciona com o app instalado na tela de início (iOS 16.4 ou mais novo).
 - **Configuração:** chaves VAPID (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`) geradas em Admin →
   Configurações; migração `0031_bolao_push.sql`.
-- **Avisos por horário** (inscrições, vagas, bolão fechando, lives) precisam de alguém chamando
+- **Avisos por horário** (inscrições, vagas, lembretes de voto, bolão fechando, lives) precisam de alguém chamando
   `/api/cron/avisos` a cada 5 minutos. O cron da Vercel no plano gratuito roda só 1 vez por dia,
   por isso usamos o [cron-job.org](https://cron-job.org) (gratuito):
   1. Crie a conta e clique em **Create cronjob**.
