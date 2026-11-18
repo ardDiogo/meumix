@@ -585,13 +585,13 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
           <ul className="list-disc space-y-1 pl-5">
             <li>
               <b className="text-fg">Resultado</b> (vitória, empate ou derrota na série, pelos mapas): com times
-              parelhos, vitória <b className="text-fg">+10</b>, derrota <b className="text-fg">−10</b> e empate 0. Conta
-              a força dos times pelo ELO médio de cada um: ganhar de um time mais forte vale mais (até +20), e perder
-              para um mais fraco tira mais (até −20). Conta: 20 × (resultado − chance de vitória).
+              parelhos, vitória <b className="text-fg">+20</b>, derrota <b className="text-fg">−20</b> e empate 0. Conta
+              a força dos times pelo ELO médio de cada um: ganhar de um time mais forte vale mais (até +40), e perder
+              para um mais fraco tira mais (até −40). Conta: 40 × (resultado − chance de vitória).
             </li>
             <li>
               <b className="text-fg">Desempenho</b>: a sua PTS comparada com a média da PTS dos 10 jogadores do mix, de{" "}
-              <b className="text-fg">−10 a +10</b>. Conta: 15 × (sua PTS − média) ÷ média. Quem joga acima da média
+              <b className="text-fg">−20 a +20</b>. Conta: 30 × (sua PTS − média) ÷ média. Quem joga acima da média
               ganha mais (ou perde menos); quem joga abaixo, o contrário. Mix sem estatísticas: 0.
             </li>
             <li>

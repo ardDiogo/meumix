@@ -3,19 +3,19 @@ import { describe, it } from "node:test";
 import { mixRp, rpPerformance, rpResult, winChance } from "./rp";
 
 describe("RP do MeuMix", () => {
-  it("times parelhos: +10 / −10 no resultado", () => {
-    assert.equal(rpResult(1, 800, 800), 10);
-    assert.equal(rpResult(0, 800, 800), -10);
+  it("times parelhos: +20 / −20 no resultado", () => {
+    assert.equal(rpResult(1, 800, 800), 20);
+    assert.equal(rpResult(0, 800, 800), -20);
     assert.equal(rpResult(0.5, 800, 800), 0);
   });
   it("ganhar de time mais forte vale mais", () => {
-    assert.ok(rpResult(1, 700, 900) > 15);
-    assert.ok(rpResult(1, 900, 700) < 5);
+    assert.ok(rpResult(1, 700, 900) > 30);
+    assert.ok(rpResult(1, 900, 700) < 10);
     assert.ok(winChance(900, 700) > 0.7);
   });
-  it("desempenho limitado a ±10", () => {
-    assert.equal(rpPerformance(300, 90), 10);
-    assert.equal(rpPerformance(-50, 90), -10);
+  it("desempenho limitado a ±20", () => {
+    assert.equal(rpPerformance(300, 90), 20);
+    assert.equal(rpPerformance(-50, 90), -20);
     assert.equal(rpPerformance(50, null), 0);
   });
   it("igual ao banco (teste da 0056)", () => {
@@ -42,6 +42,6 @@ describe("RP do MeuMix", () => {
       line("B", 8, 30, 0),
     ];
     const rp = mixRp(players).map((r) => r.rp);
-    assert.deepEqual(rp, [20, 10, 10, 10, 10, -10, -10, -10, -10, -20]);
+    assert.deepEqual(rp, [40, 19, 19, 19, 19, -21, -21, -21, -21, -40]);
   });
 });

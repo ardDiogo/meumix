@@ -62,7 +62,8 @@ c(migracao, ok) as (values
   ('0053_mix_strikes', to_regclass('public.mix_strikes') is not null),
   ('0054_league_starters', exists (select 1 from col where t = 'league_members' and c = 'starter')),
   ('0056_rp_meumix_preview', exists (select 1 from col where t = 'league_elo_history' and c = 'rp_result')),
-  ('0057_rp_meumix_apply', exists (select 1 from pg_proc where proname = 'recompute_league_elo' and prosrc like '%league_elo_compute%'))
+  ('0057_rp_meumix_apply', exists (select 1 from pg_proc where proname = 'recompute_league_elo' and prosrc like '%league_elo_compute%')),
+  ('0058_rp_meumix_scale', exists (select 1 from pg_proc where proname = 'league_elo_compute' and prosrc like '%40 * (v_s - v_e)%'))
 )
 select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
 from c

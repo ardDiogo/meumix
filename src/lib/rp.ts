@@ -1,16 +1,16 @@
 import { mvpScore, type ScoreLine } from "./match-rules";
 
 /*
- * RP do MeuMix (supabase/migrations/0056): o que o ELO de cada liga soma a cada mix.
+ * RP do MeuMix (supabase/migrations/0056 e 0058): o que o ELO de cada liga soma a cada mix.
  * A mesma conta roda no banco (recálculo do ELO); esta é para a tela (prévia e explicação).
  *
  *   RP = resultado + desempenho
- *   resultado  = 20 × (S − E)  S: 1 vitória, 0,5 empate, 0 derrota · E: chance pelo ELO médio dos times
- *   desempenho = 15 × (PTS − média) ÷ média, de −10 a +10 (mix sem estatísticas: 0)
+ *   resultado  = 40 × (S − E)  S: 1 vitória, 0,5 empate, 0 derrota · E: chance pelo ELO médio dos times
+ *   desempenho = 30 × (PTS − média) ÷ média, de −20 a +20 (mix sem estatísticas: 0)
  */
-export const RP_RESULT_K = 20;
-export const RP_PERF_K = 15;
-export const RP_PERF_CAP = 10;
+export const RP_RESULT_K = 40;
+export const RP_PERF_K = 30;
+export const RP_PERF_CAP = 20;
 
 export const winChance = (mine: number, theirs: number) => 1 / (1 + 10 ** ((theirs - mine) / 400));
 
