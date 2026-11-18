@@ -22,7 +22,15 @@ export interface StatRow {
   fa: number;
   mk: number;
   fk: number;
+  /** RP do MeuMix (o que entrou no ELO); sem a migração 0057, o RP da GC. */
   rp: number;
+  /** RP informado pela GC (só informação). */
+  rpGc?: number | null;
+  /** Partes do RP do MeuMix: resultado (vitória × força dos times) e desempenho (PTS × média). */
+  rpResult?: number | null;
+  rpPerf?: number | null;
+  /** Média da PTS do mix (base do desempenho). */
+  ptsAvg?: number | null;
   drop: number;
   isMvp: boolean;
   isLanterna: boolean;

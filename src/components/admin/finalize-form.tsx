@@ -10,6 +10,7 @@ import { ELO_CAP, levelForElo } from "@/lib/levels";
 import { useLevels } from "../players/levels-context";
 import { mapIdFromName, matchProfiles, type MergedResult } from "@/lib/gc-ocr";
 import { pickMvpAndLanterna } from "@/lib/match-rules";
+import { mixRp } from "@/lib/rp";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
@@ -55,7 +56,7 @@ const FIELDS = [
   ["fa", "FA"],
   ["mk", "MK"],
   ["firstKills", "FK"],
-  ["rp", "RP"],
+  ["rp", "RP GC"],
   ["drop", "DROP"],
 ] as const;
 const DECIMAL = new Set(["adr", "kast", "rp"]);
@@ -173,6 +174,21 @@ export function FinalizeForm({
   // Só aponta MVP/lanterna depois que alguma estatística foi preenchida.
   const hasStats = parsed.some((p) => p.kills > 0 || p.deaths > 0);
   const { mvp, lanterna } = hasStats ? pickMvpAndLanterna(parsed) : { mvp: -1, lanterna: -1 };
+  // Prévia do RP do MeuMix (a conta de verdade roda no banco ao finalizar).
+  const seriesA = mapRows.filter(
+    (m) => m.scoreA !== "" && m.scoreB !== "" && Number(m.scoreA) > Number(m.scoreB),
+  ).length;
+  const seriesB = mapRows.filter(
+    (m) => m.scoreA !== "" && m.scoreB !== "" && Number(m.scoreB) > Number(m.scoreA),
+  ).length;
+  const preview = mixRp(
+    rows.map((r, i) => ({
+      ...parsed[i]!,
+      team: r.team,
+      elo: r.userId ? r.elo : null,
+      score: (seriesA === seriesB ? 0.5 : seriesA > seriesB === (r.team === "A") ? 1 : 0) as 1 | 0.5 | 0,
+    })),
+  );
   const wins = mapRows.reduce(
     (acc, m) => {
       const a = Number(m.scoreA);
@@ -192,11 +208,6 @@ export function FinalizeForm({
     }));
     if (mapRows.some((m) => m.scoreA === "" || m.scoreB === "")) {
       setError("Preencha o placar de todos os mapas.");
-      return;
-    }
-    // A resposta da GC não traz o RP, e o ELO do mix é o RP: sem ele, ninguém ganharia nem perderia nada.
-    if (platform === "gc" && rows.every((r) => !r.calculateElo || intOr0(r.rp) === 0)) {
-      setError("Preencha o RP de cada jogador (soma dos mapas). A GC não manda o RP, e é ele que muda o ELO.");
       return;
     }
     const payloadPlayers: FinalizePlayer[] = rows.map((r) => ({
@@ -275,10 +286,6 @@ export function FinalizeForm({
     rpMissing = false,
   ) {
     const notes = [...result.warnings];
-    if (source === "gc" && rpMissing)
-      notes.push(
-        "A GC não manda o RP: preencha o RP de cada jogador (soma dos mapas) antes de finalizar. É ele que muda o ELO.",
-      );
     const profileRows = rows.filter((r) => r.userId);
     // Vínculo garantido (SteamID / ID Faceit) vale antes da semelhança de nick.
     // …e os apelidos salvos em finalizações anteriores.
@@ -527,7 +534,7 @@ export function FinalizeForm({
       <Card>
         <CardHeader
           title="Estatísticas dos jogadores"
-          description="Totais da série. RP é somado ao ELO atual (teto de 1600). MVP e lanterna são calculados automaticamente."
+          description="Totais da série. O ELO muda pelo RP do MeuMix (resultado × força dos times + desempenho pela PTS), calculado sozinho; o RP GC é só informação (opcional). MVP e lanterna também são automáticos."
         />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -552,7 +559,9 @@ export function FinalizeForm({
             <tbody>
               {rows.map((r, i) => {
                 const after =
-                  r.elo == null || !r.calculateElo ? r.elo : Math.min(Math.max(r.elo + intOr0(r.rp), 0), ELO_CAP);
+                  r.elo == null || !r.calculateElo
+                    ? r.elo
+                    : Math.min(Math.max(r.elo + (preview[i]?.rp ?? 0), 0), ELO_CAP);
                 return (
                   <tr key={r.key} className="border-b border-border last:border-0">
                     <td className="px-3 py-1.5">

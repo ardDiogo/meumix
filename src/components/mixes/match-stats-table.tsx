@@ -38,6 +38,27 @@ const scoreBreakdown = (r: StatRow) => {
   )}) + 0,2 × ${n(adr)} ADR (${n(0.2 * adr)}) − 2 × ${r.d} mortes (${n(2 * r.d)}) = ${n(mixScore(r))}`;
 };
 
+const dec = (v: number) => {
+  const t = Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  return `${v < 0 ? "−" : "+"}${t}`;
+};
+
+/** A conta do RP do MeuMix do jogador. */
+const rpBreakdown = (r: StatRow) =>
+  `${r.name}: resultado ${dec(r.rpResult ?? 0)} (vitória, empate ou derrota × força dos times) + desempenho ${dec(
+    r.rpPerf ?? 0,
+  )} (PTS ${fmt(mixScore(r), 1)} × média do mix ${fmt(r.ptsAvg ?? null, 1)}) = ${signed(r.rp)}${
+    r.rpGc != null ? ` · RP da GC: ${signed(r.rpGc)} (não conta)` : ""
+  }`;
+
+const RP_GC: Col = {
+  key: "rpgc",
+  label: "RP GC",
+  title: "RP informado pela GC: só informação, não entra no ELO (pode vir congelado ou dobrado)",
+  value: (r) => r.rpGc ?? null,
+  render: (r) => <span className="text-subtle">{r.rpGc == null ? "-" : signed(r.rpGc)}</span>,
+};
+
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
@@ -100,9 +121,13 @@ const BASE_COLS: Col[] = [
   {
     key: "rp",
     label: "RP",
-    title: "Pontos de ranking (somados ao ELO)",
+    title: "RP do MeuMix (somado ao ELO da liga): resultado × força dos times + desempenho pela PTS",
     value: (r) => r.rp,
-    render: (r) => <span className={tone(r.rp)}>{signed(r.rp)}</span>,
+    render: (r) => (
+      <span className={tone(r.rp)} title={r.rpResult != null ? rpBreakdown(r) : undefined}>
+        {signed(r.rp)}
+      </span>
+    ),
   },
   { key: "drop", label: "DROP", value: (r) => r.drop },
 ];
@@ -334,9 +359,16 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
   const [tab, setTab] = useState<Tab>("geral");
   const [only, setOnly] = useState<number | null>(null);
   // Jogador com a conta da PTS aberta (toque ou clique na PTS).
-  const [openPts, setOpenPts] = useState<string | null>(null);
+  const [open, setOpen] = useState<{ key: string; kind: "pts" | "rp" } | null>(null);
   const spec = TABS.find((t) => t.key === tab)!;
-  const cols = useMemo(() => (tab === "geral" ? geralCols(withGc) : spec.cols), [tab, withGc, spec]);
+  const hasRpGc = rows.some((r) => r.rpGc != null);
+  const cols = useMemo(() => {
+    if (tab !== "geral") return spec.cols;
+    const base = geralCols(withGc);
+    if (!hasRpGc) return base;
+    const at = base.findIndex((c) => c.key === "rp") + 1;
+    return [...base.slice(0, at), RP_GC, ...base.slice(at)];
+  }, [tab, withGc, spec, hasRpGc]);
   // Trocar de aba volta para a ordenação padrão dela.
   const [sort, setSort] = useState<{ key: string; desc: boolean }>({ key: "pts", desc: true });
 
@@ -471,12 +503,18 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
                   </td>
                   {cols.map((c) => (
                     <td key={c.key} className="px-2 py-2.5 text-center tabular">
-                      {c.key === "pts" ? (
+                      {c.key === "pts" || (c.key === "rp" && r.rpResult != null) ? (
                         <button
                           type="button"
-                          aria-expanded={openPts === r.key}
-                          aria-label={`Ver a conta da PTS de ${r.name}`}
-                          onClick={() => setOpenPts(openPts === r.key ? null : r.key)}
+                          aria-expanded={open?.key === r.key && open.kind === c.key}
+                          aria-label={`Ver a conta ${c.key === "pts" ? "da PTS" : "do RP"} de ${r.name}`}
+                          onClick={() =>
+                            setOpen(
+                              open?.key === r.key && open.kind === c.key
+                                ? null
+                                : { key: r.key, kind: c.key as "pts" | "rp" },
+                            )
+                          }
                           className="rounded-sm underline decoration-dotted underline-offset-4 hover:text-brand"
                         >
                           {c.render ? c.render(r) : c.value(r)}
@@ -489,11 +527,13 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
                     </td>
                   ))}
                 </tr>
-                {openPts === r.key && (
+                {open?.key === r.key && (
                   <tr className="border-b border-border bg-surface-2/40">
                     <td colSpan={cols.length + 1} className="px-4 py-2 text-xs text-muted">
-                      <span className="font-semibold text-fg">Conta da PTS · </span>
-                      {scoreBreakdown(r)}
+                      <span className="font-semibold text-fg">
+                        {open.kind === "pts" ? "Conta da PTS · " : "Conta do RP · "}
+                      </span>
+                      {open.kind === "pts" ? scoreBreakdown(r) : rpBreakdown(r)}
                     </td>
                   </tr>
                 )}
@@ -505,7 +545,7 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
       <p className="border-t border-border px-4 py-3 text-xs text-muted">
         <b className="text-fg">Ordem da planilha:</b> 1º o MVP, último o lanterna; o resto pela maior PTS (3 × K + 1,5 ×
         A + 1,2 × FK + 0,2 × ADR − 2 × D). Se empatar, mais kills fica na frente, depois mais assistências. Toque na PTS
-        de um jogador para ver a conta dele.
+        de um jogador para ver a conta dele; no RP, a conta do RP.
       </p>
       <details className="group border-t border-border px-4 py-3 text-xs text-muted">
         <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>
@@ -531,8 +571,10 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
               <b className="text-fg">Lanterna</b> tem conta própria: o menor valor de kills + ADR ÷ 100 + KDR × 10.
             </li>
             <li>
-              A PTS só define o MVP e a ordem da tabela: <b className="text-fg">não mexe no ELO</b>, que vem do RP da
-              GC. Passe o mouse (ou toque) na PTS de um jogador para ver a conta dele.
+              A PTS define o MVP e a ordem da tabela e também entra no <b className="text-fg">RP do MeuMix</b>, que muda
+              o ELO: RP = resultado (vitória +10 / derrota −10 com times parelhos; vale mais contra time mais forte) +
+              desempenho (a sua PTS contra a média do mix, de −10 a +10). O RP da GC aparece só como informação. Toque
+              na PTS ou no RP de um jogador para ver a conta dele.
             </li>
           </ul>
         </div>

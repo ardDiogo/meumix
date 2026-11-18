@@ -157,7 +157,14 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 **Cálculo de ELO**
 
 - Cada jogador do placar é vinculado ao perfil (pelo ID Faceit, ou por semelhança de nome ≥70%). O admin pode marcar "Não calcular".
-- O RP da partida é somado ao ELO atual; o nível é recalculado.
+- O ELO de cada liga soma o **RP do MeuMix** de cada mix (migrações 0056/0057), não o RP da GC (que pode vir congelado ou dobrado):
+  - **RP = resultado + desempenho**.
+  - **Resultado** = 20 × (S − E): S = 1 vitória, 0,5 empate, 0 derrota (pelos mapas da série); E = chance de vitória pelo ELO médio dos times (Elo clássico, escala 400). Times parelhos: +10 / −10; ganhar de time mais forte vale mais.
+  - **Desempenho** = 15 × (PTS − média da PTS do mix) ÷ média, de −10 a +10 (mix sem estatísticas: 0).
+  - A força dos times usa o ELO de antes do mix; ELO limitado a 0–1600; "Não calcular" não muda o ELO.
+  - O ELO da liga é sempre recalculado do histórico inteiro (ao finalizar, excluir, mudar a data ou vincular convidado), a partir do ELO inicial do nível GC + ajuste do admin.
+  - O RP da GC continua gravado e aparece na planilha (coluna "RP GC") só como informação.
+- O nível é recalculado pelo ELO.
 - **MVP:** maior (K×3) + (A×1,5) + (FK×1,2) + (ADR×0,2) − (D×2). A mesma pontuação (PTS) ordena a tabela do mix (MVP primeiro, lanterna por último).
 - **Lanterna:** menor K + ADR/100 + KDR×10.
 - Vitórias/derrotas, kills, mortes, FK, DIFF somam; ADR e KAST viram médias ponderadas.

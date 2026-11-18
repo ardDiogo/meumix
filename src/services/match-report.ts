@@ -10,6 +10,19 @@ export interface MatchReport {
 
 const num = (v: unknown) => (v == null || v === "" ? null : Number(v));
 
+/** RP do MeuMix gravado no recálculo da liga (0057); antes disso, o RP da GC. */
+function rpOf(r: Record<string, unknown>, h: Record<string, unknown> | undefined) {
+  const gc = num(r.rp) ?? 0;
+  if (!h || h.rp_result == null) return { rp: gc, rpGc: null, rpResult: null, rpPerf: null, ptsAvg: null };
+  return {
+    rp: num(h.rp) ?? 0,
+    rpGc: gc,
+    rpResult: num(h.rp_result),
+    rpPerf: num(h.rp_perf),
+    ptsAvg: num(h.pts_avg),
+  };
+}
+
 /** Estatísticas completas de uma partida finalizada (inclui convidados). */
 export async function getMatchReport(matchId: string): Promise<MatchReport | null> {
   if (!/^[0-9a-f-]{36}$/i.test(matchId)) return null;
@@ -30,7 +43,8 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
   // ELO na liga do mix (sem a migração 0046: o ELO gravado no registro).
   const { data: leagueRows, error: leagueError } = await supabase
     .from("league_elo_history")
-    .select("record_id, elo_before, elo_after")
+    // "*": as colunas do RP do MeuMix só existem após a migração 0056.
+    .select("*")
     .eq("match_id", matchId);
   const leagueElo = leagueError ? null : new Map((leagueRows ?? []).map((h) => [h.record_id as string, h]));
   const before = (r: Record<string, unknown>) =>
@@ -57,7 +71,7 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
       fa: r.fa ?? 0,
       mk: r.mk ?? 0,
       fk: r.first_kills ?? 0,
-      rp: r.rp ?? 0,
+      ...rpOf(r, leagueElo?.get(r.id as string)),
       drop: r.drop_count ?? 0,
       isMvp: !!r.is_mvp,
       isLanterna: !!r.is_lanterna,

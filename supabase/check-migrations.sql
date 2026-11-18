@@ -60,7 +60,9 @@ c(migracao, ok) as (values
   ('0051_bolao_outcome', exists (select 1 from col where t = 'mix_predictions' and c = 'kind')),
   ('0052_badges_dedupe', exists (select 1 from pg_proc where proname = 'sync_auto_badges_league' and prosrc like '%só ganha o%')),
   ('0053_mix_strikes', to_regclass('public.mix_strikes') is not null),
-  ('0054_league_starters', exists (select 1 from col where t = 'league_members' and c = 'starter'))
+  ('0054_league_starters', exists (select 1 from col where t = 'league_members' and c = 'starter')),
+  ('0056_rp_meumix_preview', exists (select 1 from col where t = 'league_elo_history' and c = 'rp_result')),
+  ('0057_rp_meumix_apply', exists (select 1 from pg_proc where proname = 'recompute_league_elo' and prosrc like '%league_elo_compute%'))
 )
 select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
 from c
