@@ -33,9 +33,9 @@ const fmt = (n: number | null, digits = 0) =>
 const scoreBreakdown = (r: StatRow) => {
   const n = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
   const adr = r.adr ?? 0;
-  return `${r.name}: 3 × ${r.k} kills (${n(3 * r.k)}) + 1,5 × ${r.a} assist. (${n(1.5 * r.a)}) + 0,2 × ${n(adr)} ADR (${n(
-    0.2 * adr,
-  )}) − 2 × ${r.d} mortes (${n(2 * r.d)}) = ${n(mixScore(r))}`;
+  return `${r.name}: 3 × ${r.k} kills (${n(3 * r.k)}) + 1,5 × ${r.a} assist. (${n(1.5 * r.a)}) + 1,2 × ${r.fk} FK (${n(
+    1.2 * r.fk,
+  )}) + 0,2 × ${n(adr)} ADR (${n(0.2 * adr)}) − 2 × ${r.d} mortes (${n(2 * r.d)}) = ${n(mixScore(r))}`;
 };
 
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
@@ -45,7 +45,8 @@ const BASE_COLS: Col[] = [
   {
     key: "pts",
     label: "PTS",
-    title: "Pontuação do mix (a mesma do MVP): kills × 3 + assistências × 1,5 + ADR × 0,2 − mortes × 2",
+    title:
+      "Pontuação do mix (a mesma do MVP): kills × 3 + assistências × 1,5 + first kills × 1,2 + ADR × 0,2 − mortes × 2",
     value: mixScore,
     render: (r) => (
       <span className="cursor-help font-display font-bold" title={scoreBreakdown(r)}>
@@ -503,23 +504,24 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
       </div>
       <p className="border-t border-border px-4 py-3 text-xs text-muted">
         <b className="text-fg">Ordem da planilha:</b> 1º o MVP, último o lanterna; o resto pela maior PTS (3 × K + 1,5 ×
-        A + 0,2 × ADR − 2 × D). Se empatar, mais kills fica na frente, depois mais assistências. Toque na PTS de um
-        jogador para ver a conta dele.
+        A + 1,2 × FK + 0,2 × ADR − 2 × D). Se empatar, mais kills fica na frente, depois mais assistências. Toque na PTS
+        de um jogador para ver a conta dele.
       </p>
       <details className="group border-t border-border px-4 py-3 text-xs text-muted">
         <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>
         <div className="mt-2 space-y-2 leading-relaxed">
           <p className="rounded-md bg-surface-2/60 px-3 py-2 font-display text-sm font-bold text-fg">
-            PTS = 3 × K + 1,5 × A + 0,2 × ADR − 2 × D
+            PTS = 3 × K + 1,5 × A + 1,2 × FK + 0,2 × ADR − 2 × D
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              <b className="text-fg">Entra na conta:</b> kills (+3 cada), assistências (+1,5 cada), ADR (dano médio por
-              round × 0,2) e mortes (−2 cada). Com mais de um mapa, K, A e D são somados e o ADR é a média pelos rounds.
+              <b className="text-fg">Entra na conta:</b> kills (+3 cada), assistências (+1,5 cada), first kills — a
+              primeira kill do round (+1,2 cada), ADR (dano médio por round × 0,2) e mortes (−2 cada). Com mais de um
+              mapa, K, A, FK e D são somados e o ADR é a média pelos rounds.
             </li>
             <li>
-              <b className="text-fg">Não entra:</b> rating e swing da GC, KDR, KAST, HS%, FA, MK, FK e o placar do time.
-              O KDR aparece só de forma indireta, pelas kills e pelas mortes.
+              <b className="text-fg">Não entra:</b> rating e swing da GC, KDR, KAST, HS%, FA, MK e o placar do time. O
+              KDR aparece só de forma indireta, pelas kills e pelas mortes.
             </li>
             <li>
               <b className="text-fg">Ordem da tabela:</b> o MVP (maior PTS da partida) vem primeiro, o lanterna por

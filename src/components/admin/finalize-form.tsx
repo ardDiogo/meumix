@@ -165,6 +165,7 @@ export function FinalizeForm({
         kills: intOr0(r.kills),
         deaths: intOr0(r.deaths),
         assists: intOr0(r.assists),
+        firstKills: intOr0(r.firstKills),
         adr: numOrNull(r.adr),
       })),
     [rows],

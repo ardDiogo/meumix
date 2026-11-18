@@ -361,7 +361,7 @@ Faceit (`POST /fetch-faceit-stats`): extrair `match_id` do link → `GET /data/v
 
 ```text
 vínculo jogador↔perfil: faceit_player_id; senão semelhança de nick >= 0.70; admin pode 'Não calcular'
-mvp      = argmax (K*3 + A*1.5 + ADR*0.2 - D*2)
+mvp      = argmax (K*3 + A*1.5 + FK*1.2 + ADR*0.2 - D*2)
 lanterna = argmin (K + ADR/100 + KDR*10)
 novo_elo = clamp(elo + RP, 0, 1600); novo_nivel = level(novo_elo)
 insert player_match_records (elo_before/after, level_before/after, wins/losses por mapResults)

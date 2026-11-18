@@ -158,7 +158,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 
 - Cada jogador do placar é vinculado ao perfil (pelo ID Faceit, ou por semelhança de nome ≥70%). O admin pode marcar "Não calcular".
 - O RP da partida é somado ao ELO atual; o nível é recalculado.
-- **MVP:** maior (K×3) + (A×1,5) + (ADR×0,2) − (D×2).
+- **MVP:** maior (K×3) + (A×1,5) + (FK×1,2) + (ADR×0,2) − (D×2). A mesma pontuação (PTS) ordena a tabela do mix (MVP primeiro, lanterna por último).
 - **Lanterna:** menor K + ADR/100 + KDR×10.
 - Vitórias/derrotas, kills, mortes, FK, DIFF somam; ADR e KAST viram médias ponderadas.
 

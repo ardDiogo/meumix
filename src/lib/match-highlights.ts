@@ -32,7 +32,8 @@ export const diffOf = (r: StatRow) => r.k - r.d;
 export const kdrOf = (r: StatRow) => (r.d ? r.k / r.d : r.k);
 
 /** Pontuação do mix (a mesma que escolhe o MVP). */
-export const mixScore = (r: StatRow) => mvpScore({ kills: r.k, deaths: r.d, assists: r.a, adr: r.adr });
+export const mixScore = (r: StatRow) =>
+  mvpScore({ kills: r.k, deaths: r.d, assists: r.a, firstKills: r.fk, adr: r.adr });
 
 /**
  * Ordem padrão dos jogadores do mix: MVP primeiro, lanterna por último e o
@@ -61,7 +62,9 @@ const maxBy = (rows: StatRow[], value: (r: StatRow) => number) =>
  */
 export function matchHighlights(rows: StatRow[]): Highlight[] {
   if (!rows.length) return [];
-  const picked = pickMvpAndLanterna(rows.map((r) => ({ kills: r.k, deaths: r.d, assists: r.a, adr: r.adr })));
+  const picked = pickMvpAndLanterna(
+    rows.map((r) => ({ kills: r.k, deaths: r.d, assists: r.a, firstKills: r.fk, adr: r.adr })),
+  );
   const mvp = rows.find((r) => r.isMvp) ?? rows[picked.mvp];
   const worst = rows.find((r) => r.isLanterna) ?? (picked.lanterna >= 0 ? rows[picked.lanterna] : undefined);
   const list: (Highlight | null)[] = [
