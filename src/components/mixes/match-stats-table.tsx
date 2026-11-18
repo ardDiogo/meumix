@@ -43,12 +43,12 @@ const dec = (v: number) => {
   return `${v < 0 ? "−" : "+"}${t}`;
 };
 
-/** A conta do RP do MeuMix do jogador. */
+/** A conta do ELO do mix do jogador. */
 const rpBreakdown = (r: StatRow) =>
   `${r.name}: resultado ${dec(r.rpResult ?? 0)} (vitória, empate ou derrota × força dos times) + desempenho ${dec(
     r.rpPerf ?? 0,
   )} (PTS ${fmt(mixScore(r), 1)} × média do mix ${fmt(r.ptsAvg ?? null, 1)}) = ${signed(r.rp)}${
-    r.rpGc != null ? ` · RP da GC: ${signed(r.rpGc)} (não conta)` : ""
+    r.rpGc != null ? ` · RP da GC: ${signed(r.rpGc)} (só informação)` : ""
   }`;
 
 const RP_GC: Col = {
@@ -120,8 +120,8 @@ const BASE_COLS: Col[] = [
   { key: "fk", label: "FK", title: "First kills", value: (r) => r.fk },
   {
     key: "rp",
-    label: "RP",
-    title: "RP do MeuMix (somado ao ELO da liga): resultado × força dos times + desempenho pela PTS",
+    label: "ELO",
+    title: "ELO ganho ou perdido no mix: resultado × força dos times + desempenho pela PTS",
     value: (r) => r.rp,
     render: (r) => (
       <span className={tone(r.rp)} title={r.rpResult != null ? rpBreakdown(r) : undefined}>
@@ -507,7 +507,7 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
                         <button
                           type="button"
                           aria-expanded={open?.key === r.key && open.kind === c.key}
-                          aria-label={`Ver a conta ${c.key === "pts" ? "da PTS" : "do RP"} de ${r.name}`}
+                          aria-label={`Ver a conta ${c.key === "pts" ? "da PTS" : "do ELO"} de ${r.name}`}
                           onClick={() =>
                             setOpen(
                               open?.key === r.key && open.kind === c.key
@@ -531,7 +531,7 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
                   <tr className="border-b border-border bg-surface-2/40">
                     <td colSpan={cols.length + 1} className="px-4 py-2 text-xs text-muted">
                       <span className="font-semibold text-fg">
-                        {open.kind === "pts" ? "Conta da PTS · " : "Conta do RP · "}
+                        {open.kind === "pts" ? "Conta da PTS · " : "Conta do ELO · "}
                       </span>
                       {open.kind === "pts" ? scoreBreakdown(r) : rpBreakdown(r)}
                     </td>
@@ -545,7 +545,7 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
       <p className="border-t border-border px-4 py-3 text-xs text-muted">
         <b className="text-fg">Ordem da planilha:</b> 1º o MVP, último o lanterna; o resto pela maior PTS (3 × K + 1,5 ×
         A + 1,2 × FK + 0,2 × ADR − 2 × D). Se empatar, mais kills fica na frente, depois mais assistências. Toque na PTS
-        de um jogador para ver a conta dele; no RP, a conta do RP.
+        de um jogador para ver a conta dele; no ELO, a conta do ELO.
       </p>
       <details className="group border-t border-border px-4 py-3 text-xs text-muted">
         <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>
@@ -571,11 +571,41 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
               <b className="text-fg">Lanterna</b> tem conta própria: o menor valor de kills + ADR ÷ 100 + KDR × 10.
             </li>
             <li>
-              A PTS define o MVP e a ordem da tabela e também entra no <b className="text-fg">RP do MeuMix</b>, que muda
-              o ELO: RP = resultado (vitória +10 / derrota −10 com times parelhos; vale mais contra time mais forte) +
-              desempenho (a sua PTS contra a média do mix, de −10 a +10). O RP da GC aparece só como informação. Toque
-              na PTS ou no RP de um jogador para ver a conta dele.
+              A PTS define o MVP e a ordem da tabela e também entra no <b className="text-fg">ELO</b> (veja abaixo).
             </li>
+          </ul>
+        </div>
+      </details>
+      <details className="group border-t border-border px-4 py-3 text-xs text-muted">
+        <summary className="cursor-pointer font-semibold text-fg select-none">Como o ELO é calculado?</summary>
+        <div className="mt-2 space-y-2 leading-relaxed">
+          <p className="rounded-md bg-surface-2/60 px-3 py-2 font-display text-sm font-bold text-fg">
+            ELO do mix = resultado + desempenho
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <b className="text-fg">Resultado</b> (vitória, empate ou derrota na série, pelos mapas): com times
+              parelhos, vitória <b className="text-fg">+10</b>, derrota <b className="text-fg">−10</b> e empate 0. Conta
+              a força dos times pelo ELO médio de cada um: ganhar de um time mais forte vale mais (até +20), e perder
+              para um mais fraco tira mais (até −20). Conta: 20 × (resultado − chance de vitória).
+            </li>
+            <li>
+              <b className="text-fg">Desempenho</b>: a sua PTS comparada com a média da PTS dos 10 jogadores do mix, de{" "}
+              <b className="text-fg">−10 a +10</b>. Conta: 15 × (sua PTS − média) ÷ média. Quem joga acima da média
+              ganha mais (ou perde menos); quem joga abaixo, o contrário. Mix sem estatísticas: 0.
+            </li>
+            <li>
+              O ELO de cada liga é separado (Mix da Lanterna e Mix do Jantinha) e começa no ELO inicial do seu nível da
+              GC. Fica entre 0 e 1600 e define o seu nível (1 a 10), o ranking e o equilíbrio dos times.
+            </li>
+            <li>
+              O ELO da liga é recalculado do histórico inteiro sempre que um mix é finalizado, excluído ou corrigido.
+            </li>
+            <li>
+              <b className="text-fg">RP GC</b>: o RP que a GC informou, só como informação. Não entra no ELO, porque
+              pode vir congelado ou dobrado.
+            </li>
+            <li>Toque no ELO de um jogador para ver a conta dele.</li>
           </ul>
         </div>
       </details>

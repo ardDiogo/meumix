@@ -169,7 +169,7 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
               {mvp.k}K / {mvp.a}A / {mvp.d}D
             </span>
             <span className="mt-2 rounded-full bg-purple-500/15 px-3 py-0.5 text-xs font-bold text-purple-400 tabular">
-              {signed(mvp.rp)} RP · {fmt2(kdrOf(mvp))} KDR
+              {signed(mvp.rp)} ELO · {fmt2(kdrOf(mvp))} KDR
             </span>
           </div>
         )}
@@ -219,7 +219,7 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
                 </span>
                 <span className="text-xs text-muted tabular">
                   {worst.adr != null ? `${worst.adr.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} ADR · ` : ""}
-                  {signed(worst.rp)} RP
+                  {signed(worst.rp)} ELO
                 </span>
               </div>
             </div>

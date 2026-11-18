@@ -157,7 +157,7 @@ const COLS: { label: string; width: number; gc?: boolean; cell: (r: Row) => Cell
   { label: "FA", width: 36, cell: (r) => ({ text: String(r.fa) }) },
   { label: "MK", width: 40, cell: (r) => ({ text: String(r.mk) }) },
   { label: "FK", width: 38, cell: (r) => ({ text: String(r.fk) }) },
-  { label: "RP", width: 52, cell: (r) => ({ text: signed(r.rp), color: tone(r.rp) }) },
+  { label: "ELO", width: 52, cell: (r) => ({ text: signed(r.rp), color: tone(r.rp) }) },
 ];
 
 const HL: Record<HighlightKey, { title: string; color: string; detail: (r: StatRow) => string }> = {
@@ -687,7 +687,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                   background: "rgba(168,85,247,0.16)",
                 }}
               >
-                {`${signed(mvp.rp)} RP · ${fmt(kdrOf(mvp), 2)} KDR`}
+                {`${signed(mvp.rp)} ELO · ${fmt(kdrOf(mvp), 2)} KDR`}
               </span>
             </div>
           )}
@@ -761,7 +761,7 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                   </span>
                   <span
                     style={{ fontSize: 14, color: C.muted }}
-                  >{`${fmt(worst.adr, 1)} ADR · ${signed(worst.rp)} RP`}</span>
+                  >{`${fmt(worst.adr, 1)} ADR · ${signed(worst.rp)} ELO`}</span>
                 </div>
               </div>
             )}
