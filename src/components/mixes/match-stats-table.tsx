@@ -29,6 +29,13 @@ type Col = {
 
 const fmt = (n: number | null, digits = 0) =>
   n == null ? "-" : n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+/** A conta da PTS do jogador, para o balão ao passar o mouse (ou tocar). */
+const scoreBreakdown = (r: StatRow) =>
+  `${r.name}: 3 × ${r.k} kills (${fmt(3 * r.k, 1)}) + 1,5 × ${r.a} assist. (${fmt(1.5 * r.a, 1)}) + 0,2 × ${fmt(
+    r.adr ?? 0,
+    1,
+  )} ADR (${fmt(0.2 * (r.adr ?? 0), 1)}) − 2 × ${r.d} mortes (${fmt(2 * r.d, 1)}) = ${fmt(mixScore(r), 1)}`;
+
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
 
@@ -38,7 +45,11 @@ const BASE_COLS: Col[] = [
     label: "PTS",
     title: "Pontuação do mix (a mesma do MVP): kills × 3 + assistências × 1,5 + ADR × 0,2 − mortes × 2",
     value: mixScore,
-    render: (r) => <span className="font-display font-bold">{fmt(mixScore(r), 1)}</span>,
+    render: (r) => (
+      <span className="cursor-help font-display font-bold" title={scoreBreakdown(r)}>
+        {fmt(mixScore(r), 1)}
+      </span>
+    ),
   },
   {
     key: "k",
@@ -462,6 +473,35 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
           </tbody>
         </table>
       </div>
+      <details className="group border-t border-border px-4 py-3 text-xs text-muted">
+        <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>
+        <div className="mt-2 space-y-2 leading-relaxed">
+          <p className="rounded-md bg-surface-2/60 px-3 py-2 font-display text-sm font-bold text-fg">
+            PTS = 3 × K + 1,5 × A + 0,2 × ADR − 2 × D
+          </p>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              <b className="text-fg">Entra na conta:</b> kills (+3 cada), assistências (+1,5 cada), ADR (dano médio por
+              round × 0,2) e mortes (−2 cada). Com mais de um mapa, K, A e D são somados e o ADR é a média pelos rounds.
+            </li>
+            <li>
+              <b className="text-fg">Não entra:</b> rating e swing da GC, KDR, KAST, HS%, FA, MK, FK e o placar do time.
+              O KDR aparece só de forma indireta, pelas kills e pelas mortes.
+            </li>
+            <li>
+              <b className="text-fg">Ordem da tabela:</b> o MVP (maior PTS da partida) vem primeiro, o lanterna por
+              último e o resto pela PTS. Se empatar, quem tem mais kills fica na frente, depois mais assistências.
+            </li>
+            <li>
+              <b className="text-fg">Lanterna</b> tem conta própria: o menor valor de kills + ADR ÷ 100 + KDR × 10.
+            </li>
+            <li>
+              A PTS só define o MVP e a ordem da tabela: <b className="text-fg">não mexe no ELO</b>, que vem do RP da
+              GC. Passe o mouse (ou toque) na PTS de um jogador para ver a conta dele.
+            </li>
+          </ul>
+        </div>
+      </details>
       {withGc && (
         <p className="border-t border-border px-4 py-3 text-xs text-subtle">
           Dados da Gamers Club. Com mais de um mapa, contagens são somadas e rating, ADR, KAST e mira são médias pelos
