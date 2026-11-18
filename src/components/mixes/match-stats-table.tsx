@@ -2,7 +2,7 @@
 
 import { ArrowDown, ArrowUp } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { MapIcon } from "@/components/maps/map-icon";
 import type { GcMapStored } from "@/lib/gc-api";
 import { aggregateGc, type GcLine } from "@/lib/gc-analysis";
@@ -30,11 +30,13 @@ type Col = {
 const fmt = (n: number | null, digits = 0) =>
   n == null ? "-" : n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 /** A conta da PTS do jogador, para o balão ao passar o mouse (ou tocar). */
-const scoreBreakdown = (r: StatRow) =>
-  `${r.name}: 3 × ${r.k} kills (${fmt(3 * r.k, 1)}) + 1,5 × ${r.a} assist. (${fmt(1.5 * r.a, 1)}) + 0,2 × ${fmt(
-    r.adr ?? 0,
-    1,
-  )} ADR (${fmt(0.2 * (r.adr ?? 0), 1)}) − 2 × ${r.d} mortes (${fmt(2 * r.d, 1)}) = ${fmt(mixScore(r), 1)}`;
+const scoreBreakdown = (r: StatRow) => {
+  const n = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  const adr = r.adr ?? 0;
+  return `${r.name}: 3 × ${r.k} kills (${n(3 * r.k)}) + 1,5 × ${r.a} assist. (${n(1.5 * r.a)}) + 0,2 × ${n(adr)} ADR (${n(
+    0.2 * adr,
+  )}) − 2 × ${r.d} mortes (${n(2 * r.d)}) = ${n(mixScore(r))}`;
+};
 
 const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
 const tone = (n: number) => (n > 0 ? "text-win" : n < 0 ? "text-loss" : "text-muted");
@@ -330,6 +332,8 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
   const withGc = gcMaps.length > 0;
   const [tab, setTab] = useState<Tab>("geral");
   const [only, setOnly] = useState<number | null>(null);
+  // Jogador com a conta da PTS aberta (toque ou clique na PTS).
+  const [openPts, setOpenPts] = useState<string | null>(null);
   const spec = TABS.find((t) => t.key === tab)!;
   const cols = useMemo(() => (tab === "geral" ? geralCols(withGc) : spec.cols), [tab, withGc, spec]);
   // Trocar de aba volta para a ordenação padrão dela.
@@ -442,37 +446,66 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
           </thead>
           <tbody>
             {sorted.map((r) => (
-              <tr key={r.key} className="border-b border-border last:border-0 hover:bg-surface-2/50">
-                <td className="px-4 py-2.5">
-                  <div className="flex items-center gap-2 font-semibold">
-                    <TeamDot side={r.team} />
-                    <Avatar name={r.name} src={r.avatarUrl} size="sm" />
-                    {r.userId ? (
-                      <Link
-                        href={r.profileNick ? `/jogadores/${playerSlug(r.profileNick)}` : `/jogadores/${r.userId}`}
-                        className="max-w-44 truncate hover:text-brand"
-                        title={r.name}
-                      >
-                        {shortNick(r.name)}
-                      </Link>
-                    ) : (
-                      <span className="max-w-44 truncate" title={`${r.name} · convidado (sem conta)`}>
-                        {shortNick(r.name)}
-                      </span>
-                    )}
-                    {r.elo != null && <LevelBadge elo={r.elo} />}
-                  </div>
-                </td>
-                {cols.map((c) => (
-                  <td key={c.key} className="px-2 py-2.5 text-center tabular">
-                    {c.render ? c.render(r) : c.value(r)}
+              <Fragment key={r.key}>
+                <tr className="border-b border-border last:border-0 hover:bg-surface-2/50">
+                  <td className="px-4 py-2.5">
+                    <div className="flex items-center gap-2 font-semibold">
+                      <TeamDot side={r.team} />
+                      <Avatar name={r.name} src={r.avatarUrl} size="sm" />
+                      {r.userId ? (
+                        <Link
+                          href={r.profileNick ? `/jogadores/${playerSlug(r.profileNick)}` : `/jogadores/${r.userId}`}
+                          className="max-w-44 truncate hover:text-brand"
+                          title={r.name}
+                        >
+                          {shortNick(r.name)}
+                        </Link>
+                      ) : (
+                        <span className="max-w-44 truncate" title={`${r.name} · convidado (sem conta)`}>
+                          {shortNick(r.name)}
+                        </span>
+                      )}
+                      {r.elo != null && <LevelBadge elo={r.elo} />}
+                    </div>
                   </td>
-                ))}
-              </tr>
+                  {cols.map((c) => (
+                    <td key={c.key} className="px-2 py-2.5 text-center tabular">
+                      {c.key === "pts" ? (
+                        <button
+                          type="button"
+                          aria-expanded={openPts === r.key}
+                          aria-label={`Ver a conta da PTS de ${r.name}`}
+                          onClick={() => setOpenPts(openPts === r.key ? null : r.key)}
+                          className="rounded-sm underline decoration-dotted underline-offset-4 hover:text-brand"
+                        >
+                          {c.render ? c.render(r) : c.value(r)}
+                        </button>
+                      ) : c.render ? (
+                        c.render(r)
+                      ) : (
+                        c.value(r)
+                      )}
+                    </td>
+                  ))}
+                </tr>
+                {openPts === r.key && (
+                  <tr className="border-b border-border bg-surface-2/40">
+                    <td colSpan={cols.length + 1} className="px-4 py-2 text-xs text-muted">
+                      <span className="font-semibold text-fg">Conta da PTS · </span>
+                      {scoreBreakdown(r)}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>
       </div>
+      <p className="border-t border-border px-4 py-3 text-xs text-muted">
+        <b className="text-fg">Ordem da planilha:</b> 1º o MVP, último o lanterna; o resto pela maior PTS (3 × K + 1,5 ×
+        A + 0,2 × ADR − 2 × D). Se empatar, mais kills fica na frente, depois mais assistências. Toque na PTS de um
+        jogador para ver a conta dele.
+      </p>
       <details className="group border-t border-border px-4 py-3 text-xs text-muted">
         <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>
         <div className="mt-2 space-y-2 leading-relaxed">
