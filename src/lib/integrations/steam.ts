@@ -73,13 +73,31 @@ export function parseSteamXml(xml: string): SteamProfile | { error: string } {
 
 const TIMEOUT = 10_000;
 
+/** Falha passageira da Steam (limite de consultas, instabilidade, tempo esgotado): vale tentar depois. */
+export class SteamTemporaryError extends Error {}
+
+const temporary = (status: number) => status === 429 || status >= 500;
+
 async function viaXml(input: SteamInput): Promise<SteamProfile> {
   const path = input.kind === "id64" ? `profiles/${input.value}` : `id/${encodeURIComponent(input.value)}`;
-  const res = await fetch(`https://steamcommunity.com/${path}/?xml=1`, {
-    headers: { accept: "text/xml" },
-    cache: "no-store",
-    signal: AbortSignal.timeout(TIMEOUT),
-  });
+  let res: Response | null = null;
+  // Limite de consultas (429) ou instabilidade: uma nova tentativa depois de uma pausa curta.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 1500));
+    try {
+      res = await fetch(`https://steamcommunity.com/${path}/?xml=1`, {
+        headers: { accept: "text/xml" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(TIMEOUT),
+      });
+    } catch {
+      res = null;
+      continue;
+    }
+    if (!temporary(res.status)) break;
+  }
+  if (!res) throw new SteamTemporaryError("a Steam não respondeu");
+  if (temporary(res.status)) throw new SteamTemporaryError(`a Steam respondeu ${res.status}`);
   if (!res.ok) throw new Error(`a Steam respondeu ${res.status}`);
   const parsed = parseSteamXml(await res.text());
   if ("error" in parsed) {
@@ -129,4 +147,14 @@ export async function fetchSteamProfile(input: SteamInput): Promise<SteamProfile
     }
   }
   return viaXml(input);
+}
+
+/**
+ * Vínculo sem a foto: link com SteamID64 e a Steam fora do ar ou limitando as
+ * consultas. Fica com steam_synced_at vazio e a foto é buscada depois (cron de avisos).
+ */
+export function offlineSteamProfile(input: SteamInput, error: unknown): SteamProfile | null {
+  return input.kind === "id64" && error instanceof SteamTemporaryError
+    ? { steamId: input.value, nickname: null, avatarUrl: null, profileUrl: steamProfileUrl(input.value)! }
+    : null;
 }

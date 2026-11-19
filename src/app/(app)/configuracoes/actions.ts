@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isPlatformAdmin } from "@/lib/auth/permissions";
-import { fetchSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
+import { fetchSteamProfile, offlineSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
@@ -47,11 +47,17 @@ export async function linkSteamProfile(input: string, targetUserId?: string): Pr
   }
 
   let profile;
+  let later = false;
   try {
     profile = await fetchSteamProfile(parsed);
   } catch (e) {
-    const reason = e instanceof Error ? e.message : "erro desconhecido";
-    return { ok: false, message: `Não foi possível ler o perfil na Steam (${reason}).` };
+    // Link com SteamID e a Steam limitando as consultas: vincula agora, a foto vem depois.
+    profile = offlineSteamProfile(parsed, e);
+    later = !!profile;
+    if (!profile) {
+      const reason = e instanceof Error ? e.message : "erro desconhecido";
+      return { ok: false, message: `Não foi possível ler o perfil na Steam (${reason}).` };
+    }
   }
 
   const { error } = await auth.admin
@@ -59,8 +65,8 @@ export async function linkSteamProfile(input: string, targetUserId?: string): Pr
     .update({
       steam_id: profile.steamId,
       steam_url: profile.profileUrl,
-      avatar_url: profile.avatarUrl,
-      steam_synced_at: new Date().toISOString(),
+      ...(later ? {} : { avatar_url: profile.avatarUrl }),
+      steam_synced_at: later ? null : new Date().toISOString(),
     })
     .eq("id", auth.userId);
   if (error) return { ok: false, message: dbError(error) };
@@ -74,9 +80,11 @@ export async function linkSteamProfile(input: string, targetUserId?: string): Pr
   refresh();
   return {
     ok: true,
-    message: profile.avatarUrl
-      ? `Perfil Steam vinculado${profile.nickname ? ` (${profile.nickname})` : ""}.`
-      : "Perfil vinculado, mas a Steam não retornou foto.",
+    message: later
+      ? "Perfil Steam vinculado. A Steam está limitando as consultas agora: a foto chega sozinha em alguns minutos."
+      : profile.avatarUrl
+        ? `Perfil Steam vinculado${profile.nickname ? ` (${profile.nickname})` : ""}.`
+        : "Perfil vinculado, mas a Steam não retornou foto.",
     avatarUrl: profile.avatarUrl,
     steamUrl: profile.profileUrl,
   };

@@ -6,7 +6,7 @@ import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { canManageAdmins, isSuperAdminEmail, isPlatformAdmin } from "@/lib/auth/permissions";
 import { validateDisplayName, validatePassword } from "@/lib/auth/validation";
-import { fetchSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
+import { fetchSteamProfile, offlineSteamProfile, parseSteamInput } from "@/lib/integrations/steam";
 import { resolveTwitchLogin } from "@/services/twitch";
 import { deleteAccount } from "@/services/account";
 import { ELO_CAP, levelForElo } from "@/lib/levels";
@@ -80,6 +80,7 @@ export async function updateUserData(userId: string, input: UserDataInput): Prom
   const { data: current } = await admin.from("profiles").select("steam_url").eq("id", userId).maybeSingle();
   const steamInput = input.steam.trim();
   let steamPatch: Record<string, unknown> = {};
+  let steamLater = false;
   if (!steamInput) {
     if (current?.steam_url) steamPatch = { steam_id: null, steam_url: null, avatar_url: null, steam_synced_at: null };
   } else {
@@ -97,10 +98,16 @@ export async function updateUserData(userId: string, input: UserDataInput): Prom
           steam_synced_at: new Date().toISOString(),
         };
       } catch (e) {
-        return {
-          ok: false,
-          message: `Não foi possível ler o perfil na Steam (${e instanceof Error ? e.message : "erro"}).`,
-        };
+        // Link com SteamID e a Steam limitando as consultas: vincula agora, a foto vem depois.
+        const offline = offlineSteamProfile(parsed, e);
+        if (offline) {
+          steamPatch = { steam_id: offline.steamId, steam_url: offline.profileUrl, steam_synced_at: null };
+          steamLater = true;
+        } else
+          return {
+            ok: false,
+            message: `Não foi possível ler o perfil na Steam (${e instanceof Error ? e.message : "erro"}).`,
+          };
       }
     }
   }
@@ -157,7 +164,12 @@ export async function updateUserData(userId: string, input: UserDataInput): Prom
   });
   await audit({ action: "admin.user_edit", outcome: "success", actorId: session.id, detail: { userId, nick } });
   refresh();
-  return { ok: true, message: `Dados de ${nick} salvos.` };
+  return {
+    ok: true,
+    message: steamLater
+      ? `Dados de ${nick} salvos. A Steam está limitando as consultas agora: o perfil foi vinculado e a foto chega sozinha em alguns minutos.`
+      : `Dados de ${nick} salvos.`,
+  };
 }
 
 /* ------------------------------- Editar ELO ------------------------------- */
