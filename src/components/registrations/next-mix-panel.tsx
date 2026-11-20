@@ -67,33 +67,54 @@ async function siteUrl() {
   return host ? `${proto}://${host}` : "https://meumix.vercel.app";
 }
 
-/** Texto do convite no formato do WhatsApp (*negrito*). */
+/** "21h" ou "21h30". */
+const hourShort = (d: Date) => {
+  const [h, m] = hourMin(d).split(":");
+  return m === "00" ? `${h}h` : `${h}h${m}`;
+};
+
+/**
+ * Texto do convite no formato do WhatsApp (*negrito*): o link de jogar (/confirmar, que
+ * já inscreve) e, bem separado, o de só acompanhar (/dashboard, que não inscreve).
+ */
 function inviteMessage(opts: {
   eventAt: Date;
   opensAt: Date;
   classified: string[];
   reserves: string[];
   maxPlayers: number;
-  link: string;
+  site: string;
 }) {
+  const left = opts.maxPlayers - opts.classified.length;
   const lines = [
-    `🎮 *MIX MEUMIX - ${weekday(opts.eventAt)}, ${dayMonth(opts.eventAt)} às ${hourMin(opts.eventAt)}*`,
-    `⏰ Inscrições abrem às ${hourMin(opts.opensAt)} (${dayMonth(opts.opensAt)})`,
-    `👥 ${opts.classified.length}/${opts.maxPlayers} jogadores classificados`,
+    `🎮 *MIX MEUMIX — ${weekday(opts.eventAt).toUpperCase()}, ${dayMonth(opts.eventAt)} ÀS ${hourShort(opts.eventAt).toUpperCase()}*`,
+    `⏰ Inscrições abrem às ${hourShort(opts.opensAt)} (${dayMonth(opts.opensAt)})`,
+    "",
+    `👥 ${opts.classified.length}/${opts.maxPlayers} jogadores confirmados`,
+    left > 0
+      ? `🔥 ${left} vaga${left > 1 ? "s" : ""} disponíve${left > 1 ? "is" : "l"}!`
+      : "🔥 Lista completa! Entre como reserva",
   ];
   if (opts.classified.length) {
     lines.push("", "📋 *Jogadores:*", ...opts.classified.map((n, i) => `${i + 1}. ${n}`));
   }
   if (opts.reserves.length) {
-    lines.push("", "🪑 *Suplentes:*", ...opts.reserves.map((n, i) => `${i + 1}. ${n}`));
+    lines.push("", "🪑 *Reservas:*", ...opts.reserves.map((n, i) => `${i + 1}. ${n}`));
   }
-  const left = opts.maxPlayers - opts.classified.length;
   lines.push(
     "",
-    left > 0
-      ? `🔥 Faltam ${left} vaga${left > 1 ? "s" : ""}! Confirme sua presença com 1 toque:`
-      : "✅ Vagas preenchidas! Entre como suplente com 1 toque:",
-    opts.link,
+    "━━━━━━━━━━",
+    "",
+    "🎯 *VAI JOGAR?*",
+    left > 0 ? "Garanta sua vaga na partida:" : "Entre na lista de reserva:",
+    `👉 ${opts.site}/confirmar`,
+    "",
+    "━━━━━━━━━━",
+    "",
+    "🧱 *VAI FICAR NO ALAMBRADO?*",
+    "Só quer acompanhar a resenha? Veja lista, times, bolão e resultados ao vivo.",
+    "⚠️ Este link *não* confirma vaga no mix:",
+    `👉 ${opts.site}/dashboard`,
   );
   return lines.join("\n");
 }
@@ -146,7 +167,7 @@ export async function NextMixPanel() {
     classified: classifiedList.map((r) => r.displayName),
     reserves: registrations.filter((r) => r.status === "reserve").map((r) => r.displayName),
     maxPlayers: schedule.maxPlayers,
-    link: `${await siteUrl()}/confirmar`,
+    site: await siteUrl(),
   });
   // PICK e times montados: insígnias e resumo dos jogadores, de uma vez (falha = sem os extras).
   const pickInfo = draft
