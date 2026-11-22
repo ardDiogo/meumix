@@ -30,7 +30,12 @@ export function CreateMixForm({ leagues = [] }: { leagues?: { id: string; name: 
   }, [state]);
 
   const errors = state.status === "invalid" ? state.errors : {};
-  const parsed = parseSchedule({ recurrence, date, eventTime, registrationOpensAt }, todayISO());
+  // "Hoje" é uma data única já com a data de hoje (sem procurar no calendário).
+  const today = todayISO();
+  const isToday = recurrence === "today";
+  const sentRecurrence = isToday ? "once" : recurrence;
+  const sentDate = isToday ? today : date;
+  const parsed = parseSchedule({ recurrence: sentRecurrence, date: sentDate, eventTime, registrationOpensAt }, today);
   const valid = Object.keys(parsed.errors).length === 0;
   const next = valid ? nextOccurrence(parsed.recurrence, new Date()) : null;
 
@@ -71,12 +76,8 @@ export function CreateMixForm({ leagues = [] }: { leagues?: { id: string; name: 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className={recurrence === "once" ? "" : "sm:col-span-2"}>
               <Label htmlFor="recurrence">Tipo de recorrência</Label>
-              <Select
-                id="recurrence"
-                name="recurrence"
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value)}
-              >
+              <Select id="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)}>
+                <option value="today">Hoje ({today.split("-").reverse().slice(0, 2).join("/")})</option>
                 {WEEKDAYS.map((d) => (
                   <option key={d.value} value={`weekly:${d.value}`}>
                     {describeRecurrence({ kind: "weekly", weekday: d.value })}
@@ -84,7 +85,9 @@ export function CreateMixForm({ leagues = [] }: { leagues?: { id: string; name: 
                 ))}
                 <option value="once">Data única</option>
               </Select>
-              <FieldError message={errors.recurrence} />
+              <input type="hidden" name="recurrence" value={sentRecurrence} />
+              {isToday && <input type="hidden" name="date" value={today} />}
+              <FieldError message={errors.recurrence ?? (isToday ? errors.date : undefined)} />
             </div>
             {recurrence === "once" && (
               <div>
