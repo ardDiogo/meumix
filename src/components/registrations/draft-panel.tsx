@@ -131,7 +131,16 @@ export function DraftPanel({
         />
       )}
       {draft.status === "ppt" ? (
-        <PptStage scheduleId={scheduleId} date={date} draft={draft} name={name} avatar={avatar} mySide={mySide} />
+        // Cada rodada (depois de um empate) começa do zero: sem a jogada da rodada anterior marcada.
+        <PptStage
+          key={`ppt-${draft.tieCount}`}
+          scheduleId={scheduleId}
+          date={date}
+          draft={draft}
+          name={name}
+          avatar={avatar}
+          mySide={mySide}
+        />
       ) : (
         <PickStage
           scheduleId={scheduleId}
@@ -211,7 +220,7 @@ function PptStage({
                 aria-pressed={choice === c.id}
                 onClick={() => setChoice(c.id)}
                 className={cn(
-                  "flex flex-col items-center gap-1 rounded-lg border py-4 transition-colors",
+                  "flex touch-manipulation flex-col items-center gap-1 rounded-lg border py-4 transition-colors select-none",
                   choice === c.id
                     ? "border-brand bg-brand/10"
                     : "border-border bg-surface-2 hover:border-border-strong",
