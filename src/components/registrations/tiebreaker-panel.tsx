@@ -108,6 +108,35 @@ export function TiebreakerPanel({
           </p>
         ))}
 
+        {tiebreaker.waiting && tiebreaker.tally.length > 0 && (
+          <div>
+            <div className="mb-1.5 text-[11px] font-semibold tracking-wider text-muted uppercase">Apuração ao vivo</div>
+            <ul className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
+              {tiebreaker.tally.map((m) => (
+                <li
+                  key={m.id}
+                  className={cn(
+                    "flex flex-col gap-1 rounded-md border px-3 py-1.5 text-sm",
+                    m.locked ? "border-brand/40 bg-brand/10" : "border-border bg-surface-2",
+                  )}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 font-semibold">
+                      <MapEmblem id={m.id as MapId} size={18} />
+                      {m.name}
+                      {m.locked && <span className="text-[10px] font-bold text-brand uppercase">garantido</span>}
+                    </span>
+                    <span className="text-xs text-muted tabular">
+                      {m.votes} {m.votes === 1 ? "voto" : "votos"}
+                    </span>
+                  </span>
+                  <VoterFaces voters={m.voters} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {tiebreaker.waiting && (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface-2/60 px-3 py-2 text-sm">
             <p className="text-muted">

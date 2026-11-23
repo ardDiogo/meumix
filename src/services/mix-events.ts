@@ -132,6 +132,8 @@ export interface TiebreakerView {
   pending: boolean;
   /** Votação de mapas ainda aberta e o top 4 em aberto: quantos classificados votaram. */
   waiting: { voted: number; total: number } | null;
+  /** Apuração ao vivo (com a votação aberta): votos e quem votou em cada mapa. */
+  tally: { id: string; name: string; votes: number; voters: Voter[]; locked: boolean }[];
 }
 
 export interface VoteSummary {
@@ -521,7 +523,7 @@ export async function loadTiebreaker(
   people?: Map<string, { name: string; avatarUrl: string | null }>,
 ): Promise<TiebreakerView> {
   const names = new Map(votes.maps.map((m) => [m.id, m.name]));
-  const empty: TiebreakerView = { enabled, rounds: [], finalMaps: [], pending: false, waiting: null };
+  const empty: TiebreakerView = { enabled, rounds: [], finalMaps: [], pending: false, waiting: null, tally: [] };
   const supabase = await createSupabaseServerClient();
   // Mapas se definem antes do PICK: o quadro aparece com a lista fechada (ou com os times prontos).
   const full = mapVoters ? mapVoters.total >= (mapVoters.max ?? mapVoters.total) : draft?.status === "completed";
@@ -561,6 +563,18 @@ export async function loadTiebreaker(
     enabled,
     pending: result.pending,
     waiting: result.waiting && mapVoters ? { voted: mapVoters.voted, total: mapVoters.total } : null,
+    tally: result.waiting
+      ? [...main]
+          .sort((x, y) => y.votes - x.votes)
+          .filter((m) => m.votes > 0)
+          .map((m) => ({
+            id: m.id,
+            name: names.get(m.id) ?? m.id,
+            votes: m.votes,
+            voters: votersOf((ballots ?? []).filter((b) => b.map_id === m.id)),
+            locked: result.maps.includes(m.id),
+          }))
+      : [],
     finalMaps: result.maps.map((id) => ({
       id,
       name: names.get(id) ?? id,
