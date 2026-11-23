@@ -15,6 +15,17 @@ export interface RoundRow {
   slots: number;
   winning_maps: string[];
   random_maps: string[];
+  /** "captains": só os 2 capitães escolhem (0059); "players": os 10 classificados (antigo). */
+  mode?: "players" | "captains";
+}
+
+/** Abre o round do desempate entre os capitães (sem a migração 0059: o round antigo, dos 10). */
+async function openRound(admin: Admin, row: Record<string, unknown>) {
+  const opts = { onConflict: "schedule_id,event_date,round_number", ignoreDuplicates: true };
+  const { error } = await admin.from("map_tiebreaker_rounds").upsert({ ...row, mode: "captains" }, opts);
+  if (error?.code === "42703" || error?.code === "PGRST204")
+    return admin.from("map_tiebreaker_rounds").upsert(row, opts);
+  return { error };
 }
 
 async function classifiedOf(admin: Admin, scheduleId: string, date: string) {
@@ -68,12 +79,7 @@ export async function detectTiebreaker(scheduleId: string, date: string, force =
   if (!force && remaining > 0) return;
   const tie = computeTie(tally, MAPS_IN_ROTATION);
   if (!tie.tie) return;
-  await admin
-    .from("map_tiebreaker_rounds")
-    .upsert(
-      { ...match, round_number: 1, candidate_maps: tie.zone, slots: tie.slots },
-      { onConflict: "schedule_id,event_date,round_number", ignoreDuplicates: true },
-    );
+  await openRound(admin, { ...match, round_number: 1, candidate_maps: tie.zone, slots: tie.slots });
 }
 
 /**
@@ -204,9 +210,11 @@ export async function forceMapDecision(scheduleId: string, date: string) {
         winning_maps: tie.zone,
         closed_at: new Date().toISOString(),
       };
-  const { error } = await admin
-    .from("map_tiebreaker_rounds")
-    .upsert(row, { onConflict: "schedule_id,event_date,round_number", ignoreDuplicates: true });
+  const { error } = tie.tie
+    ? await openRound(admin, row)
+    : await admin
+        .from("map_tiebreaker_rounds")
+        .upsert(row, { onConflict: "schedule_id,event_date,round_number", ignoreDuplicates: true });
   if (error) return { ok: false, message: "Não foi possível encerrar a votação de mapas." };
   return {
     ok: true,
@@ -226,12 +234,96 @@ export async function mapsReady(scheduleId: string, date: string) {
   if (!admin) return true;
   const match = { schedule_id: scheduleId, event_date: date };
   const [{ data: rounds }, { data: feature }] = await Promise.all([
-    admin.from("map_tiebreaker_rounds").select("status").match(match),
+    admin.from("map_tiebreaker_rounds").select("*").match(match),
     admin.from("feature_settings").select("enabled").eq("feature_key", "map_tiebreaker").maybeSingle(),
   ]);
-  if (rounds?.length) return !rounds.some((r) => r.status === "voting");
+  // Desempate entre os capitães em aberto: o PPT pode começar (o perdedor fica com o
+  // mapa da discordância); o PICK espera os mapas (pickPlayer).
+  if (rounds?.length) return !rounds.some((r) => r.status === "voting" && r.mode !== "captains");
   const { tally, remaining } = await mainMapVotes(admin, scheduleId, date);
   // Sem desempate ligado: com todos votando, vale a ordem da apuração.
   if (feature && !feature.enabled && remaining === 0) return true;
   return lockedMaps(tally, MAPS_IN_ROTATION, remaining).decided;
+}
+
+/** Algum desempate de mapas ainda em aberto (o PICK só começa com os mapas definidos). */
+export async function mapsPendingForPick(scheduleId: string, date: string) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return false;
+  const { data } = await admin
+    .from("map_tiebreaker_rounds")
+    .select("id")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .eq("status", "voting")
+    .limit(1);
+  return !!data?.length;
+}
+
+/**
+ * Desempate entre os capitães: com os dois votos, mapa escolhido pelos dois entra; na
+ * discordância, vale a escolha de quem perdeu o pedra-papel-tesoura (precisa do PPT
+ * concluído). `force` (admin): fecha com o que tiver (um voto só vale; nenhum, sorteio).
+ * Devolve "completed", "waiting_votes" ou "waiting_ppt".
+ */
+export async function resolveCaptainRound(roundId: string, force = false) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return "waiting_votes" as const;
+  const { data: round } = await admin.from("map_tiebreaker_rounds").select("*").eq("id", roundId).maybeSingle();
+  const r = round as RoundRow | null;
+  if (!r || r.status !== "voting") return "completed" as const;
+  const [{ data: draft }, { data: votes }] = await Promise.all([
+    admin
+      .from("mix_draft_state")
+      .select("captain_a, captain_b, status, winner")
+      .match({ schedule_id: r.schedule_id, event_date: r.event_date })
+      .maybeSingle(),
+    admin.from("map_tiebreaker_votes").select("user_id, maps").eq("round_id", roundId),
+  ]);
+  const choice = (id: string | null | undefined) =>
+    ((votes ?? []).find((v) => v.user_id === id)?.maps as string[] | undefined) ?? null;
+  const a = choice(draft?.captain_a as string | undefined);
+  const b = choice(draft?.captain_b as string | undefined);
+  const fill = (base: string[], extra: string[]) =>
+    [...base, ...extra.filter((m) => !base.includes(m))].slice(0, r.slots);
+
+  let winners: string[] | null = null;
+  let random: string[] = [];
+  if (a && b) {
+    const agreed = r.candidate_maps.filter((m) => a.includes(m) && b.includes(m));
+    if (agreed.length >= r.slots) winners = agreed.slice(0, r.slots);
+    else if (draft && draft.status !== "ppt" && draft.winner) {
+      const loser = draft.winner === draft.captain_a ? b : a;
+      winners = fill(agreed, loser);
+    } else if (!force) return "waiting_ppt" as const;
+    else winners = fill(agreed, secureSample(r.candidate_maps.filter((m) => !agreed.includes(m)), r.slots));
+  } else if (!force) return "waiting_votes" as const;
+  else if (a || b) winners = fill([], (a ?? b)!);
+  else {
+    random = secureSample(r.candidate_maps, r.slots);
+    winners = [];
+  }
+
+  await admin
+    .from("map_tiebreaker_rounds")
+    .update({
+      status: random.length ? "resolved_random" : "completed",
+      winning_maps: winners,
+      random_maps: random,
+      closed_at: new Date().toISOString(),
+    })
+    .eq("id", roundId)
+    .eq("status", "voting");
+  return "completed" as const;
+}
+
+/** Resolve os desempates entre capitães em aberto do mix (depois de um voto ou do PPT). */
+export async function resolveCaptainRounds(scheduleId: string, date: string) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return;
+  const { data } = await admin
+    .from("map_tiebreaker_rounds")
+    .select("*")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .eq("status", "voting");
+  for (const r of (data ?? []) as RoundRow[]) if (r.mode === "captains") await resolveCaptainRound(r.id);
 }
