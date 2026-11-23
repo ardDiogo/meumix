@@ -18,6 +18,7 @@
     "test:ligas": "tsx --test src/lib/league.test.ts",
     "test:faltas": "tsx --test src/lib/strikes.test.ts",
     "test:rp": "tsx --test src/lib/rp.test.ts",
+    "test:mapas": "tsx --test src/lib/map-tiebreak-lock.test.ts",
     "test:campeonato": "tsx --test src/lib/championship.test.ts src/lib/championship-draft.test.ts src/lib/championship-schedule.test.ts src/lib/championship-standings.test.ts src/lib/championship-playoffs.test.ts src/lib/championship-stats.test.ts"
   },
   "dependencies": {

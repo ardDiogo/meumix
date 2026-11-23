@@ -8,7 +8,22 @@ import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
 import { after } from "next/server";
 import { notifyTiebreaker } from "@/services/notify";
-import { closeRound, type RoundRow } from "@/services/tiebreaker";
+import { startDraftIfReady } from "@/services/mix-events";
+import { closeRound, forceMapDecision, type RoundRow } from "@/services/tiebreaker";
+
+/** Mapas definidos: se os capitães também estão, a escolha dos times começa. */
+async function startPickAfterMaps(scheduleId: string, date: string) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return;
+  const { data: draft } = await admin
+    .from("mix_draft_state")
+    .select("status")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .maybeSingle();
+  if (draft) return;
+  const { data } = await admin.rpc("mix_classified", { p_schedule: scheduleId, p_date: date });
+  await startDraftIfReady(scheduleId, date, (data as string[] | null) ?? []);
+}
 
 export type TiebreakResult = { ok: true; message: string } | { ok: false; message: string };
 const fail = (message: string): TiebreakResult => ({ ok: false, message });
@@ -51,8 +66,9 @@ export async function submitTiebreakerVote(roundId: string, maps: string[]): Pro
   });
   // O servidor revalida: só fecha quando todos os classificados votaram.
   const closed = await closeRound(roundId);
-  // Empate de novo: o round 2 abriu, avisa quem precisa votar.
+  // Empate de novo: o round 2 abriu, avisa quem precisa votar. Desempate decidido: libera o PICK.
   if (closed.message.includes("Round 2")) after(() => notifyTiebreaker(round.schedule_id, round.event_date));
+  else if (closed.ok) await startPickAfterMaps(round.schedule_id, round.event_date);
   revalidatePath("/dashboard");
   return {
     ok: true,
@@ -73,6 +89,13 @@ export async function forceCloseRound(roundId: string): Promise<TiebreakResult> 
       .eq("id", roundId)
       .maybeSingle();
     if (r) after(() => notifyTiebreaker(r.schedule_id as string, r.event_date as string));
+  } else if (result.ok) {
+    const { data: r } = await createSupabaseAdminClient()!
+      .from("map_tiebreaker_rounds")
+      .select("schedule_id, event_date")
+      .eq("id", roundId)
+      .maybeSingle();
+    if (r) await startPickAfterMaps(r.schedule_id as string, r.event_date as string);
   }
   await audit({
     action: "admin.force_close_tiebreaker",
@@ -80,6 +103,25 @@ export async function forceCloseRound(roundId: string): Promise<TiebreakResult> 
     actorId: session!.id,
     detail: { round_id: roundId },
   });
+  revalidatePath("/dashboard");
+  return result.ok ? { ok: true, message: result.message } : fail(result.message);
+}
+
+/** Admin: encerra a votação de mapas com os votos atuais (quando falta voto e o top 4 está em aberto). */
+export async function forceMapVoting(scheduleId: string, date: string): Promise<TiebreakResult> {
+  const session = await getSession();
+  if (!canManageMixes(session) || !(await canManageLeagueOf({ scheduleId })))
+    return fail("Apenas administradores da liga podem encerrar a votação de mapas.");
+  const result = await forceMapDecision(scheduleId, date);
+  await audit({
+    action: "admin.force_map_voting",
+    outcome: result.ok ? "success" : "error",
+    actorId: session!.id,
+    scheduleId,
+    eventDate: date,
+  });
+  if (result.ok && "tiebreak" in result && result.tiebreak) after(() => notifyTiebreaker(scheduleId, date));
+  else if (result.ok) await startPickAfterMaps(scheduleId, date);
   revalidatePath("/dashboard");
   return result.ok ? { ok: true, message: result.message } : fail(result.message);
 }

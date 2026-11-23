@@ -1,5 +1,5 @@
 import "server-only";
-import { computeTie, countVotes, secureSample, type Tally } from "@/lib/map-tiebreak";
+import { computeTie, countVotes, lockedMaps, secureSample, type Tally } from "@/lib/map-tiebreak";
 import { MAPS_IN_ROTATION } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -24,6 +24,11 @@ async function classifiedOf(admin: Admin, scheduleId: string, date: string) {
 
 /** Votação principal: contagem só dos classificados, incluindo mapas ativos sem voto. */
 export async function mainMapTally(admin: Admin, scheduleId: string, date: string): Promise<Tally> {
+  return (await mainMapVotes(admin, scheduleId, date)).tally;
+}
+
+/** Contagem da votação principal e quantos classificados ainda não votaram nos mapas. */
+export async function mainMapVotes(admin: Admin, scheduleId: string, date: string) {
   const [classified, votes, maps] = await Promise.all([
     classifiedOf(admin, scheduleId, date),
     admin.from("map_votes").select("user_id, map_id").match({ schedule_id: scheduleId, event_date: date }),
@@ -35,26 +40,33 @@ export async function mainMapTally(admin: Admin, scheduleId: string, date: strin
     if (!classified.includes(v.user_id as string)) continue;
     ballots.set(v.user_id as string, [...(ballots.get(v.user_id as string) ?? []), v.map_id as string]);
   }
-  return countVotes(ids, [...ballots.values()]);
+  return { tally: countVotes(ids, [...ballots.values()]), remaining: Math.max(0, classified.length - ballots.size) };
 }
 
 /**
- * 'detect' (idempotente): com a escolha dos times concluída e a chave ligada,
- * abre o Round 1 se o 4º lugar estiver empatado.
+ * 'detect' (idempotente): com a lista fechada e a chave ligada, abre o Round 1 se o
+ * 4º lugar estiver empatado com todos os classificados votando (antes do PICK).
  */
-export async function detectTiebreaker(scheduleId: string, date: string) {
+export async function detectTiebreaker(scheduleId: string, date: string, force = false) {
   const admin = createSupabaseAdminClient();
   if (!admin) return;
   const match = { schedule_id: scheduleId, event_date: date };
-  const [{ data: feature }, { data: draft }, { data: existing }] = await Promise.all([
+  const [{ data: feature }, { data: schedule }, { data: existing }] = await Promise.all([
     admin.from("feature_settings").select("enabled").eq("feature_key", "map_tiebreaker").maybeSingle(),
-    admin.from("mix_draft_state").select("status").match(match).maybeSingle(),
+    admin.from("mix_schedules").select("max_players").eq("id", scheduleId).maybeSingle(),
     admin.from("map_tiebreaker_rounds").select("id").match(match).limit(1),
   ]);
   if (feature && !feature.enabled) return;
-  if (draft?.status !== "completed" || existing?.length) return;
+  if (existing?.length) return;
+  // Os mapas se definem antes do PICK, com a lista fechada.
+  const classified = await classifiedOf(admin, scheduleId, date);
+  if (classified.length < ((schedule?.max_players as number | undefined) ?? 10)) return;
 
-  const tie = computeTie(await mainMapTally(admin, scheduleId, date), MAPS_IN_ROTATION);
+  const { tally, remaining } = await mainMapVotes(admin, scheduleId, date);
+  // Como nos capitães: só decide quando os votos que faltam não mudam o resultado.
+  // Com votos faltando e o top 4 em aberto, espera (o admin pode forçar).
+  if (!force && remaining > 0) return;
+  const tie = computeTie(tally, MAPS_IN_ROTATION);
   if (!tie.tie) return;
   await admin
     .from("map_tiebreaker_rounds")
@@ -65,7 +77,8 @@ export async function detectTiebreaker(scheduleId: string, date: string) {
 }
 
 /**
- * 'close' (idempotente): exige o voto de todos os classificados, a menos que `force`.
+ * 'close' (idempotente): exige o voto de todos os classificados (ou que os votos que
+ * faltam já não mudem o resultado), a menos que `force`.
  * Sem empate → completed; empate no round 1 → abre round 2; empate no round 2 → sorteio.
  */
 export async function closeRound(roundId: string, force = false): Promise<{ ok: boolean; message: string }> {
@@ -79,17 +92,17 @@ export async function closeRound(roundId: string, force = false): Promise<{ ok: 
   const classified = await classifiedOf(admin, r.schedule_id, r.event_date);
   const { data: votes } = await admin.from("map_tiebreaker_votes").select("user_id, maps").eq("round_id", roundId);
   const valid = (votes ?? []).filter((v) => classified.includes(v.user_id as string));
+  const tally = countVotes(
+    r.candidate_maps,
+    valid.map((v) => v.maps as string[]),
+  );
+  // Fecha antes de todos votarem quando os votos que faltam já não mudam o resultado.
   if (!force && valid.length < classified.length) {
-    return { ok: false, message: `Aguardando votos (${valid.length}/${classified.length}).` };
+    if (!lockedMaps(tally, r.slots, classified.length - valid.length).decided)
+      return { ok: false, message: `Aguardando votos (${valid.length}/${classified.length}).` };
   }
 
-  const tie = computeTie(
-    countVotes(
-      r.candidate_maps,
-      valid.map((v) => v.maps as string[]),
-    ),
-    r.slots,
-  );
+  const tie = computeTie(tally, r.slots);
   const closedAt = new Date().toISOString();
   let update: Partial<RoundRow> & { closed_at: string };
   if (!tie.tie) {
@@ -127,14 +140,24 @@ export async function closeRound(roundId: string, force = false): Promise<{ ok: 
 }
 
 /** Mapas finais: garantidos da votação principal + vencedores dos rounds. */
-export function finalMaps(main: Tally, rounds: RoundRow[], tiebreakerEnabled: boolean) {
+export function finalMaps(main: Tally, rounds: RoundRow[], tiebreakerEnabled: boolean, remaining = 0) {
   const tie = computeTie(main, MAPS_IN_ROTATION);
+  if (!rounds.length && remaining > 0) {
+    // Votos faltando: só os mapas que eles já não conseguem tirar do top 4.
+    const lock = lockedMaps(main, MAPS_IN_ROTATION, remaining);
+    return { maps: lock.locked, random: [] as string[], pending: !lock.decided, waiting: !lock.decided };
+  }
   if (!rounds.length) {
     // Desempate desligado: vale a ordem da apuração.
     if (!tie.tie || !tiebreakerEnabled) {
-      return { maps: [...tie.guaranteed, ...tie.zone.slice(0, tie.slots)], random: [] as string[], pending: false };
+      return {
+        maps: [...tie.guaranteed, ...tie.zone.slice(0, tie.slots)],
+        random: [] as string[],
+        pending: false,
+        waiting: false,
+      };
     }
-    return { maps: tie.guaranteed, random: [] as string[], pending: true };
+    return { maps: tie.guaranteed, random: [] as string[], pending: true, waiting: false };
   }
   const r1 = rounds.find((r) => r.round_number === 1);
   const r2 = rounds.find((r) => r.round_number === 2);
@@ -145,5 +168,61 @@ export function finalMaps(main: Tally, rounds: RoundRow[], tiebreakerEnabled: bo
     ...(r2?.random_maps ?? []),
   ];
   const pending = rounds.some((r) => r.status === "voting");
-  return { maps, random: r2?.random_maps ?? [], pending };
+  return { maps, random: r2?.random_maps ?? [], pending, waiting: false };
+}
+
+/**
+ * Admin encerra a votação de mapas com os votos atuais (alguém não votou e o top 4
+ * segue em aberto). Empate na última vaga → abre o desempate; sem empate → grava um
+ * round já concluído com os mapas da linha de corte. Depois disso, a votação de mapas
+ * fica fechada (os votos não mudam mais o resultado).
+ */
+export async function forceMapDecision(scheduleId: string, date: string) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "Servidor não configurado." };
+  const match = { schedule_id: scheduleId, event_date: date };
+  const { data: existing } = await admin.from("map_tiebreaker_rounds").select("id").match(match).limit(1);
+  if (existing?.length) return { ok: true, message: "A votação de mapas já está encerrada." };
+  const tie = computeTie(await mainMapTally(admin, scheduleId, date), MAPS_IN_ROTATION);
+  const row = tie.tie
+    ? { ...match, round_number: 1, candidate_maps: tie.zone, slots: tie.slots }
+    : {
+        ...match,
+        round_number: 1,
+        candidate_maps: tie.zone,
+        slots: tie.slots,
+        status: "completed",
+        winning_maps: tie.zone,
+        closed_at: new Date().toISOString(),
+      };
+  const { error } = await admin
+    .from("map_tiebreaker_rounds")
+    .upsert(row, { onConflict: "schedule_id,event_date,round_number", ignoreDuplicates: true });
+  if (error) return { ok: false, message: "Não foi possível encerrar a votação de mapas." };
+  return {
+    ok: true,
+    message: tie.tie
+      ? "Votação encerrada: empate na última vaga, desempate aberto."
+      : "Votação encerrada: mapas definidos.",
+    tiebreak: tie.tie,
+  };
+}
+
+/**
+ * Mapas definidos (o PICK pode começar): os votos que faltam já não mudam o top 4,
+ * ou todos votaram e não há empate, ou o desempate já terminou.
+ */
+export async function mapsReady(scheduleId: string, date: string) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return true;
+  const match = { schedule_id: scheduleId, event_date: date };
+  const [{ data: rounds }, { data: feature }] = await Promise.all([
+    admin.from("map_tiebreaker_rounds").select("status").match(match),
+    admin.from("feature_settings").select("enabled").eq("feature_key", "map_tiebreaker").maybeSingle(),
+  ]);
+  if (rounds?.length) return !rounds.some((r) => r.status === "voting");
+  const { tally, remaining } = await mainMapVotes(admin, scheduleId, date);
+  // Sem desempate ligado: com todos votando, vale a ordem da apuração.
+  if (feature && !feature.enabled && remaining === 0) return true;
+  return lockedMaps(tally, MAPS_IN_ROTATION, remaining).decided;
 }

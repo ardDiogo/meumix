@@ -9,7 +9,7 @@ import { headers } from "next/headers";
 import { after } from "next/server";
 import { canManageMixes } from "@/lib/auth/permissions";
 import { currentOccurrence, registrationWindow } from "@/lib/mix-schedule";
-import { allClassifiedVoted, captainsDecided, CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
+import { CAPTAIN_VOTES_PER_PLAYER, MAP_VOTES_PER_PLAYER } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { confirmLinkUser } from "@/services/confirm-links";
@@ -17,8 +17,9 @@ import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
 import { getFeatures } from "@/services/features";
 import { starterDelaySeconds } from "@/services/starters";
-import { notifyCaptains, notifyDraftReview, notifyRepick, notifyVoteCall } from "@/services/notify";
-import { toSchedule, type ScheduleRow } from "@/services/mix-events";
+import { notifyCaptains, notifyDraftReview, notifyRepick, notifyTiebreaker, notifyVoteCall } from "@/services/notify";
+import { detectTiebreaker } from "@/services/tiebreaker";
+import { startDraftIfReady, toSchedule, type ScheduleRow } from "@/services/mix-events";
 
 /**
  * `code` permite à tela decidir se tenta de novo: só `error` (falha técnica)
@@ -440,6 +441,13 @@ async function requireClassifiedVoter(scheduleId: string, date: string) {
 export async function submitMapVotes(scheduleId: string, date: string, mapIds: string[]): Promise<ActionResult> {
   const v = await requireClassifiedVoter(scheduleId, date);
   if ("error" in v) return v.error!;
+  // Desempate aberto (ou votação encerrada pelo admin): os votos de mapas não mudam mais.
+  const { data: rounds } = await v.ctx.admin
+    .from("map_tiebreaker_rounds")
+    .select("id")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .limit(1);
+  if (rounds?.length) return fail("A votação de mapas já foi encerrada.", "closed");
   const unique = [...new Set(mapIds)];
   if (unique.length !== MAP_VOTES_PER_PLAYER) {
     return fail(`Escolha exatamente ${MAP_VOTES_PER_PLAYER} mapas.`, "invalid");
@@ -462,6 +470,18 @@ export async function submitMapVotes(scheduleId: string, date: string, mapIds: s
     eventDate: date,
     detail: { maps: unique },
   });
+  // Times já definidos: com este voto, o top 4 pode ter ficado decidido (ou empatado com todos votando).
+  const { data: draft } = await v.ctx.admin
+    .from("mix_draft_state")
+    .select("status")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .maybeSingle();
+  // Lista fechada: este voto pode ter definido os mapas (ou aberto o desempate) e liberado o PICK.
+  if (v.classified.length >= v.ctx.schedule.maxPlayers) {
+    await detectTiebreaker(scheduleId, date);
+    after(() => notifyTiebreaker(scheduleId, date));
+    if (!draft) await startDraftIfReady(scheduleId, date, v.classified);
+  }
   refresh();
   return { ok: true, message: "Voto de mapas registrado!" };
 }
@@ -502,31 +522,8 @@ export async function submitCaptainVotes(
     detail: { candidates: unique },
   });
 
-  // Todos os classificados votaram nos 2 capitães: a disputa começa sozinha.
-  if (v.classified.length >= v.ctx.schedule.maxPlayers) {
-    const { data: votes } = await v.ctx.admin.from("captain_votes").select("voter_id, candidate_id").match(occurrence);
-    // Começa antes se o 2º colocado já não pode ser alcançado (seção 4).
-    const decided = captainsDecided(
-      v.classified,
-      (votes ?? []).map((x) => ({ voter: x.voter_id as string, candidate: x.candidate_id as string })),
-    );
-    // Com sugestão de times ainda em votação, espera o resultado dela.
-    const { data: pending } = await v.ctx.admin
-      .from("mix_team_suggestions")
-      .select("status")
-      .match(occurrence)
-      .eq("status", "pending")
-      .maybeSingle();
-    // Todos os classificados votaram (1 ou 2 capitães cada): reservas não contam.
-    const everyone = allClassifiedVoted(
-      v.classified,
-      (votes ?? []).map((x) => ({ voter: x.voter_id as string, candidate: x.candidate_id as string })),
-    );
-    if ((everyone || decided) && !pending) {
-      const { error } = await v.ctx.admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
-      if (!error) after(() => notifyCaptains(scheduleId, date));
-    }
-  }
+  // Capitães e mapas decididos (os votos que faltam não mudam nada): a disputa começa sozinha.
+  if (v.classified.length >= v.ctx.schedule.maxPlayers) await startDraftIfReady(scheduleId, date, v.classified);
   refresh();
   return { ok: true, message: "Voto de capitães registrado!" };
 }

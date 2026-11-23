@@ -10,7 +10,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { after } from "next/server";
 import { getFeatures } from "./features";
 import { activePenalties } from "./penalties";
-import { finalMaps, type RoundRow } from "./tiebreaker";
+import { detectTiebreaker, finalMaps, mapsReady, type RoundRow } from "./tiebreaker";
 import type { MixRecurrence, Weekday } from "@/types/domain";
 import { profileAvatars } from "./avatars";
 import { listAllMaps } from "./maps";
@@ -111,6 +111,8 @@ export interface TiebreakerView {
   /** `votes`: votos na votação de mapas; `tiebreakVotes`: no desempate que o definiu (se houve). */
   finalMaps: { id: string; name: string; random: boolean; votes: number; tiebreakVotes: number | null }[];
   pending: boolean;
+  /** Votação de mapas ainda aberta e o top 4 em aberto: quantos classificados votaram. */
+  waiting: { voted: number; total: number } | null;
 }
 
 export interface VoteSummary {
@@ -326,9 +328,10 @@ async function cancelledOccurrences(): Promise<Set<string>> {
 }
 
 /**
- * Começa a seleção de equipes se a lista está fechada e todos os classificados votaram
- * nos capitães (1 ou 2 votos cada; reservas não contam) ou os 2 capitães já estão
- * garantidos, e não há sugestão de times em votação. Devolve true se começou.
+ * Começa a seleção de equipes se a lista está fechada, os capitães estão decididos (todos
+ * os classificados votaram, ou os votos que faltam não mudam os 2 capitães), os mapas
+ * estão definidos (idem, ou o desempate terminou) e não há sugestão de times em votação.
+ * Devolve true se começou.
  */
 export async function startDraftIfReady(scheduleId: string, date: string, classified: string[]) {
   const admin = createSupabaseAdminClient();
@@ -341,6 +344,9 @@ export async function startDraftIfReady(scheduleId: string, date: string, classi
   if (error || pending) return false;
   const list = (votes ?? []).map((x) => ({ voter: x.voter_id as string, candidate: x.candidate_id as string }));
   if (!allClassifiedVoted(classified, list) && !captainsDecided(classified, list)) return false;
+  // Mapas antes do PICK: com todos votando e empate, abre o desempate e espera por ele.
+  await detectTiebreaker(scheduleId, date);
+  if (!(await mapsReady(scheduleId, date))) return false;
   const { error: startError } = await admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
   if (startError) return false;
   after(() => import("./notify").then((m) => m.notifyCaptains(scheduleId, date)));
@@ -396,7 +402,11 @@ export async function getNextMix(
   const reviewClient = await createSupabaseServerClient();
   const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA, review, discipline] = await Promise.all([
     activePenalties(ids),
-    loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId),
+    loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId, {
+      voted: registrations.filter((r) => r.status === "classified" && r.mapVoted).length,
+      total: classified.length,
+      max: next.schedule.maxPlayers,
+    }),
     loadFinalizedMatch(next.schedule.id, next.occurrence.date),
     loadSuggestion(next.schedule.id, next.occurrence.date, viewerId, classified),
     draft?.status === "completed" ? teamWinProbability(draft.teamA, draft.teamB, next.schedule.id) : null,
@@ -467,11 +477,15 @@ export async function loadTiebreaker(
   draft: DraftView | null,
   enabled: boolean,
   viewerId: string | null,
+  /** Classificados que já votaram nos mapas / total (sem isso, conta como todos votaram). */
+  mapVoters?: { voted: number; total: number; max?: number },
 ): Promise<TiebreakerView> {
   const names = new Map(votes.maps.map((m) => [m.id, m.name]));
-  const empty: TiebreakerView = { enabled, rounds: [], finalMaps: [], pending: false };
+  const empty: TiebreakerView = { enabled, rounds: [], finalMaps: [], pending: false, waiting: null };
   const supabase = await createSupabaseServerClient();
-  if (!supabase || draft?.status !== "completed") return empty;
+  // Mapas se definem antes do PICK: o quadro aparece com a lista fechada (ou com os times prontos).
+  const full = mapVoters ? mapVoters.total >= (mapVoters.max ?? mapVoters.total) : draft?.status === "completed";
+  if (!supabase || !full) return empty;
 
   const { data: rounds } = await supabase
     .from("map_tiebreaker_rounds")
@@ -491,11 +505,13 @@ export async function loadTiebreaker(
 
   const counts = new Map(votes.mapTally.map((m) => [m.id, m.votes]));
   const main = votes.maps.map((m) => ({ id: m.id, votes: counts.get(m.id) ?? 0 }));
-  const result = finalMaps(main, rows, enabled);
+  const remaining = mapVoters ? Math.max(0, mapVoters.total - mapVoters.voted) : 0;
+  const result = finalMaps(main, rows, enabled, remaining);
 
   const view: TiebreakerView = {
     enabled,
     pending: result.pending,
+    waiting: result.waiting && mapVoters ? { voted: mapVoters.voted, total: mapVoters.total } : null,
     finalMaps: result.maps.map((id) => ({
       id,
       name: names.get(id) ?? id,

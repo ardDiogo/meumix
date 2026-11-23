@@ -56,3 +56,32 @@ export function countVotes(candidates: string[], ballots: string[][]): Tally {
   }
   return candidates.map((id) => ({ id, votes: counts.get(id)! }));
 }
+
+/**
+ * Mapas já garantidos com `remaining` classificados ainda sem votar (cada voto
+ * marca `MAP_VOTES_PER_PLAYER` mapas diferentes, então cada mapa ganha no máximo
+ * 1 voto por pessoa). Um mapa está garantido quando, mesmo com todos os votos que
+ * faltam indo para os rivais, menos de `n` deles conseguem alcançá-lo (empate conta
+ * como alcançar). Está fora quando `n` rivais já têm mais votos do que ele consegue
+ * chegar. `decided`: todos garantidos ou fora — os votos que faltam não mudam nada.
+ */
+export function lockedMaps(tally: Tally, n: number, remaining: number) {
+  if (remaining <= 0) {
+    const tie = computeTie(tally, n);
+    return { locked: tie.tie ? tie.guaranteed : [...tie.guaranteed, ...tie.zone], decided: !tie.tie };
+  }
+  if (tally.length <= n) return { locked: tally.map((m) => m.id), decided: true };
+  const locked: string[] = [];
+  let undecided = 0;
+  for (const m of tally) {
+    const rivals = tally.filter((x) => x.id !== m.id);
+    const canReach = rivals.filter((x) => x.votes + remaining >= m.votes).length;
+    const above = rivals.filter((x) => x.votes > m.votes + remaining).length;
+    if (canReach < n) locked.push(m.id);
+    else if (above < n) undecided++;
+  }
+  const ordered = sortTally(tally)
+    .map((m) => m.id)
+    .filter((id) => locked.includes(id));
+  return { locked: ordered, decided: undecided === 0 && ordered.length === n };
+}

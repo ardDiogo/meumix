@@ -249,6 +249,7 @@ export async function NextMixPanel() {
                   myCaptains={votes.mine.captains}
                   captainsLocked={!!draft}
                   mandatory={full}
+                  mapsClosed={result.mix.tiebreaker.rounds.length > 0}
                   suggestion={
                     !draft && result.mix.suggestion?.status === "pending"
                       ? {
@@ -312,6 +313,18 @@ export async function NextMixPanel() {
         </div>
       </Card>
 
+      {/* Mapas antes do PICK: aparecem com a lista fechada. */}
+      {(full || draft?.status === "completed") && (
+        <TiebreakerPanel
+          scheduleId={schedule.id}
+          date={occurrence.date}
+          tiebreaker={result.mix.tiebreaker}
+          classifiedCount={classified}
+          isClassified={mine?.status === "classified"}
+          isAdmin={canManageMixes}
+        />
+      )}
+
       {draft && (
         <DraftPanel
           scheduleId={schedule.id}
@@ -340,15 +353,6 @@ export async function NextMixPanel() {
           names={Object.fromEntries(registrations.map((r) => [r.userId, r.displayName]))}
           avatars={Object.fromEntries(registrations.map((r) => [r.userId, r.avatarUrl]))}
           canVote={mine?.status === "classified"}
-          isAdmin={canManageMixes}
-        />
-      )}
-
-      {draft?.status === "completed" && (
-        <TiebreakerPanel
-          tiebreaker={result.mix.tiebreaker}
-          classifiedCount={classified}
-          isClassified={mine?.status === "classified"}
           isAdmin={canManageMixes}
         />
       )}

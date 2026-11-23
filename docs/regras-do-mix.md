@@ -78,12 +78,14 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 - Cada jogador escolhe **exatamente 4 mapas** dentre os mapas ativos configurados pelo admin. Pode trocar o voto (substitui o anterior).
 - Só contam votos dos **classificados**.
 - Entram na rotação os **4 mais votados**.
+- **Os mapas se definem antes do PICK**: com a lista fechada, ficam definidos quando todos os classificados votaram, ou antes, quando os votos que faltam já não mudam o top 4 (mesmo indo todos para os rivais). Enquanto isso o quadro "Mapas do mix" mostra "Aguardando votos (x/10)".
+- O admin pode **encerrar a votação de mapas** com os votos atuais (alguém não votou). Encerrada (ou com desempate aberto), a votação de mapas não aceita mais votos.
 
 **Desempate de mapas** (pode ser desligado no admin)
 
-- Roda só depois que os times estão escolhidos.
-- Se o 4º lugar está empatado com mais mapas do que vagas restantes, abre o **Round 1** só com os mapas empatados; cada classificado vota no número de vagas restantes.
-- Fecha quando todos os 10 votaram (ou o admin força o fechamento).
+- Roda antes do PICK, com a lista fechada e todos votando (ou com a votação encerrada pelo admin).
+- Se o 4º lugar está empatado com mais mapas do que vagas restantes, abre o **Round 1** só com os mapas empatados; cada classificado vota no número de vagas restantes. Quem precisa votar recebe aviso no celular (e um lembrete 30 min depois).
+- Fecha quando todos os 10 votaram, ou antes se os votos que faltam já não mudam o resultado (ou o admin força o fechamento).
 - Persistindo o empate → **Round 2** apenas com os que continuam empatados.
 - Persistindo de novo → **sorteio aleatório** seguro, marcado como "Decidido por sorteio".
 - A votação principal nunca é reaberta.
@@ -92,7 +94,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 
 - Cada classificado vota em **até 2 jogadores**; não pode votar em si mesmo; só pode votar em classificados. Cada par voto/votado é único.
 - Os **2 mais votados** viram capitães.
-- **Quando começa:** com a lista fechada (10 classificados), assim que **todos os classificados votaram** (1 ou 2 capitães cada). Reservas não votam e não contam. A checagem roda a cada voto e também ao abrir o mix.
+- **Quando começa a escolha dos times (PPT e PICK):** com a lista fechada (10 classificados), quando os **capitães e os mapas estão decididos**: todos os classificados votaram, ou os votos que faltam já não mudam os 2 capitães nem os 4 mapas. Empate nos mapas com todos votando: o desempate acontece antes. Reservas não votam e não contam. A checagem roda a cada voto (capitães, mapas, desempate) e também ao abrir o mix. O admin ainda pode iniciar a seleção à mão.
 - **Bloqueio de voto tardio:** assim que a disputa de capitães (pedra-papel-tesoura) começa, o banco recusa novos votos. A tela também verifica antes de enviar e pula direto para a votação de mapas.
 - Se o resultado já está matematicamente garantido, a etapa pode avançar antes.
 

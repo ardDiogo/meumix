@@ -36,6 +36,7 @@ export function VoteDialog({
   myCaptains,
   captainsLocked,
   mandatory,
+  mapsClosed = false,
   suggestion = null,
 }: {
   scheduleId: string;
@@ -47,6 +48,8 @@ export function VoteDialog({
   /** A disputa de capitães começou: votos de capitão encerrados (pula para mapas). */
   captainsLocked: boolean;
   mandatory: boolean;
+  /** Votação de mapas encerrada (desempate aberto ou encerrada pelo admin): não cobra o voto de mapas. */
+  mapsClosed?: boolean;
   /** Sugestão de times em votação (nomes já resolvidos): é a 1ª etapa. */
   suggestion?: DialogSuggestion | null;
 }) {
@@ -54,7 +57,7 @@ export function VoteDialog({
   // Com a sugestão em votação, capitães só se ela for recusada.
   const captainsOff = captainsLocked || !!suggestion;
   const pendingCaptains = !captainsOff && myCaptains.length === 0 && candidates.length > 0;
-  const pendingMaps = myMaps.length !== MAP_VOTES_PER_PLAYER;
+  const pendingMaps = !mapsClosed && myMaps.length !== MAP_VOTES_PER_PLAYER;
   const firstStep: Step = pendingSuggestion
     ? "suggestion"
     : pendingCaptains

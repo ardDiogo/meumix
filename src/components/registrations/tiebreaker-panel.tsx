@@ -3,7 +3,7 @@
 import { Check, Dices, Loader2, Map as MapIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { forceCloseRound, submitTiebreakerVote } from "@/app/(app)/desempate/actions";
+import { forceCloseRound, forceMapVoting, submitTiebreakerVote } from "@/app/(app)/desempate/actions";
 import { cn } from "@/lib/utils";
 import type { TiebreakerRoundView, TiebreakerView } from "@/services/mix-events";
 import { Badge } from "../ui/badge";
@@ -14,25 +14,33 @@ import type { MapId } from "@/types/domain";
 
 /** Mapas do mix e desempate (docs/regras-do-mix.md, seção 3). */
 export function TiebreakerPanel({
+  scheduleId,
+  date,
   tiebreaker,
   classifiedCount,
   isClassified,
   isAdmin,
 }: {
+  scheduleId: string;
+  date: string;
   tiebreaker: TiebreakerView;
   classifiedCount: number;
   isClassified: boolean;
   isAdmin: boolean;
 }) {
   const open = tiebreaker.rounds.find((r) => r.status === "voting");
-  const done = tiebreaker.rounds.filter((r) => r.status !== "voting");
+  // Round "concluído" sem empate (votação de mapas encerrada pelo admin) não aparece como desempate.
+  const done = tiebreaker.rounds.filter((r) => r.status !== "voting" && r.candidates.length > r.slots);
+  const [closing, startClosing] = useTransition();
 
   return (
     <Card>
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
         <MapIcon className="size-4 text-brand" aria-hidden />
         <h2 className="font-display text-sm font-semibold tracking-wide uppercase">Mapas do mix</h2>
-        {tiebreaker.pending ? (
+        {tiebreaker.waiting ? (
+          <Badge variant="brand">Aguardando votos</Badge>
+        ) : tiebreaker.pending ? (
           <Badge variant="brand">Desempate em andamento</Badge>
         ) : (
           <Badge variant="win">Definidos</Badge>
@@ -89,6 +97,35 @@ export function TiebreakerPanel({
                 : `empate persistiu (${r.votesCast} votos).`}
           </p>
         ))}
+
+        {tiebreaker.waiting && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface-2/60 px-3 py-2 text-sm">
+            <p className="text-muted">
+              <span className="font-semibold text-fg">
+                {tiebreaker.waiting.voted}/{tiebreaker.waiting.total} votaram nos mapas.
+              </span>{" "}
+              Os mapas ficam definidos quando os votos que faltam já não mudam o resultado (com todos votando, um empate
+              na última vaga abre o desempate).
+            </p>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={closing}
+                onClick={() =>
+                  confirm("Encerrar a votação de mapas com os votos atuais? Quem não votou não vota mais.") &&
+                  startClosing(async () => {
+                    const r = await forceMapVoting(scheduleId, date);
+                    if (r.ok) toast.success(r.message);
+                    else toast.error(r.message);
+                  })
+                }
+              >
+                {closing && <Loader2 className="animate-spin" />} Encerrar votação de mapas
+              </Button>
+            )}
+          </div>
+        )}
 
         {open && <OpenRound round={open} classifiedCount={classifiedCount} canVote={isClassified} isAdmin={isAdmin} />}
       </div>
