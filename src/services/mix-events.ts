@@ -92,11 +92,18 @@ export interface Departure {
   removedBy: string | null;
 }
 
+/** Quem votou num mapa (foto pequena embaixo do mapa). */
+export interface Voter {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+}
+
 export interface TiebreakerRoundView {
   id: string;
   roundNumber: 1 | 2;
   status: "voting" | "completed" | "resolved_random";
-  candidates: { id: string; name: string; votes: number }[];
+  candidates: { id: string; name: string; votes: number; voters: Voter[] }[];
   slots: number;
   votesCast: number;
   myVote: string[];
@@ -109,7 +116,15 @@ export interface TiebreakerView {
   rounds: TiebreakerRoundView[];
   /** Mapas definidos para o mix (após a escolha dos times). */
   /** `votes`: votos na votação de mapas; `tiebreakVotes`: no desempate que o definiu (se houve). */
-  finalMaps: { id: string; name: string; random: boolean; votes: number; tiebreakVotes: number | null }[];
+  finalMaps: {
+    id: string;
+    name: string;
+    random: boolean;
+    votes: number;
+    tiebreakVotes: number | null;
+    /** Quem votou nele (na votação de mapas). */
+    voters: Voter[];
+  }[];
   pending: boolean;
   /** Votação de mapas ainda aberta e o top 4 em aberto: quantos classificados votaram. */
   waiting: { voted: number; total: number } | null;
@@ -406,7 +421,12 @@ export async function getNextMix(
       voted: registrations.filter((r) => r.status === "classified" && r.mapVoted).length,
       total: classified.length,
       max: next.schedule.maxPlayers,
-    }),
+    },
+    new Map(
+      registrations
+        .filter((r) => r.status === "classified")
+        .map((r) => [r.userId, { name: r.displayName, avatarUrl: r.avatarUrl }]),
+    )),
     loadFinalizedMatch(next.schedule.id, next.occurrence.date),
     loadSuggestion(next.schedule.id, next.occurrence.date, viewerId, classified),
     draft?.status === "completed" ? teamWinProbability(draft.teamA, draft.teamB, next.schedule.id) : null,
@@ -479,6 +499,8 @@ export async function loadTiebreaker(
   viewerId: string | null,
   /** Classificados que já votaram nos mapas / total (sem isso, conta como todos votaram). */
   mapVoters?: { voted: number; total: number; max?: number },
+  /** Classificados (nome e foto) para mostrar quem votou em cada mapa. */
+  people?: Map<string, { name: string; avatarUrl: string | null }>,
 ): Promise<TiebreakerView> {
   const names = new Map(votes.maps.map((m) => [m.id, m.name]));
   const empty: TiebreakerView = { enabled, rounds: [], finalMaps: [], pending: false, waiting: null };
@@ -503,6 +525,15 @@ export async function loadTiebreaker(
         )
     : { data: [] };
 
+  // Votos de mapas de cada classificado (para as fotos embaixo de cada mapa).
+  const { data: ballots } = people
+    ? await supabase.from("map_votes").select("user_id, map_id").match({ schedule_id: scheduleId, event_date: date })
+    : { data: [] };
+  const votersOf = (rows: { user_id: unknown }[]): Voter[] =>
+    rows.flatMap((v) => {
+      const p = people?.get(v.user_id as string);
+      return p ? [{ userId: v.user_id as string, name: p.name, avatarUrl: p.avatarUrl }] : [];
+    });
   const counts = new Map(votes.mapTally.map((m) => [m.id, m.votes]));
   const main = votes.maps.map((m) => ({ id: m.id, votes: counts.get(m.id) ?? 0 }));
   const remaining = mapVoters ? Math.max(0, mapVoters.total - mapVoters.voted) : 0;
@@ -518,6 +549,7 @@ export async function loadTiebreaker(
       random: result.random.includes(id),
       votes: counts.get(id) ?? 0,
       tiebreakVotes: null,
+      voters: votersOf((ballots ?? []).filter((b) => b.map_id === id)),
     })),
     rounds: rows.map((r) => {
       const mine = (rvotes ?? []).filter((v) => v.round_id === r.id);
@@ -534,6 +566,7 @@ export async function loadTiebreaker(
           id,
           name: names.get(id) ?? id,
           votes: mine.filter((v) => (v.maps as string[]).includes(id)).length,
+          voters: votersOf(mine.filter((v) => (v.maps as string[]).includes(id))),
         })),
       };
     }),

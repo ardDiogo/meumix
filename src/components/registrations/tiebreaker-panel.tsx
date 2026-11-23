@@ -5,7 +5,8 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { forceCloseRound, forceMapVoting, submitTiebreakerVote } from "@/app/(app)/desempate/actions";
 import { cn } from "@/lib/utils";
-import type { TiebreakerRoundView, TiebreakerView } from "@/services/mix-events";
+import type { TiebreakerRoundView, TiebreakerView, Voter } from "@/services/mix-events";
+import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
@@ -51,29 +52,32 @@ export function TiebreakerPanel({
           {tiebreaker.finalMaps.map((m) => (
             <span
               key={m.id}
-              className="inline-flex items-center gap-1.5 rounded-md border border-brand/40 bg-brand/10 px-3 py-1.5 text-sm font-semibold"
+              className="inline-flex flex-col gap-1 rounded-md border border-brand/40 bg-brand/10 px-3 py-1.5 text-sm font-semibold"
             >
-              <MapEmblem id={m.id as MapId} size={18} />
-              {m.name}
-              <span
-                className="text-xs font-medium text-muted tabular"
-                title={
-                  m.tiebreakVotes != null
-                    ? `${m.votes} na votação de mapas e ${m.tiebreakVotes} no desempate`
-                    : `${m.votes} na votação de mapas`
-                }
-              >
-                {m.votes} {m.votes === 1 ? "voto" : "votos"}
-                {m.tiebreakVotes != null && ` · ${m.tiebreakVotes} no desempate`}
-              </span>
-              {m.random && (
+              <span className="inline-flex items-center gap-1.5">
+                <MapEmblem id={m.id as MapId} size={18} />
+                {m.name}
                 <span
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-muted"
-                  title="Decidido por sorteio"
+                  className="text-xs font-medium text-muted tabular"
+                  title={
+                    m.tiebreakVotes != null
+                      ? `${m.votes} na votação de mapas e ${m.tiebreakVotes} no desempate`
+                      : `${m.votes} na votação de mapas`
+                  }
                 >
-                  <Dices className="size-3.5" /> sorteio
+                  {m.votes} {m.votes === 1 ? "voto" : "votos"}
+                  {m.tiebreakVotes != null && ` · ${m.tiebreakVotes} no desempate`}
                 </span>
-              )}
+                {m.random && (
+                  <span
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted"
+                    title="Decidido por sorteio"
+                  >
+                    <Dices className="size-3.5" /> sorteio
+                  </span>
+                )}
+              </span>
+              <VoterFaces voters={m.voters} />
             </span>
           ))}
           {tiebreaker.pending &&
@@ -177,19 +181,22 @@ function OpenRound({
                 aria-pressed={active}
                 onClick={() => toggle(c.id)}
                 className={cn(
-                  "flex h-10 w-full items-center justify-between rounded-md border px-3 text-sm font-medium transition-colors",
+                  "flex min-h-10 w-full flex-col justify-center gap-1 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
                   active ? "border-brand bg-brand/10" : "border-border bg-surface-2 hover:border-border-strong",
                   !canVote && "cursor-default",
                 )}
               >
-                <span className="flex items-center gap-2">
-                  <MapEmblem id={c.id as MapId} size={20} />
-                  {c.name}
+                <span className="flex w-full items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <MapEmblem id={c.id as MapId} size={20} />
+                    {c.name}
+                  </span>
+                  <span className="flex items-center gap-1 text-xs text-muted tabular">
+                    {active && <Check className="size-3.5 text-brand" />}
+                    {c.votes}
+                  </span>
                 </span>
-                <span className="flex items-center gap-1 text-xs text-muted tabular">
-                  {active && <Check className="size-3.5 text-brand" />}
-                  {c.votes}
-                </span>
+                <VoterFaces voters={c.voters} />
               </button>
             </li>
           );
@@ -218,5 +225,22 @@ function OpenRound({
         )}
       </div>
     </div>
+  );
+}
+
+/** Fotos pequenas de quem votou no mapa (passe o mouse para ver o nome). */
+function VoterFaces({ voters }: { voters: Voter[] }) {
+  if (!voters.length) return null;
+  return (
+    <span
+      className="flex flex-wrap items-center gap-0.5"
+      aria-label={`Votaram: ${voters.map((v) => v.name).join(", ")}`}
+    >
+      {voters.map((v) => (
+        <span key={v.userId} title={v.name}>
+          <Avatar name={v.name} src={v.avatarUrl} size="xs" className="size-5 text-[9px]" />
+        </span>
+      ))}
+    </span>
   );
 }

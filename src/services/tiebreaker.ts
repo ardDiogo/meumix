@@ -1,5 +1,5 @@
 import "server-only";
-import { computeTie, countVotes, lockedMaps, secureSample, type Tally } from "@/lib/map-tiebreak";
+import { computeTie, countVotes, lockedMaps, secureSample, sortTally, type Tally } from "@/lib/map-tiebreak";
 import { MAPS_IN_ROTATION } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -161,8 +161,17 @@ export function finalMaps(main: Tally, rounds: RoundRow[], tiebreakerEnabled: bo
   }
   const r1 = rounds.find((r) => r.round_number === 1);
   const r2 = rounds.find((r) => r.round_number === 2);
+  // Garantidos = os mais votados fora do desempate, só o que sobra das vagas (os votos
+  // podem ter mudado depois que o desempate abriu; as vagas do desempate não mudam).
+  const zone = new Set(r1?.candidate_maps ?? []);
+  const guaranteed = r1
+    ? sortTally(main)
+        .filter((m) => !zone.has(m.id))
+        .slice(0, MAPS_IN_ROTATION - r1.slots)
+        .map((m) => m.id)
+    : tie.guaranteed;
   const maps = [
-    ...tie.guaranteed,
+    ...guaranteed,
     ...(r1?.winning_maps ?? []),
     ...(r2?.winning_maps ?? []),
     ...(r2?.random_maps ?? []),
