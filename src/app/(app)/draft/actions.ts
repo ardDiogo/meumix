@@ -7,7 +7,14 @@ import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
-import { notifyCaptains, notifyPicked, notifyPickTurn, notifyRepick, notifyTeamsDefined } from "@/services/notify";
+import {
+  notifyCaptains,
+  notifyPicked,
+  notifyPickTurn,
+  notifyRepick,
+  notifyTeamsDefined,
+  notifyTiebreaker,
+} from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
 import { repick } from "@/services/draft-review";
 
@@ -137,6 +144,7 @@ export async function pickPlayer(scheduleId: string, date: string, playerId: str
       if (p.state) await notifyPickTurn(scheduleId, date, p.state, p.by);
     }
     if (completed) await notifyTeamsDefined(scheduleId, date);
+    if (completed) await notifyTiebreaker(scheduleId, date);
   });
   refresh();
   return { ok: true, message: `Jogador escolhido!${autoMessage}` };

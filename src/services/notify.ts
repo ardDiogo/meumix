@@ -393,6 +393,18 @@ export async function runScheduledNotices(now = new Date()) {
       }
     }
 
+    // Desempate de mapas aberto há 30 min ou mais: lembra quem ainda não votou.
+    if (toStart > 0) {
+      const { data: open } = await admin
+        .from("map_tiebreaker_rounds")
+        .select("id")
+        .match({ schedule_id: schedule.id, event_date: o.date })
+        .eq("status", "voting")
+        .lt("started_at", new Date(now.getTime() - 30 * MIN).toISOString())
+        .limit(1);
+      if (open?.length) sent += await notifyTiebreaker(schedule.id, o.date, true);
+    }
+
     if (toStart <= 0 || toStart > 60 * MIN) continue;
     const match = { schedule_id: schedule.id, event_date: o.date };
     const [{ data: regs }, { data: done }, draft] = await Promise.all([
@@ -500,4 +512,42 @@ export async function notifyRepick(scheduleId: string, date: string) {
       tag: `pick:${date}`,
     },
   );
+}
+
+/**
+ * Desempate de mapas aberto: avisa os classificados que ainda não votaram nele.
+ * `reminder`: segundo aviso (cron), para quem continua sem votar.
+ */
+export async function notifyTiebreaker(scheduleId: string, date: string, reminder = false) {
+  const admin = createSupabaseAdminClient();
+  if (!admin) return 0;
+  const { data: rounds } = await admin
+    .from("map_tiebreaker_rounds")
+    .select("id, round_number, candidate_maps, slots")
+    .match({ schedule_id: scheduleId, event_date: date })
+    .eq("status", "voting");
+  let sent = 0;
+  for (const r of rounds ?? []) {
+    const [classified, { data: votes }, { data: maps }] = await Promise.all([
+      classifiedOf(scheduleId, date),
+      admin.from("map_tiebreaker_votes").select("user_id").eq("round_id", r.id),
+      admin
+        .from("maps")
+        .select("id, name")
+        .in("id", r.candidate_maps as string[]),
+    ]);
+    const voted = new Set((votes ?? []).map((v) => v.user_id as string));
+    const pending = classified.filter((u) => !voted.has(u));
+    const names = (maps ?? []).map((m) => m.name as string).join(", ");
+    const slots = r.slots as number;
+    sent += await sendPush(
+      { topic: "pick", userIds: pending, once: `desempate${reminder ? "-lembrete" : ""}:${r.id}` },
+      {
+        title: reminder ? "Falta o seu voto no desempate 🗺️" : `Desempate de mapas — round ${r.round_number} 🗺️`,
+        body: `Escolha ${slots} mapa${slots > 1 ? "s" : ""} entre ${names}. O mix só define os mapas com o voto de todos.`,
+        tag: `desempate:${date}`,
+      },
+    );
+  }
+  return sent;
 }

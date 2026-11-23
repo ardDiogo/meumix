@@ -9,7 +9,7 @@ import { ACCEPT_RATIO } from "@/lib/team-balance";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
-import { notifyTeamsDefined } from "@/services/notify";
+import { notifyTeamsDefined, notifyTiebreaker } from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
 
 export type SuggestionResult = { ok: boolean; message: string };
@@ -61,7 +61,10 @@ async function accept(
     .update({ status: "accepted", decided_at: new Date().toISOString() })
     .match(match);
   await detectTiebreaker(match.schedule_id, match.event_date);
-  after(() => notifyTeamsDefined(match.schedule_id, match.event_date));
+  after(async () => {
+    await notifyTeamsDefined(match.schedule_id, match.event_date);
+    await notifyTiebreaker(match.schedule_id, match.event_date);
+  });
   return true;
 }
 

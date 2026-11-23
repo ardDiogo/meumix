@@ -6,6 +6,8 @@ import { canManageMixes } from "@/lib/auth/permissions";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { audit } from "@/services/audit";
 import { getSession } from "@/services/auth";
+import { after } from "next/server";
+import { notifyTiebreaker } from "@/services/notify";
 import { closeRound, type RoundRow } from "@/services/tiebreaker";
 
 export type TiebreakResult = { ok: true; message: string } | { ok: false; message: string };
@@ -49,6 +51,8 @@ export async function submitTiebreakerVote(roundId: string, maps: string[]): Pro
   });
   // O servidor revalida: só fecha quando todos os classificados votaram.
   const closed = await closeRound(roundId);
+  // Empate de novo: o round 2 abriu, avisa quem precisa votar.
+  if (closed.message.includes("Round 2")) after(() => notifyTiebreaker(round.schedule_id, round.event_date));
   revalidatePath("/dashboard");
   return {
     ok: true,
@@ -62,6 +66,14 @@ export async function forceCloseRound(roundId: string): Promise<TiebreakResult> 
   if (!canManageMixes(session) || !(await canManageLeagueOf({ roundId })))
     return fail("Apenas administradores da liga podem forçar o fechamento.");
   const result = await closeRound(roundId, true);
+  if (result.message.includes("Round 2")) {
+    const { data: r } = await createSupabaseAdminClient()!
+      .from("map_tiebreaker_rounds")
+      .select("schedule_id, event_date")
+      .eq("id", roundId)
+      .maybeSingle();
+    if (r) after(() => notifyTiebreaker(r.schedule_id as string, r.event_date as string));
+  }
   await audit({
     action: "admin.force_close_tiebreaker",
     outcome: result.ok ? "success" : "error",
