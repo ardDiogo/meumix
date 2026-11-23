@@ -50,6 +50,7 @@ export function DraftPanel({
   probA = null,
   review = null,
   info = {},
+  mapsPending = false,
 }: {
   scheduleId: string;
   date: string;
@@ -65,6 +66,8 @@ export function DraftPanel({
   review?: DraftReviewView | null;
   /** Resumo e insígnias de cada jogador (PICK). */
   info?: Record<string, PickInfo>;
+  /** Desempate de mapas em aberto: o PICK espera os mapas. */
+  mapsPending?: boolean;
 }) {
   const [pending, run] = useRun();
   const name = (id: string | null) => (id ? (names[id] ?? "Jogador") : "—");
@@ -151,6 +154,7 @@ export function DraftPanel({
           classified={classified}
           mySide={mySide}
           info={info}
+          mapsPending={mapsPending}
         />
       )}
     </Card>
@@ -296,9 +300,11 @@ function PickStage({
   classified,
   mySide,
   info,
+  mapsPending,
 }: {
   scheduleId: string;
   date: string;
+  mapsPending: boolean;
   draft: DraftView;
   name: (id: string | null) => string;
   avatar: (id: string | null) => string | null;
@@ -310,7 +316,7 @@ function PickStage({
   const [picking, setPicking] = useState<string | null>(null);
   const taken = new Set([...draft.teamA, ...draft.teamB]);
   const available = classified.filter((id) => !taken.has(id));
-  const myTurn = draft.status === "draft" && mySide !== null && draft.currentTurn === mySide;
+  const myTurn = draft.status === "draft" && !mapsPending && mySide !== null && draft.currentTurn === mySide;
   const turnCaptain = draft.currentTurn === "a" ? draft.captainA : draft.captainB;
   const left = draft.status === "draft" ? (TURN_PATTERN[draft.turnNumber] ?? 0) - draft.picksInTurn : 0;
   const a = choiceLabel(draft.revealedA);
@@ -326,7 +332,14 @@ function PickStage({
         </p>
       )}
 
-      {draft.status === "draft" && (
+      {draft.status === "draft" && mapsPending && (
+        <div className="rounded-md border border-brand/50 bg-brand/10 px-3 py-2 text-center text-sm font-medium">
+          Primeiro os mapas: os capitães definem o desempate no quadro &quot;Mapas do mix&quot;. O PICK começa logo
+          depois.
+        </div>
+      )}
+
+      {draft.status === "draft" && !mapsPending && (
         <div
           className={cn(
             "rounded-md border px-3 py-2 text-center text-sm",

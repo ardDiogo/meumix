@@ -81,14 +81,15 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 - **Os mapas se definem antes do PICK**: com a lista fechada, ficam definidos quando todos os classificados votaram, ou antes, quando os votos que faltam já não mudam o top 4 (mesmo indo todos para os rivais). Enquanto isso o quadro "Mapas do mix" mostra "Aguardando votos (x/10)".
 - O admin pode **encerrar a votação de mapas** com os votos atuais (alguém não votou). Encerrada (ou com desempate aberto), a votação de mapas não aceita mais votos.
 
-**Desempate de mapas** (pode ser desligado no admin)
+**Desempate de mapas** (pode ser desligado no admin) — entre os capitães (migração 0059)
 
-- Roda antes do PICK, com a lista fechada e todos votando (ou com a votação encerrada pelo admin).
-- Se o 4º lugar está empatado com mais mapas do que vagas restantes, abre o **Round 1** só com os mapas empatados; cada classificado vota no número de vagas restantes. Quem precisa votar recebe aviso no celular (e um lembrete 30 min depois).
-- Fecha quando todos os 10 votaram, ou antes se os votos que faltam já não mudam o resultado (ou o admin força o fechamento).
-- Persistindo o empate → **Round 2** apenas com os que continuam empatados.
-- Persistindo de novo → **sorteio aleatório** seguro, marcado como "Decidido por sorteio".
-- A votação principal nunca é reaberta.
+- Roda antes do PICK, com a lista fechada e todos votando (ou com a votação encerrada pelo admin), quando a última vaga dos 4 mapas está empatada.
+- **Só os 2 capitães escolhem**: cada um marca quantos mapas faltam (1, 2…) entre os empatados. A escolha de um só aparece depois que os dois escolheram. Os capitães recebem aviso no celular.
+- **Mapa escolhido pelos dois entra.** Nas vagas que sobram (discordância), entra a escolha de **quem perder o pedra-papel-tesoura**; quem ganha o PPT escolhe primeiro no PICK. Sem limite de tempo.
+- O PPT pode acontecer enquanto os capitães escolhem; o **PICK só começa com os mapas definidos**.
+- O admin pode forçar o fechamento: vale o que os dois concordaram e a escolha de quem votou; o que faltar é sorteado.
+- Sem a migração 0059, vale o desempate antigo (os 10 votam; empate de novo → round 2 → sorteio).
+- A votação principal não é reaberta.
 
 ## 4) Votação de capitães
 

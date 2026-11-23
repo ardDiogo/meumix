@@ -15,7 +15,7 @@ import {
   notifyTeamsDefined,
   notifyTiebreaker,
 } from "@/services/notify";
-import { detectTiebreaker } from "@/services/tiebreaker";
+import { detectTiebreaker, mapsPendingForPick, resolveCaptainRounds } from "@/services/tiebreaker";
 import { repick } from "@/services/draft-review";
 
 export type DraftResult = { ok: true; message: string } | { ok: false; message: string };
@@ -81,6 +81,8 @@ export async function submitPpt(scheduleId: string, date: string, choice: string
     p_choice: choice,
   });
   if (error) return fail(dbMessage(error.message));
+  // PPT decidido: na discordância do desempate de mapas, o perdedor fica com o mapa dele.
+  if (data === "win") await resolveCaptainRounds(scheduleId, date);
   refresh();
   const messages: Record<string, string> = {
     waiting: "Jogada confirmada! Aguardando o outro capitão.",
@@ -96,6 +98,9 @@ export async function pickPlayer(scheduleId: string, date: string, playerId: str
   if (!session) return fail("Entre na sua conta.");
   const admin = createSupabaseAdminClient();
   if (!admin) return fail("Servidor não configurado.");
+  // Mapas antes do PICK: com desempate de mapas em aberto, espera.
+  if (await mapsPendingForPick(scheduleId, date))
+    return fail("Primeiro os capitães definem os mapas do desempate (quadro Mapas do mix).");
   const { data, error } = await admin.rpc("draft_pick", {
     p_schedule: scheduleId,
     p_date: date,

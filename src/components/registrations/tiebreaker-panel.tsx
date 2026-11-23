@@ -21,9 +21,11 @@ export function TiebreakerPanel({
   classifiedCount,
   isClassified,
   isAdmin,
+  viewerId = null,
 }: {
   scheduleId: string;
   date: string;
+  viewerId?: string | null;
   tiebreaker: TiebreakerView;
   classifiedCount: number;
   isClassified: boolean;
@@ -93,12 +95,16 @@ export function TiebreakerPanel({
 
         {done.map((r) => (
           <p key={r.id} className="text-xs text-muted">
-            Round {r.roundNumber}:{" "}
-            {r.status === "resolved_random"
-              ? "empate persistiu — decidido por sorteio."
-              : r.winning.length
-                ? `vencedores definidos (${r.votesCast} votos).`
-                : `empate persistiu (${r.votesCast} votos).`}
+            {r.mode === "captains" ? "Desempate entre os capitães" : `Round ${r.roundNumber}`}:{" "}
+            {r.mode === "captains"
+              ? r.status === "resolved_random"
+                ? "decidido por sorteio."
+                : "mapas definidos."
+              : r.status === "resolved_random"
+                ? "empate persistiu — decidido por sorteio."
+                : r.winning.length
+                  ? `vencedores definidos (${r.votesCast} votos).`
+                  : `empate persistiu (${r.votesCast} votos).`}
           </p>
         ))}
 
@@ -131,7 +137,14 @@ export function TiebreakerPanel({
           </div>
         )}
 
-        {open && <OpenRound round={open} classifiedCount={classifiedCount} canVote={isClassified} isAdmin={isAdmin} />}
+        {open && (
+          <OpenRound
+            round={open}
+            classifiedCount={classifiedCount}
+            canVote={open.mode === "captains" ? open.captains.some((c) => c.userId === viewerId) : isClassified}
+            isAdmin={isAdmin}
+          />
+        )}
       </div>
     </Card>
   );
@@ -149,6 +162,7 @@ function OpenRound({
   isAdmin: boolean;
 }) {
   const [picked, setPicked] = useState<string[]>(round.myVote);
+  const captains = round.mode === "captains";
   const [pending, start] = useTransition();
   const toggle = (id: string) =>
     setPicked((l) => (l.includes(id) ? l.filter((x) => x !== id) : l.length < round.slots ? [...l, id] : l));
@@ -162,14 +176,37 @@ function OpenRound({
   return (
     <div className="rounded-lg border border-brand/40 p-4">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <div className="font-display text-sm font-semibold uppercase">Desempate — Round {round.roundNumber}</div>
+        <div className="font-display text-sm font-semibold uppercase">
+          {captains ? "Desempate entre os capitães" : `Desempate — Round ${round.roundNumber}`}
+        </div>
         <span className="text-xs text-muted tabular">
-          {round.votesCast}/{classifiedCount} votos
+          {captains
+            ? `${round.captains.filter((c) => c.voted).length}/2 capitães`
+            : `${round.votesCast}/${classifiedCount} votos`}
         </span>
       </div>
       <p className="mb-3 text-sm text-muted">
-        Mapas empatados na última vaga. Escolha {round.slots} {round.slots > 1 ? "mapas" : "mapa"}.
+        Mapas empatados na última vaga. {captains ? "Cada capitão escolhe" : "Escolha"} {round.slots}{" "}
+        {round.slots > 1 ? "mapas" : "mapa"}.
+        {captains &&
+          " Mapa escolhido pelos dois entra; na discordância, fica a escolha de quem perder o pedra-papel-tesoura (quem ganha escolhe primeiro no PICK)."}
       </p>
+      {captains && (
+        <div className="mb-3 flex flex-wrap gap-2 text-xs">
+          {round.captains.map((c) => (
+            <span
+              key={c.userId}
+              className={cn(
+                "inline-flex items-center gap-1 rounded-md border px-2 py-1",
+                c.voted ? "border-win/40 text-win" : "border-border text-muted",
+              )}
+            >
+              {c.voted ? <Check className="size-3.5" /> : <Loader2 className="size-3.5 animate-spin" />} {c.name}
+              {c.voted ? " escolheu" : " escolhendo…"}
+            </span>
+          ))}
+        </div>
+      )}
       <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
         {round.candidates.map((c) => {
           const active = picked.includes(c.id);
@@ -193,7 +230,7 @@ function OpenRound({
                   </span>
                   <span className="flex items-center gap-1 text-xs text-muted tabular">
                     {active && <Check className="size-3.5 text-brand" />}
-                    {c.votes}
+                    {!captains && c.votes}
                   </span>
                 </span>
                 <VoterFaces voters={c.voters} />

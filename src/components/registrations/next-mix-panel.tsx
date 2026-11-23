@@ -319,6 +319,7 @@ export async function NextMixPanel() {
           scheduleId={schedule.id}
           date={occurrence.date}
           tiebreaker={result.mix.tiebreaker}
+          viewerId={session?.id ?? null}
           classifiedCount={classified}
           isClassified={mine?.status === "classified"}
           isAdmin={canManageMixes}
@@ -342,6 +343,7 @@ export async function NextMixPanel() {
           probA={result.mix.draftProbA}
           review={result.mix.review}
           info={pickInfo}
+          mapsPending={result.mix.tiebreaker.rounds.some((r) => r.status === "voting")}
         />
       )}
 

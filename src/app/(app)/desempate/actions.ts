@@ -9,7 +9,7 @@ import { getSession } from "@/services/auth";
 import { after } from "next/server";
 import { notifyTiebreaker } from "@/services/notify";
 import { startDraftIfReady } from "@/services/mix-events";
-import { closeRound, forceMapDecision, type RoundRow } from "@/services/tiebreaker";
+import { closeRound, forceMapDecision, resolveCaptainRound, type RoundRow } from "@/services/tiebreaker";
 
 /** Mapas definidos: se os capitães também estão, a escolha dos times começa. */
 async function startPickAfterMaps(scheduleId: string, date: string) {
@@ -39,12 +39,24 @@ export async function submitTiebreakerVote(roundId: string, maps: string[]): Pro
   const round = data as RoundRow | null;
   if (!round || round.status !== "voting") return fail("Este desempate já foi encerrado.");
 
-  const { data: classified } = await admin.rpc("mix_classified", {
-    p_schedule: round.schedule_id,
-    p_date: round.event_date,
-  });
-  if (!((classified as string[] | null) ?? []).includes(session.id))
-    return fail("Só jogadores classificados podem votar.");
+  const captainsMode = round.mode === "captains";
+  if (captainsMode) {
+    // Desempate entre os capitães: só os 2 escolhem.
+    const { data: draft } = await admin
+      .from("mix_draft_state")
+      .select("captain_a, captain_b")
+      .match({ schedule_id: round.schedule_id, event_date: round.event_date })
+      .maybeSingle();
+    if (!draft || ![draft.captain_a, draft.captain_b].includes(session.id))
+      return fail("Neste desempate só os capitães escolhem os mapas.");
+  } else {
+    const { data: classified } = await admin.rpc("mix_classified", {
+      p_schedule: round.schedule_id,
+      p_date: round.event_date,
+    });
+    if (!((classified as string[] | null) ?? []).includes(session.id))
+      return fail("Só jogadores classificados podem votar.");
+  }
 
   const unique = [...new Set(maps)];
   if (unique.length !== round.slots || unique.some((m) => !round.candidate_maps.includes(m))) {
@@ -64,6 +76,19 @@ export async function submitTiebreakerVote(roundId: string, maps: string[]): Pro
     eventDate: round.event_date,
     detail: { round: round.round_number, maps: unique },
   });
+  if (captainsMode) {
+    const state = await resolveCaptainRound(roundId);
+    revalidatePath("/dashboard");
+    return {
+      ok: true,
+      message:
+        state === "completed"
+          ? "Mapas definidos!"
+          : state === "waiting_ppt"
+            ? "Escolha registrada! Vocês discordaram: o mapa fica com quem perder o pedra-papel-tesoura."
+            : "Escolha registrada! Aguardando o outro capitão.",
+    };
+  }
   // O servidor revalida: só fecha quando todos os classificados votaram.
   const closed = await closeRound(roundId);
   // Empate de novo: o round 2 abriu, avisa quem precisa votar. Desempate decidido: libera o PICK.
@@ -81,6 +106,22 @@ export async function forceCloseRound(roundId: string): Promise<TiebreakResult> 
   const session = await getSession();
   if (!canManageMixes(session) || !(await canManageLeagueOf({ roundId })))
     return fail("Apenas administradores da liga podem forçar o fechamento.");
+  const { data: row } = await createSupabaseAdminClient()!
+    .from("map_tiebreaker_rounds")
+    .select("*")
+    .eq("id", roundId)
+    .maybeSingle();
+  if ((row as RoundRow | null)?.mode === "captains") {
+    await resolveCaptainRound(roundId, true);
+    await audit({
+      action: "admin.force_close_tiebreaker",
+      outcome: "success",
+      actorId: session!.id,
+      detail: { round_id: roundId, mode: "captains" },
+    });
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Desempate fechado com as escolhas atuais." };
+  }
   const result = await closeRound(roundId, true);
   if (result.message.includes("Round 2")) {
     const { data: r } = await createSupabaseAdminClient()!

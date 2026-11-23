@@ -103,6 +103,10 @@ export interface TiebreakerRoundView {
   id: string;
   roundNumber: 1 | 2;
   status: "voting" | "completed" | "resolved_random";
+  /** "captains": só os 2 capitães escolhem (discordância → escolha de quem perder o PPT). */
+  mode: "players" | "captains";
+  /** Capitães e se já escolheram (só no modo capitães). */
+  captains: { userId: string; name: string; voted: boolean }[];
   candidates: { id: string; name: string; votes: number; voters: Voter[] }[];
   slots: number;
   votesCast: number;
@@ -364,7 +368,13 @@ export async function startDraftIfReady(scheduleId: string, date: string, classi
   if (!(await mapsReady(scheduleId, date))) return false;
   const { error: startError } = await admin.rpc("draft_start", { p_schedule: scheduleId, p_date: date });
   if (startError) return false;
-  after(() => import("./notify").then((m) => m.notifyCaptains(scheduleId, date)));
+  after(() =>
+    import("./notify").then(async (m) => {
+      await m.notifyCaptains(scheduleId, date);
+      // Mapas empatados: o desempate é dos capitães (avisa os 2).
+      await m.notifyTiebreaker(scheduleId, date);
+    }),
+  );
   return true;
 }
 
@@ -553,10 +563,19 @@ export async function loadTiebreaker(
     })),
     rounds: rows.map((r) => {
       const mine = (rvotes ?? []).filter((v) => v.round_id === r.id);
+      const captainsMode = r.mode === "captains";
+      const captainIds = captainsMode && draft ? [draft.captainA, draft.captainB] : [];
+      const hidden = captainsMode && r.status === "voting";
       return {
         id: r.id,
         roundNumber: r.round_number,
         status: r.status,
+        mode: captainsMode ? ("captains" as const) : ("players" as const),
+        captains: captainIds.map((id) => ({
+          userId: id,
+          name: people?.get(id)?.name ?? "Capitão",
+          voted: mine.some((v) => v.user_id === id),
+        })),
         slots: r.slots,
         votesCast: mine.length,
         myVote: (mine.find((v) => v.user_id === viewerId)?.maps as string[] | undefined) ?? [],
@@ -565,8 +584,9 @@ export async function loadTiebreaker(
         candidates: r.candidate_maps.map((id) => ({
           id,
           name: names.get(id) ?? id,
-          votes: mine.filter((v) => (v.maps as string[]).includes(id)).length,
-          voters: votersOf(mine.filter((v) => (v.maps as string[]).includes(id))),
+          // Entre os capitães, a escolha de um só aparece depois que os dois escolheram.
+          votes: hidden ? 0 : mine.filter((v) => (v.maps as string[]).includes(id)).length,
+          voters: hidden ? [] : votersOf(mine.filter((v) => (v.maps as string[]).includes(id))),
         })),
       };
     }),

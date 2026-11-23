@@ -1,5 +1,13 @@
 import "server-only";
-import { computeTie, countVotes, lockedMaps, secureSample, sortTally, type Tally } from "@/lib/map-tiebreak";
+import {
+  captainMaps,
+  computeTie,
+  countVotes,
+  lockedMaps,
+  secureSample,
+  sortTally,
+  type Tally,
+} from "@/lib/map-tiebreak";
 import { MAPS_IN_ROTATION } from "@/lib/mix-rules";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -176,14 +184,10 @@ export function finalMaps(main: Tally, rounds: RoundRow[], tiebreakerEnabled: bo
         .slice(0, MAPS_IN_ROTATION - r1.slots)
         .map((m) => m.id)
     : tie.guaranteed;
-  const maps = [
-    ...guaranteed,
-    ...(r1?.winning_maps ?? []),
-    ...(r2?.winning_maps ?? []),
-    ...(r2?.random_maps ?? []),
-  ];
+  const random = [...(r1?.random_maps ?? []), ...(r2?.random_maps ?? [])];
+  const maps = [...guaranteed, ...(r1?.winning_maps ?? []), ...(r2?.winning_maps ?? []), ...random];
   const pending = rounds.some((r) => r.status === "voting");
-  return { maps, random: r2?.random_maps ?? [], pending, waiting: false };
+  return { maps, random, pending, waiting: false };
 }
 
 /**
@@ -286,21 +290,18 @@ export async function resolveCaptainRound(roundId: string, force = false) {
   const fill = (base: string[], extra: string[]) =>
     [...base, ...extra.filter((m) => !base.includes(m))].slice(0, r.slots);
 
-  let winners: string[] | null = null;
+  const loser = draft && draft.status !== "ppt" && draft.winner ? (draft.winner === draft.captain_a ? "a" : "b") : null;
+  const decided = captainMaps(r.candidate_maps, r.slots, a, b, loser);
+  let winners: string[] = [];
   let random: string[] = [];
-  if (a && b) {
-    const agreed = r.candidate_maps.filter((m) => a.includes(m) && b.includes(m));
-    if (agreed.length >= r.slots) winners = agreed.slice(0, r.slots);
-    else if (draft && draft.status !== "ppt" && draft.winner) {
-      const loser = draft.winner === draft.captain_a ? b : a;
-      winners = fill(agreed, loser);
-    } else if (!force) return "waiting_ppt" as const;
-    else winners = fill(agreed, secureSample(r.candidate_maps.filter((m) => !agreed.includes(m)), r.slots));
-  } else if (!force) return "waiting_votes" as const;
-  else if (a || b) winners = fill([], (a ?? b)!);
+  if ("winners" in decided) winners = decided.winners;
+  else if (!force) return decided.waiting === "ppt" ? ("waiting_ppt" as const) : ("waiting_votes" as const);
   else {
-    random = secureSample(r.candidate_maps, r.slots);
-    winners = [];
+    // Admin fechou: concordância + escolha de quem votou; o resto, sorteio.
+    const agreed = a && b ? r.candidate_maps.filter((m) => a.includes(m) && b.includes(m)) : [];
+    winners = fill(agreed, a && b ? [] : (a ?? b ?? []));
+    const left = r.candidate_maps.filter((m) => !winners.includes(m));
+    random = secureSample(left, r.slots - winners.length);
   }
 
   await admin

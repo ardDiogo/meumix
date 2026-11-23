@@ -85,3 +85,23 @@ export function lockedMaps(tally: Tally, n: number, remaining: number) {
     .filter((id) => locked.includes(id));
   return { locked: ordered, decided: undecided === 0 && ordered.length === n };
 }
+
+/**
+ * Desempate entre os capitães: cada um escolhe `slots` mapas entre os empatados.
+ * Mapa escolhido pelos dois entra; as vagas que sobram ficam com a escolha de quem
+ * perdeu o PPT (`loser`). Sem os dois votos, ou com discordância e sem PPT, espera.
+ */
+export function captainMaps(
+  candidates: string[],
+  slots: number,
+  a: string[] | null,
+  b: string[] | null,
+  loser: "a" | "b" | null,
+): { winners: string[] } | { waiting: "votes" | "ppt" } {
+  if (!a || !b) return { waiting: "votes" };
+  const agreed = candidates.filter((m) => a.includes(m) && b.includes(m));
+  if (agreed.length >= slots) return { winners: agreed.slice(0, slots) };
+  if (!loser) return { waiting: "ppt" };
+  const extra = (loser === "a" ? a : b).filter((m) => !agreed.includes(m));
+  return { winners: [...agreed, ...extra].slice(0, slots) };
+}

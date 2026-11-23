@@ -523,7 +523,7 @@ export async function notifyTiebreaker(scheduleId: string, date: string, reminde
   if (!admin) return 0;
   const { data: rounds } = await admin
     .from("map_tiebreaker_rounds")
-    .select("id, round_number, candidate_maps, slots")
+    .select("*")
     .match({ schedule_id: scheduleId, event_date: date })
     .eq("status", "voting");
   let sent = 0;
@@ -537,14 +537,24 @@ export async function notifyTiebreaker(scheduleId: string, date: string, reminde
         .in("id", r.candidate_maps as string[]),
     ]);
     const voted = new Set((votes ?? []).map((v) => v.user_id as string));
-    const pending = classified.filter((u) => !voted.has(u));
+    // Desempate entre os capitães: só os 2 recebem o aviso.
+    const captains = r.mode === "captains" ? await draftOf(scheduleId, date) : null;
+    if (r.mode === "captains" && !captains) continue;
+    const voters = captains ? [captains.captain_a, captains.captain_b] : classified;
+    const pending = voters.filter((u) => !voted.has(u));
     const names = (maps ?? []).map((m) => m.name as string).join(", ");
     const slots = r.slots as number;
     sent += await sendPush(
       { topic: "pick", userIds: pending, once: `desempate${reminder ? "-lembrete" : ""}:${r.id}` },
       {
-        title: reminder ? "Falta o seu voto no desempate 🗺️" : `Desempate de mapas — round ${r.round_number} 🗺️`,
-        body: `Escolha ${slots} mapa${slots > 1 ? "s" : ""} entre ${names}. O mix só define os mapas com o voto de todos.`,
+        title: reminder
+          ? "Falta o seu voto no desempate 🗺️"
+          : captains
+            ? "Desempate de mapas: só os capitães 👑🗺️"
+            : `Desempate de mapas — round ${r.round_number} 🗺️`,
+        body: captains
+          ? `Escolha ${slots} mapa${slots > 1 ? "s" : ""} entre ${names}. Se os capitães discordarem, fica a escolha de quem perder o pedra-papel-tesoura.`
+          : `Escolha ${slots} mapa${slots > 1 ? "s" : ""} entre ${names}. O mix só define os mapas com o voto de todos.`,
         tag: `desempate:${date}`,
       },
     );
