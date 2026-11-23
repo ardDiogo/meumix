@@ -107,6 +107,10 @@ export function GcApiImport({
           Arraste o botão abaixo para a barra de favoritos do navegador (Ctrl+Shift+B mostra a barra). Depois, em cada
           mapa do mix, abra a partida na GC logado e clique no favorito: o mapa chega aqui sozinho.
         </p>
+        <p className="mb-3 text-xs text-subtle">
+          O navegador não deixa esse tipo de favorito ter ícone: o 🟧 no nome faz esse papel. Já tem o botão? Edite o
+          favorito e coloque 🟧 no começo do nome (ou arraste de novo).
+        </p>
         <div className="flex flex-wrap items-center gap-2">
           {/* Arrastar para os favoritos; clicar aqui não faz nada. */}
           <a
@@ -117,7 +121,7 @@ export function GcApiImport({
             }}
             className="inline-flex h-9 cursor-grab items-center gap-2 rounded-md bg-brand px-3 text-sm font-semibold text-black"
           >
-            <Download className="size-4" /> Enviar ao MeuMix
+            <Download className="size-4" aria-hidden /> 🟧 Enviar ao MeuMix
           </a>
           <Button
             variant="ghost"

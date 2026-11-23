@@ -13,10 +13,29 @@ const chakra = Chakra_Petch({
   display: "swap",
 });
 
+/** Endereço público do site (links e imagens da prévia no WhatsApp precisam ser absolutos). */
+const SITE_URL = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : "https://meumix.vercel.app";
+
+const DESCRIPTION =
+  "Plataforma para organizar mixes de CS2, acompanhar desempenho e construir comunidades competitivas.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: { default: "MeuMix", template: "%s · MeuMix" },
-  description: "Plataforma para organizar mixes de CS2, acompanhar desempenho e construir comunidades competitivas.",
+  description: DESCRIPTION,
   applicationName: "MeuMix",
+  // Prévia do link (WhatsApp, Discord…): o ícone do MeuMix, em vez do ícone genérico.
+  openGraph: {
+    type: "website",
+    siteName: "MeuMix",
+    locale: "pt_BR",
+    title: "MeuMix",
+    description: DESCRIPTION,
+    images: [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }],
+  },
+  twitter: { card: "summary", images: ["/pwa/icon-512.png"] },
   // App instalado no iPhone (Adicionar à Tela de Início).
   appleWebApp: { capable: true, title: "MeuMix", statusBarStyle: "black" },
   formatDetection: { telephone: false },

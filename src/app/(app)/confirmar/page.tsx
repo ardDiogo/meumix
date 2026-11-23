@@ -11,7 +11,15 @@ import { confirmLinkUser } from "@/services/confirm-links";
 import { getNextMix } from "@/services/mix-events";
 import { activeLeagueIdsOf } from "@/services/league";
 
-export const metadata: Metadata = { title: "Confirmar presença" };
+export const metadata: Metadata = {
+  title: "Confirmar presença",
+  description: "Toque para entrar na lista do próximo mix do MeuMix.",
+  openGraph: {
+    title: "🎯 Vai jogar? Confirme sua vaga",
+    description: "Toque para entrar na lista do próximo mix do MeuMix.",
+    images: [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }],
+  },
+};
 
 const TZ = "America/Sao_Paulo";
 const when = (d: Date) => {

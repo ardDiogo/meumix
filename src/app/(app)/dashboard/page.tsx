@@ -30,7 +30,15 @@ import { getPermissions } from "@/services/auth";
 import { getDashboard } from "@/services/queries";
 import { mixHref } from "@/lib/mix-slug";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export const metadata: Metadata = {
+  title: "Dashboard",
+  description: "Acompanhe a lista, os times, o bolão e o resultado do mix.",
+  openGraph: {
+    title: "🧱 Alambrado do MeuMix",
+    description: "Acompanhe a lista, os times, o bolão e o resultado do mix.",
+    images: [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }],
+  },
+};
 
 const RECENT_WINDOW = 10;
 

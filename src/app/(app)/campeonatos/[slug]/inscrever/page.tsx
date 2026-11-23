@@ -21,7 +21,9 @@ export async function generateMetadata({ params }: PageProps<"/campeonatos/[slug
   const data = await getChampionship((await params).slug);
   if (!data) return { title: "Campeonato" };
   const c = data.championship;
-  const banner = c.hasBanner ? [`/api/campeonatos/${c.id}/banner?v=${encodeURIComponent(c.updatedAt)}`] : undefined;
+  const banner = c.hasBanner
+    ? [`/api/campeonatos/${c.id}/banner?v=${encodeURIComponent(c.updatedAt)}`]
+    : [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }];
   const description = `${c.teamCount} times ${c.playersPerTeam}x${c.playersPerTeam}${
     c.entryFee > 0 ? ` · inscrição ${formatMoney(c.entryFee)}` : ""
   }. Toque para se inscrever.`;

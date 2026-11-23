@@ -262,7 +262,7 @@ function BookmarkletInstall() {
           }}
           className="inline-flex h-8 cursor-grab items-center gap-1.5 rounded-md bg-brand px-3 text-xs font-semibold text-black"
         >
-          <Download className="size-3.5" /> Enviar ao MeuMix
+          <Download className="size-3.5" aria-hidden /> 🟧 Enviar ao MeuMix
         </a>
         <Button
           variant="ghost"
