@@ -145,6 +145,9 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 
 - Janela em etapas: **Sugestão de times → Capitães → Mapas → Concluído** (pula as que não se aplicam).
 - Quando há 10 classificados, a janela **não pode ser fechada** até o jogador terminar as votações pendentes.
+- **Em sequência**: primeiro os capitães, depois os mapas (o servidor recusa o voto de mapas antes do de capitães, enquanto a disputa não começou).
+- **Site bloqueado até votar**: classificado de um mix com a lista fechada que ainda não votou vê, em qualquer página, a tela "Hora de votar!" com o botão "Votar agora" (leva ao Dashboard, onde abre a janela de votação).
+- **Sair do mix só depois de votar**: com a lista fechada, o classificado que ainda não votou não consegue cancelar a inscrição.
 
 ## 9) Finalização do mix e ELO
 

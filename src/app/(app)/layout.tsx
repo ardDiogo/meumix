@@ -12,6 +12,8 @@ import { getFeatures } from "@/services/features";
 import { getAppSetting } from "@/services/settings";
 import { LEGAL } from "@/lib/legal";
 import { InstallBanner, InstallLink } from "@/components/pwa/pwa";
+import { VoteGate } from "@/components/registrations/vote-gate";
+import { pendingVote } from "@/services/vote-gate";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ds = getDataSource();
@@ -23,7 +25,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     getFeatures(),
     getAppSetting("music_url"),
   ]);
-  const avatarUrl = session ? ((await profileAvatars([session.id])).get(session.id)?.avatarUrl ?? null) : null;
+  const [avatars, pending] = await Promise.all([
+    session ? profileAvatars([session.id]) : null,
+    // Classificado sem votar: o site fica bloqueado até votar (docs/regras-do-mix.md, seção 8).
+    session && ds.kind === "supabase" ? pendingVote(session.id) : null,
+  ]);
+  const avatarUrl = session ? (avatars?.get(session.id)?.avatarUrl ?? null) : null;
   const user = session && {
     displayName: session.displayName,
     avatarUrl,
@@ -56,6 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           )}
           {children}
         </main>
+        <VoteGate pending={pending} />
         <footer className="border-t border-border">
           <nav className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-xs text-subtle lg:px-6">
             <span>MeuMix</span>

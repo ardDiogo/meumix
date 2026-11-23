@@ -427,16 +427,24 @@ export async function getNextMix(
   const reviewClient = await createSupabaseServerClient();
   const [penalties, tiebreaker, finalizedMatchId, suggestion, draftProbA, review, discipline] = await Promise.all([
     activePenalties(ids),
-    loadTiebreaker(next.schedule.id, next.occurrence.date, votes, draft, features.map_tiebreaker, viewerId, {
-      voted: registrations.filter((r) => r.status === "classified" && r.mapVoted).length,
-      total: classified.length,
-      max: next.schedule.maxPlayers,
-    },
-    new Map(
-      registrations
-        .filter((r) => r.status === "classified")
-        .map((r) => [r.userId, { name: r.displayName, avatarUrl: r.avatarUrl }]),
-    )),
+    loadTiebreaker(
+      next.schedule.id,
+      next.occurrence.date,
+      votes,
+      draft,
+      features.map_tiebreaker,
+      viewerId,
+      {
+        voted: registrations.filter((r) => r.status === "classified" && r.mapVoted).length,
+        total: classified.length,
+        max: next.schedule.maxPlayers,
+      },
+      new Map(
+        registrations
+          .filter((r) => r.status === "classified")
+          .map((r) => [r.userId, { name: r.displayName, avatarUrl: r.avatarUrl }]),
+      ),
+    ),
     loadFinalizedMatch(next.schedule.id, next.occurrence.date),
     loadSuggestion(next.schedule.id, next.occurrence.date, viewerId, classified),
     draft?.status === "completed" ? teamWinProbability(draft.teamA, draft.teamB, next.schedule.id) : null,

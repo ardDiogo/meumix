@@ -16,6 +16,7 @@ import { confirmLinkUser } from "@/services/confirm-links";
 import { activePenalties } from "@/services/penalties";
 import { getSession } from "@/services/auth";
 import { getFeatures } from "@/services/features";
+import { pendingVoteIn } from "@/services/vote-gate";
 import { starterDelaySeconds } from "@/services/starters";
 import { notifyCaptains, notifyDraftReview, notifyRepick, notifyTiebreaker, notifyVoteCall } from "@/services/notify";
 import { detectTiebreaker } from "@/services/tiebreaker";
@@ -273,6 +274,13 @@ export async function leaveMix(scheduleId: string, date: string): Promise<Action
   if ("error" in ctx) return fail(ctx.error!, "unavailable");
   if (ctx.window === "closed") return fail("O mix já começou; a inscrição não pode mais ser cancelada.", "closed");
 
+  // Classificado com a lista fechada só sai depois de votar (capitães e mapas).
+  const owed = await pendingVoteIn(userId, scheduleId, date);
+  if (owed) {
+    const what = [owed.captains && "capitães", owed.maps && "mapas"].filter(Boolean).join(" e ");
+    return fail(`Vote nos ${what} antes de sair do mix.`, "denied");
+  }
+
   // Classificado saindo a menos de 3h do mix: 1 falta (2 faltas = só reserva por 2 mixes).
   const [order, features] = await Promise.all([orderedRegistrations(ctx.admin, scheduleId, date), getFeatures()]);
   const late =
@@ -441,6 +449,18 @@ async function requireClassifiedVoter(scheduleId: string, date: string) {
 export async function submitMapVotes(scheduleId: string, date: string, mapIds: string[]): Promise<ActionResult> {
   const v = await requireClassifiedVoter(scheduleId, date);
   if ("error" in v) return v.error!;
+  // Sequencial: primeiro os capitães (enquanto a disputa não começou e sem sugestão de times).
+  const occ = { schedule_id: scheduleId, event_date: date };
+  const [{ data: started }, { data: suggestion }, { count: myCaptainVotes }] = await Promise.all([
+    v.ctx.admin.from("mix_draft_state").select("status").match(occ).maybeSingle(),
+    v.ctx.admin.from("mix_team_suggestions").select("status").match(occ).eq("status", "pending").maybeSingle(),
+    v.ctx.admin
+      .from("captain_votes")
+      .select("voter_id", { count: "exact", head: true })
+      .match({ ...occ, voter_id: v.session.id }),
+  ]);
+  if (!started && !suggestion && !myCaptainVotes) return fail("Vote primeiro nos capitães.", "invalid");
+
   // Desempate aberto (ou votação encerrada pelo admin): os votos de mapas não mudam mais.
   const { data: rounds } = await v.ctx.admin
     .from("map_tiebreaker_rounds")
