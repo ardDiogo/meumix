@@ -33,9 +33,9 @@ export const metadata: Metadata = {
     locale: "pt_BR",
     title: "MeuMix",
     description: DESCRIPTION,
-    images: [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }],
+    images: [{ url: "/brand/og-share.jpg", width: 1200, height: 630, alt: "MeuMix" }],
   },
-  twitter: { card: "summary", images: ["/pwa/icon-512.png"] },
+  twitter: { card: "summary_large_image", images: ["/brand/og-share.jpg"] },
   // App instalado no iPhone (Adicionar à Tela de Início).
   appleWebApp: { capable: true, title: "MeuMix", statusBarStyle: "black" },
   formatDetection: { telephone: false },

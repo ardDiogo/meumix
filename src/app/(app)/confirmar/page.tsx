@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "🎯 Vai jogar? Confirme sua vaga",
     description: "Toque para entrar na lista do próximo mix do MeuMix.",
-    images: [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }],
+    images: [{ url: "/brand/og-share.jpg", width: 1200, height: 630, alt: "MeuMix" }],
   },
 };
 

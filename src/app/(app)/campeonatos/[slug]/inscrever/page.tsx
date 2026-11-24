@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: PageProps<"/campeonatos/[slug
   const c = data.championship;
   const banner = c.hasBanner
     ? [`/api/campeonatos/${c.id}/banner?v=${encodeURIComponent(c.updatedAt)}`]
-    : [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }];
+    : [{ url: "/brand/og-share.jpg", width: 1200, height: 630, alt: "MeuMix" }];
   const description = `${c.teamCount} times ${c.playersPerTeam}x${c.playersPerTeam}${
     c.entryFee > 0 ? ` · inscrição ${formatMoney(c.entryFee)}` : ""
   }. Toque para se inscrever.`;

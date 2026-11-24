@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "🧱 Alambrado do MeuMix",
     description: "Acompanhe a lista, os times, o bolão e o resultado do mix.",
-    images: [{ url: "/pwa/icon-512.png", width: 512, height: 512, alt: "MeuMix" }],
+    images: [{ url: "/brand/og-share.jpg", width: 1200, height: 630, alt: "MeuMix" }],
   },
 };
 
