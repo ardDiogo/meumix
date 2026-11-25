@@ -8,6 +8,7 @@ import type { GcMapStored } from "@/lib/gc-api";
 import { aggregateGc, type GcLine } from "@/lib/gc-analysis";
 import { mapName } from "@/lib/maps";
 import { byMixScore, diffOf, kdrOf, mixScore, type StatRow } from "@/lib/match-highlights";
+import { deathSplit, PTS } from "@/lib/match-rules";
 import type { MapId } from "@/types/domain";
 import { cn } from "@/lib/utils";
 import { LevelBadge } from "../players/level-badge";
@@ -33,9 +34,15 @@ const fmt = (n: number | null, digits = 0) =>
 const scoreBreakdown = (r: StatRow) => {
   const n = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
   const adr = r.adr ?? 0;
-  return `${r.name}: 3 × ${r.k} kills (${n(3 * r.k)}) + 1,5 × ${r.a} assist. (${n(1.5 * r.a)}) + 1,2 × ${r.fk} FK (${n(
-    1.2 * r.fk,
-  )}) + 0,2 × ${n(adr)} ADR (${n(0.2 * adr)}) − 2 × ${r.d} mortes (${n(2 * r.d)}) = ${n(mixScore(r))}`;
+  const { traded, untraded, known } = deathSplit({ deaths: r.d, tradedDeaths: r.tradedDeaths });
+  const deaths = known
+    ? `0,5 × ${traded} mortes trocadas (${n(PTS.tradedDeath * traded)}) − 1,5 × ${untraded} não trocadas (${n(
+        PTS.death * untraded,
+      )})`
+    : `1,5 × ${r.d} mortes (${n(PTS.death * r.d)})`;
+  return `${r.name}: 3 × ${r.k} kills (${n(PTS.kill * r.k)}) + 1,5 × ${r.a} assist. (${n(PTS.assist * r.a)}) + 2 × ${
+    r.fk
+  } FK (${n(PTS.firstKill * r.fk)}) + 0,2 × ${n(adr)} ADR (${n(PTS.adr * adr)}) − ${deaths} = ${n(mixScore(r))}`;
 };
 
 const dec = (v: number) => {
@@ -67,7 +74,7 @@ const BASE_COLS: Col[] = [
     key: "pts",
     label: "PTS",
     title:
-      "Pontuação do mix (a mesma do MVP): kills × 3 + assistências × 1,5 + first kills × 1,2 + ADR × 0,2 − mortes × 2",
+      "Pontuação do mix (a mesma do MVP): kills × 3 + assistências × 1,5 + first kills × 2 + ADR × 0,2 − mortes trocadas × 0,5 − mortes não trocadas × 1,5",
     value: mixScore,
     render: (r) => (
       <span className="cursor-help font-display font-bold" title={scoreBreakdown(r)}>
@@ -544,20 +551,26 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
       </div>
       <p className="border-t border-border px-4 py-3 text-xs text-muted">
         <b className="text-fg">Ordem da planilha:</b> 1º o MVP, último o lanterna; o resto pela maior PTS (3 × K + 1,5 ×
-        A + 1,2 × FK + 0,2 × ADR − 2 × D). Se empatar, mais kills fica na frente, depois mais assistências. Toque na PTS
-        de um jogador para ver a conta dele; no ELO, a conta do ELO.
+        A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte não trocada). Se empatar, mais kills fica na frente,
+        depois mais assistências. Toque na PTS de um jogador para ver a conta dele; no ELO, a conta do ELO.
       </p>
       <details className="group border-t border-border px-4 py-3 text-xs text-muted">
         <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>
         <div className="mt-2 space-y-2 leading-relaxed">
           <p className="rounded-md bg-surface-2/60 px-3 py-2 font-display text-sm font-bold text-fg">
-            PTS = 3 × K + 1,5 × A + 1,2 × FK + 0,2 × ADR − 2 × D
+            PTS = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte não trocada
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
               <b className="text-fg">Entra na conta:</b> kills (+3 cada), assistências (+1,5 cada), first kills — a
-              primeira kill do round (+1,2 cada), ADR (dano médio por round × 0,2) e mortes (−2 cada). Com mais de um
-              mapa, K, A, FK e D são somados e o ADR é a média pelos rounds.
+              primeira kill do round (+2 cada), ADR (dano médio por round × 0,2) e mortes. Com mais de um mapa, tudo é
+              somado e o ADR é a média pelos rounds.
+            </li>
+            <li>
+              <b className="text-fg">Mortes:</b> a morte <b className="text-fg">trocada</b> (você morreu e um colega
+              matou quem te matou, na hora — a morte de quem abre o round) tira só <b className="text-fg">0,5</b>; a
+              morte <b className="text-fg">não trocada</b> (morreu sozinho) tira <b className="text-fg">1,5</b>. Os
+              trades vêm dos dados da GC; mix sem esses dados: toda morte tira 1,5.
             </li>
             <li>
               <b className="text-fg">Não entra:</b> rating e swing da GC, KDR, KAST, HS%, FA, MK e o placar do time. O

@@ -17,6 +17,7 @@ import {
   Network,
   UsersRound,
 } from "lucide-react";
+import { RecalcPtsButton } from "@/components/admin/recalc-pts";
 import { PunishmentRules } from "@/components/admin/punishment-rules";
 import { StrikesPanel } from "@/components/admin/strikes-panel";
 import { activeSuspensions, profileNames, recentStrikes } from "@/services/strikes";
@@ -445,6 +446,17 @@ async function SettingsTab({ canManageAdmins }: { canManageAdmins: boolean }) {
         />
         <MusicSettings enabled={features.background_music} url={musicUrl} />
       </Card>
+      {canManageAdmins && (
+        <Card>
+          <CardHeader
+            title={title(UsersRound, "PTS, MVP e ELO")}
+            description="PTS = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte não trocada (sem dados de trade da GC: −1,5 por morte). Depois da migração 0060, use o botão para preencher as mortes trocadas dos mixes antigos da GC e refazer o MVP e o ELO."
+          />
+          <CardContent>
+            <RecalcPtsButton />
+          </CardContent>
+        </Card>
+      )}
       {canManageAdmins && (
         <div>
           <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-bold">

@@ -289,3 +289,19 @@ export const roundBreakAfter = (round: number) => round === 12 || (round >= 24 &
 /** Placar do ponto de vista de quem venceu: "2×10", "16×14". */
 export const winnerFirst = (s: { a: number; b: number }, w: "A" | "B") =>
   w === "A" ? `${s.a}×${s.b}` : `${s.b}×${s.a}`;
+
+/**
+ * Mortes trocadas (um colega matou quem o matou, na hora) de cada jogador do mix, pelos
+ * dados da GC: pelo jogador do MeuMix ou, convidado, pelo nick. Sem os dados, null.
+ */
+export function tradedDeathsLookup(maps: GcMapStored[]) {
+  const lines = maps.length ? aggregateGc(maps) : [];
+  const norm = (s: string) => s.trim().toLowerCase();
+  return (userId: string | null, name: string): number | null => {
+    if (!lines.length) return null;
+    const line = userId
+      ? lines.find((l) => l.userId === userId)
+      : lines.find((l) => !l.userId && norm(l.nick) === norm(name));
+    return line ? line.trades.traded : null;
+  };
+}

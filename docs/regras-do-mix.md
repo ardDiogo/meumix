@@ -172,7 +172,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
   - O ELO da liga é sempre recalculado do histórico inteiro (ao finalizar, excluir, mudar a data ou vincular convidado), a partir do ELO inicial do nível GC + ajuste do admin.
   - O RP da GC continua gravado e aparece na planilha (coluna "RP GC") só como informação.
 - O nível é recalculado pelo ELO.
-- **MVP:** maior (K×3) + (A×1,5) + (FK×1,2) + (ADR×0,2) − (D×2). A mesma pontuação (PTS) ordena a tabela do mix (MVP primeiro, lanterna por último).
+- **MVP:** maior PTS = (K×3) + (A×1,5) + (FK×2) + (ADR×0,2) − (morte trocada×0,5) − (morte não trocada×1,5); sem os dados de trade da GC, toda morte ×1,5 (migração 0060). Morte trocada = um colega matou quem te matou, na hora (a morte de quem abre o round). A mesma pontuação ordena a tabela do mix (MVP primeiro, lanterna por último) e entra no desempenho do ELO.
 - **Lanterna:** menor K + ADR/100 + KDR×10.
 - Vitórias/derrotas, kills, mortes, FK, DIFF somam; ADR e KAST viram médias ponderadas.
 

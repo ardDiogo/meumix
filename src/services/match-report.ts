@@ -71,6 +71,7 @@ export async function getMatchReport(matchId: string): Promise<MatchReport | nul
       fa: r.fa ?? 0,
       mk: r.mk ?? 0,
       fk: r.first_kills ?? 0,
+      tradedDeaths: num(r.traded_deaths),
       ...rpOf(r, leagueElo?.get(r.id as string)),
       drop: r.drop_count ?? 0,
       isMvp: !!r.is_mvp,

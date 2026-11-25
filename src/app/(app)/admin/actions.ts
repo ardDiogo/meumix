@@ -1,6 +1,9 @@
 "use server";
 
 import { canManageLeagueOf } from "@/services/league";
+import { tradedDeathsLookup } from "@/lib/gc-analysis";
+import type { GcMapStored } from "@/lib/gc-api";
+import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { revalidatePath } from "next/cache";
 import {
   canManageAdmins,
@@ -385,4 +388,64 @@ export async function endSuspension(suspensionId: number): Promise<RoleChangeRes
   revalidatePath("/admin");
   revalidatePath("/dashboard");
   return { ok: true, message: "Suspensão encerrada." };
+}
+
+/* --------------------------- PTS com os trades da GC -------------------------- */
+
+/**
+ * Super admin: preenche as mortes trocadas dos mixes antigos com os dados da GC já
+ * importados e refaz o MVP e o ELO das ligas (migração 0060).
+ */
+export async function recalcPtsFromGc(): Promise<RoleChangeResult> {
+  const session = await getSession();
+  if (!session?.isSuperAdmin) return { ok: false, message: "Apenas o super admin pode recalcular." };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
+  const { data: gc, error } = await admin
+    .from("match_gc_maps")
+    .select("match_id, map_order, map_id, data")
+    .order("match_id")
+    .order("map_order")
+    .limit(5000);
+  if (error) return { ok: false, message: "Não foi possível ler os dados da GC." };
+  const byMatch = new Map<string, GcMapStored[]>();
+  for (const r of gc ?? []) {
+    const m = { ...(r.data as GcMapStored), mapId: r.map_id as string };
+    if (!Array.isArray(m.players)) continue;
+    byMatch.set(r.match_id as string, [...(byMatch.get(r.match_id as string) ?? []), m]);
+  }
+  if (!byMatch.size) return { ok: true, message: "Nenhum mix com dados da GC para recalcular." };
+  const { data: records } = await admin
+    .from("player_match_records")
+    .select("id, match_id, user_id, player_name")
+    .in("match_id", [...byMatch.keys()]);
+  const rows = (records ?? []).flatMap((r) => {
+    const traded = tradedDeathsLookup(byMatch.get(r.match_id as string) ?? [])(
+      (r.user_id as string | null) ?? null,
+      r.player_name as string,
+    );
+    return traded == null ? [] : [{ record_id: r.id as string, traded }];
+  });
+  const { data: changed, error: rpcError } = await admin.rpc("set_traded_deaths", { p_rows: rows });
+  if (rpcError)
+    return {
+      ok: false,
+      message:
+        rpcError.code === "PGRST202" || rpcError.code === "42883"
+          ? "Rode a migração 0060_pts_trades.sql no Supabase."
+          : "Não foi possível recalcular.",
+    };
+  await recomputeBadgesSafely();
+  await audit({
+    action: "admin.recalc_pts",
+    outcome: "success",
+    actorId: session.id,
+    detail: { mixes: byMatch.size, records: rows.length },
+  });
+  for (const path of ["/dashboard", "/rankings", "/mixes", "/jogadores", "/estatisticas"])
+    revalidatePath(path, "layout");
+  return {
+    ok: true,
+    message: `PTS recalculada em ${byMatch.size} mixes da GC (${(changed as number) ?? rows.length} jogadores atualizados). MVP e ELO refeitos.`,
+  };
 }

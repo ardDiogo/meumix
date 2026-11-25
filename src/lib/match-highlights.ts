@@ -22,6 +22,8 @@ export interface StatRow {
   fa: number;
   mk: number;
   fk: number;
+  /** Mortes que um colega trocou (dados da GC); sem o dado, null. */
+  tradedDeaths?: number | null;
   /** RP do MeuMix (o que entrou no ELO); sem a migração 0057, o RP da GC. */
   rp: number;
   /** RP informado pela GC (só informação). */
@@ -41,7 +43,7 @@ export const kdrOf = (r: StatRow) => (r.d ? r.k / r.d : r.k);
 
 /** Pontuação do mix (a mesma que escolhe o MVP). */
 export const mixScore = (r: StatRow) =>
-  mvpScore({ kills: r.k, deaths: r.d, assists: r.a, firstKills: r.fk, adr: r.adr });
+  mvpScore({ kills: r.k, deaths: r.d, assists: r.a, firstKills: r.fk, adr: r.adr, tradedDeaths: r.tradedDeaths });
 
 /**
  * Ordem padrão dos jogadores do mix: MVP primeiro, lanterna por último e o
@@ -71,7 +73,14 @@ const maxBy = (rows: StatRow[], value: (r: StatRow) => number) =>
 export function matchHighlights(rows: StatRow[]): Highlight[] {
   if (!rows.length) return [];
   const picked = pickMvpAndLanterna(
-    rows.map((r) => ({ kills: r.k, deaths: r.d, assists: r.a, firstKills: r.fk, adr: r.adr })),
+    rows.map((r) => ({
+      kills: r.k,
+      deaths: r.d,
+      assists: r.a,
+      firstKills: r.fk,
+      adr: r.adr,
+      tradedDeaths: r.tradedDeaths,
+    })),
   );
   const mvp = rows.find((r) => r.isMvp) ?? rows[picked.mvp];
   const worst = rows.find((r) => r.isLanterna) ?? (picked.lanterna >= 0 ? rows[picked.lanterna] : undefined);
