@@ -25,10 +25,23 @@ export function LiveRefresh({ scheduleId }: { scheduleId: string }) {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Aba escondida: não refaz a página no servidor; atualiza uma vez ao voltar.
+    let missed = false;
     const refresh = () => {
+      if (document.visibilityState !== "visible") {
+        missed = true;
+        return;
+      }
       clearTimeout(timer);
-      timer = setTimeout(() => router.refresh(), 300);
+      timer = setTimeout(() => router.refresh(), 800);
     };
+    const onVisible = () => {
+      if (document.visibilityState === "visible" && missed) {
+        missed = false;
+        router.refresh();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     const channel = supabase.channel(`mix-${scheduleId}`);
     for (const table of TABLES) {
@@ -57,6 +70,7 @@ export function LiveRefresh({ scheduleId }: { scheduleId: string }) {
 
     return () => {
       clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
       void supabase.removeChannel(channel);
     };
   }, [router, scheduleId]);

@@ -86,7 +86,8 @@ function LiveCalendar({ championshipId }: { championshipId: string }) {
       clearTimeout(timer);
       timer = setTimeout(() => router.refresh(), 300);
     };
-    const poll = setInterval(() => router.refresh(), 20000);
+    // Reserva do tempo real: a cada 2 min, só com a aba à vista.
+    const poll = setInterval(() => document.visibilityState === "visible" && router.refresh(), 120_000);
     const supabase = getSupabaseBrowserClient();
     const channel = supabase?.channel(`calendario-${championshipId}`);
     if (supabase && channel) {

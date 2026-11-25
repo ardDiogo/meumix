@@ -96,7 +96,8 @@ export function MusicSettingsWatcher({ snapshot }: { snapshot: string }) {
   }, [snapshot]);
 
   useEffect(() => {
-    const id = setInterval(async () => {
+    // A cada 5 min e ao voltar para a aba (a cada 10s gastava CPU do servidor à toa).
+    const check = async () => {
       if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch("/api/flags", { cache: "no-store" });
@@ -109,8 +110,13 @@ export function MusicSettingsWatcher({ snapshot }: { snapshot: string }) {
       } catch {
         // Sem rede: tenta na próxima.
       }
-    }, 10_000);
-    return () => clearInterval(id);
+    };
+    const id = setInterval(check, 5 * 60_000);
+    document.addEventListener("visibilitychange", check);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", check);
+    };
   }, [router]);
 
   useEffect(() => {

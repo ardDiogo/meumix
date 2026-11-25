@@ -179,8 +179,10 @@ export function JoinButton({
     if (!loggedIn || registered || started) return;
     const id = setInterval(() => {
       const toOpen = opensAt - now();
-      // 5 min longe da abertura; a cada 5s nos últimos 2 min; a cada 45s com o mix aberto.
-      const every = toOpen > 120_000 ? 300_000 : toOpen > 0 ? 5_000 : 45_000;
+      // Só perto da abertura e com a aba à vista (cada ping gasta CPU do servidor): a cada 1 min
+      // nos 15 min antes, a cada 5s nos últimos 2 min; fora disso, nada.
+      if (document.visibilityState !== "visible" || toOpen <= 0 || toOpen > 15 * 60_000) return;
+      const every = toOpen > 120_000 ? 60_000 : 5_000;
       if (Date.now() - lastPing.current >= every) {
         lastPing.current = Date.now();
         void fetch("/api/time", { cache: "no-store" }).catch(() => undefined);

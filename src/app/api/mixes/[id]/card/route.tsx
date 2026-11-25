@@ -941,7 +941,8 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
       width: WIDTH,
       height,
       fonts: fonts.length ? fonts : undefined,
-      headers: { "cache-control": "public, max-age=60" },
+      // Gerar a imagem é pesado: a CDN guarda por 1h (e serve a antiga enquanto refaz).
+      headers: { "cache-control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400" },
     },
   );
 }

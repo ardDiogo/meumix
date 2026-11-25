@@ -85,7 +85,8 @@ function LiveDraft({ championshipId, active }: { championshipId: string; active:
       clearTimeout(timer);
       timer = setTimeout(() => router.refresh(), 300);
     };
-    const poll = setInterval(() => router.refresh(), 8000);
+    // Reserva do tempo real (cada atualização refaz a página no servidor): a cada 30 s, só com a aba à vista.
+    const poll = setInterval(() => document.visibilityState === "visible" && router.refresh(), 30_000);
     const supabase = getSupabaseBrowserClient();
     const channel = supabase?.channel(`campeonato-${championshipId}`);
     if (supabase && channel) {
