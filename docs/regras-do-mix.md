@@ -78,6 +78,7 @@ Mix agendado → Abertura (horário do servidor) → Inscrições (10 classifica
 - Cada jogador escolhe **exatamente 4 mapas** dentre os mapas ativos configurados pelo admin. Pode trocar o voto (substitui o anterior).
 - Só contam votos dos **classificados**.
 - Entram na rotação os **4 mais votados**.
+- **Ordem da série (Mapa 1, 2, 3, 4):** do mais votado para o menos votado; empate em votos, vem antes o mapa que chegou primeiro àquele número de votos (o horário do último voto que recebeu). A finalização já vem nessa ordem.
 - **Os mapas se definem antes do PICK**: com a lista fechada, ficam definidos quando todos os classificados votaram, ou antes, quando os votos que faltam já não mudam o top 4 (mesmo indo todos para os rivais). Enquanto isso o quadro "Mapas do mix" mostra "Aguardando votos (x/10)".
 - O admin pode **encerrar a votação de mapas** com os votos atuais (alguém não votou). Encerrada (ou com desempate aberto), a votação de mapas não aceita mais votos.
 

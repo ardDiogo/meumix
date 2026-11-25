@@ -51,12 +51,18 @@ export function TiebreakerPanel({
       </div>
       <div className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap gap-2">
-          {tiebreaker.finalMaps.map((m) => (
+          {tiebreaker.finalMaps.map((m, i) => (
             <span
               key={m.id}
               className="inline-flex flex-col gap-1 rounded-md border border-brand/40 bg-brand/10 px-3 py-1.5 text-sm font-semibold"
             >
               <span className="inline-flex items-center gap-1.5">
+                <span
+                  className="rounded-sm bg-brand px-1.5 py-0.5 font-display text-[10px] leading-none font-bold text-black"
+                  title={`Mapa ${i + 1} da série`}
+                >
+                  {i + 1}
+                </span>
                 <MapEmblem id={m.id as MapId} size={18} />
                 {m.name}
                 <span
@@ -92,6 +98,13 @@ export function TiebreakerPanel({
               </span>
             ))}
         </div>
+
+        {tiebreaker.finalMaps.length > 1 && (
+          <p className="text-xs text-subtle">
+            Ordem da série: mais votado primeiro; empate em votos, vem antes o mapa que chegou primeiro àquele número de
+            votos.
+          </p>
+        )}
 
         {done.map((r) => (
           <p key={r.id} className="text-xs text-muted">

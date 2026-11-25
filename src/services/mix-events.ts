@@ -546,9 +546,21 @@ export async function loadTiebreaker(
     : { data: [] };
 
   // Votos de mapas de cada classificado (para as fotos embaixo de cada mapa).
-  const { data: ballots } = people
-    ? await supabase.from("map_votes").select("user_id, map_id").match({ schedule_id: scheduleId, event_date: date })
-    : { data: [] };
+  const { data: allBallots } = await supabase
+    .from("map_votes")
+    .select("user_id, map_id, created_at")
+    .match({ schedule_id: scheduleId, event_date: date });
+  // Só os votos que contam (classificados); sem a lista (finalização), todos.
+  const ballots = (allBallots ?? []).filter((b) => !people || people.has(b.user_id as string));
+  /**
+   * Ordem dos mapas (Mapa 1, 2, 3, 4): mais votos primeiro; empate em votos, vem antes o
+   * que chegou primeiro àquele número de votos (o horário do último voto que recebeu).
+   */
+  const reachedAt = (id: string) =>
+    ballots
+      .filter((b) => b.map_id === id)
+      .map((b) => new Date(b.created_at as string).getTime())
+      .reduce((max, t) => Math.max(max, t), 0);
   const votersOf = (rows: { user_id: unknown }[]): Voter[] =>
     rows.flatMap((v) => {
       const p = people?.get(v.user_id as string);
@@ -565,24 +577,26 @@ export async function loadTiebreaker(
     waiting: result.waiting && mapVoters ? { voted: mapVoters.voted, total: mapVoters.total } : null,
     tally: result.waiting
       ? [...main]
-          .sort((x, y) => y.votes - x.votes)
+          .sort((x, y) => y.votes - x.votes || reachedAt(x.id) - reachedAt(y.id))
           .filter((m) => m.votes > 0)
           .map((m) => ({
             id: m.id,
             name: names.get(m.id) ?? m.id,
             votes: m.votes,
-            voters: votersOf((ballots ?? []).filter((b) => b.map_id === m.id)),
+            voters: votersOf(ballots.filter((b) => b.map_id === m.id)),
             locked: result.maps.includes(m.id),
           }))
       : [],
-    finalMaps: result.maps.map((id) => ({
-      id,
-      name: names.get(id) ?? id,
-      random: result.random.includes(id),
-      votes: counts.get(id) ?? 0,
-      tiebreakVotes: null,
-      voters: votersOf((ballots ?? []).filter((b) => b.map_id === id)),
-    })),
+    finalMaps: [...result.maps]
+      .sort((x, y) => (counts.get(y) ?? 0) - (counts.get(x) ?? 0) || reachedAt(x) - reachedAt(y))
+      .map((id) => ({
+        id,
+        name: names.get(id) ?? id,
+        random: result.random.includes(id),
+        votes: counts.get(id) ?? 0,
+        tiebreakVotes: null,
+        voters: votersOf(ballots.filter((b) => b.map_id === id)),
+      })),
     rounds: rows.map((r) => {
       const mine = (rvotes ?? []).filter((v) => v.round_id === r.id);
       const captainsMode = r.mode === "captains";
