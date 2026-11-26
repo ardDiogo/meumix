@@ -3,7 +3,7 @@ import { aggregateGc, gcHighlights } from "@/lib/gc-analysis";
 import { byMixScore, kdrOf, matchHighlights, mixScore, type StatRow } from "@/lib/match-highlights";
 import { mapName } from "@/lib/maps";
 import { mixHref } from "@/lib/mix-slug";
-import { overall } from "@/lib/performance";
+import { overall, statOf } from "@/lib/performance";
 import { seriesScore, seriesWinner } from "@/lib/stats";
 import type { TeamSide } from "@/types/domain";
 import { getDataSource } from "@/services";
@@ -52,6 +52,8 @@ export interface LastMixSummary {
     isLanterna: boolean;
     roast: string | null;
     tip: string | null;
+    /** Comparado com a própria média (Geral e cada estatística, em %); estreia: null. */
+    perf: { value: number; parts: { stat: string; label: string; pct: number; now: string; avg: string }[] } | null;
   } | null;
 }
 
@@ -122,6 +124,24 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
       return o ? [{ ...person(r), value: Math.round(o.value) }] : [];
     });
     const sorted = [...perf].sort((x, y) => y.value - x.value);
+    const STAT_LABEL: Record<string, string> = { kdr: "KDR", adr: "ADR", fk: "FK", kast: "KAST" };
+    const myPerf = (r: StatRow) => {
+      const avg = r.userId ? averages[r.userId] : undefined;
+      const o = r.userId ? overall(r, avg) : null;
+      if (!o || !avg) return null;
+      const fmt = (k: string, v: number | null) =>
+        v == null ? "—" : k === "kast" ? `${Math.round(v)}%` : k === "fk" ? dec(v, 1) : k === "adr" ? dec(v, 1) : dec(v);
+      return {
+        value: Math.round(o.value),
+        parts: o.parts.map((p) => ({
+          stat: p.k,
+          label: STAT_LABEL[p.k] ?? p.k,
+          pct: Math.round(p.pct),
+          now: fmt(p.k, statOf(r, p.k)),
+          avg: fmt(p.k, avg[p.k] ?? null),
+        })),
+      };
+    };
     const debuts = rows.filter((r) => r.userId && !averages[r.userId]).map((r) => r.name);
 
     const mine = viewerId ? rows.find((r) => r.userId === viewerId) : undefined;
@@ -184,6 +204,7 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
             isLanterna: mine.isLanterna,
             roast: roastOf(mine)?.roast?.trim() || null,
             tip: roastOf(mine)?.tip?.trim() || null,
+            perf: myPerf(mine),
           }
         : null,
     };

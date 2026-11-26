@@ -51,8 +51,16 @@ function LanternIcon({ className }: { className?: string }) {
 export function LastMixCarousel({ data, compact = false }: { data: LastMixSummary; compact?: boolean }) {
   const slides = useMemo(() => {
     const list: { key: string; title: string; body: React.ReactNode }[] = [
-      { key: "serie", title: "Resumo da série", body: <SeriesSlide data={data} /> },
-      { key: "destaques", title: "Destaques do mix", body: <HighlightsSlide data={data} /> },
+      {
+        key: "serie",
+        title: "Resumo e destaques",
+        body: (
+          <div className="grid gap-4 lg:grid-cols-[1fr_1.15fr]">
+            <SeriesSlide data={data} />
+            <HighlightsSlide data={data} />
+          </div>
+        ),
+      },
     ];
     if (data.roasts.length) list.push({ key: "resenhas", title: "Resenhas da IA", body: <RoastsSlide data={data} /> });
     if (data.above.length || data.below.length)
@@ -219,7 +227,7 @@ function SeriesSlide({ data }: { data: LastMixSummary }) {
         </div>
         {b && team(b, true)}
       </div>
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2">
         {data.maps.map((m, i) => (
           <div key={`${m.mapId}-${i}`} className="rounded-md border border-border bg-bg/60 px-3 py-2">
             <div className="flex items-center gap-1.5 text-sm font-semibold">
@@ -246,9 +254,9 @@ function SeriesSlide({ data }: { data: LastMixSummary }) {
 
 function HighlightsSlide({ data }: { data: LastMixSummary }) {
   return (
-    <div className="grid gap-2 md:grid-cols-[13rem_1fr]">
+    <div className="grid gap-2">
       {data.mvp && (
-        <div className="flex flex-row items-center gap-3 rounded-lg border border-purple-500/40 bg-purple-500/10 p-3 md:flex-col md:justify-center md:text-center">
+        <div className="flex flex-row items-center gap-3 rounded-lg border border-purple-500/40 bg-purple-500/10 p-3 pt-4">
           <div className="relative">
             <Crown
               className="absolute -top-4 left-1/2 size-5 -translate-x-1/2 fill-yellow-400 text-yellow-500"
@@ -267,7 +275,7 @@ function HighlightsSlide({ data }: { data: LastMixSummary }) {
         </div>
       )}
       <div className="grid gap-2">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2">
           {data.highlights.map((h) => (
             <div key={h.label} className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-bg/60 p-2">
               <Face p={h} />
@@ -300,30 +308,48 @@ function HighlightsSlide({ data }: { data: LastMixSummary }) {
 }
 
 function RoastsSlide({ data }: { data: LastMixSummary }) {
-  // Quatro frases por visita, sorteadas no navegador (as outras ficam na página do mix).
-  const [pick, setPick] = useState(data.roasts.slice(0, 4));
-  useEffect(() => {
-    const t = setTimeout(() => setPick([...data.roasts].sort(() => Math.random() - 0.5).slice(0, 4)), 0);
-    return () => clearTimeout(t);
-  }, [data.roasts]);
+  // Todos, separados por time: o vencedor primeiro (no empate, a ordem dos times).
+  const order = data.winner === "B" ? data.teams.slice().reverse() : data.teams;
   return (
-    <div className="space-y-2">
-      <div className="grid gap-2 sm:grid-cols-2">
-        {pick.map((r) => (
-          <div key={r.name} className="flex gap-2.5 rounded-md border border-border bg-bg/60 p-2.5">
-            <Face p={r} />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold">{r.name}</div>
-              <p className="mt-0.5 text-[13px] leading-snug text-orange-300 italic">“{r.text}”</p>
+    <div className="grid gap-3 md:grid-cols-2">
+      {order.map((t) => {
+        const list = data.roasts.filter((r) => r.team === t.side);
+        if (!list.length) return null;
+        const label = data.winner ? (data.winner === t.side ? "Vencedor" : "Derrota") : "Empate";
+        return (
+          <div key={t.side} className="space-y-1.5">
+            <div
+              className={cn(
+                "flex items-center gap-2 text-[11px] font-bold tracking-[0.15em] uppercase",
+                t.side === "A" ? "text-sky-400" : "text-yellow-400",
+              )}
+            >
+              {t.name}
+              <span
+                className={cn(
+                  "rounded-sm px-1.5 py-0.5 text-[9px] tracking-wider",
+                  label === "Vencedor"
+                    ? "bg-win/15 text-win"
+                    : label === "Derrota"
+                      ? "bg-loss/15 text-loss"
+                      : "bg-surface-3 text-muted",
+                )}
+              >
+                {label}
+              </span>
             </div>
+            {list.map((r) => (
+              <div key={r.name} className="flex gap-2.5 rounded-md border border-border bg-bg/60 px-2.5 py-2">
+                <Face p={r} size="xs" />
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold">{r.name}</div>
+                  <p className="text-[12px] leading-snug text-orange-300 italic">“{r.text}”</p>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      {data.roasts.length > pick.length && (
-        <p className="text-xs text-subtle">
-          Mais {data.roasts.length - pick.length} resenhas no mix · as frases trocam a cada visita
-        </p>
-      )}
+        );
+      })}
     </div>
   );
 }
@@ -446,6 +472,61 @@ function MeSlide({ data }: { data: LastMixSummary }) {
             ELO{data.league ? ` no ${data.league}` : ""}: <b className="text-fg">{me.eloAfter}</b>
           </p>
         )}
+      </div>
+      <MyPerformance me={me} />
+    </div>
+  );
+}
+
+/** "Quem superou a si mesmo" só do jogador: Geral e cada estatística contra a própria média. */
+function MyPerformance({ me }: { me: NonNullable<LastMixSummary["me"]> }) {
+  if (!me.perf)
+    return (
+      <p className="text-xs text-muted md:col-span-2">
+        🆕 Primeiro mix na liga: a comparação com a sua média aparece a partir do próximo.
+      </p>
+    );
+  const { value, parts } = me.perf;
+  const tone = (v: number) => (Math.abs(v) <= 3 ? "bg-yellow-500" : v > 0 ? "bg-win" : "bg-loss");
+  const text = (v: number) => (Math.abs(v) <= 3 ? "text-yellow-400" : v > 0 ? "text-win" : "text-loss");
+  const bar = (v: number) => (
+    <div className="relative h-2 rounded-full bg-surface-3">
+      <span className="absolute top-0 left-1/2 h-full w-px bg-border-strong" aria-hidden />
+      <span
+        className={cn("absolute top-0 h-full rounded-full", tone(v))}
+        style={
+          v >= 0
+            ? { left: "50%", width: `${Math.min(50, Math.abs(v))}%` }
+            : { right: "50%", width: `${Math.min(50, Math.abs(v))}%` }
+        }
+      />
+    </div>
+  );
+  return (
+    <div className="rounded-lg border border-border bg-bg/60 p-3 md:col-span-2">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-[11px] font-bold tracking-[0.15em] text-muted uppercase">Você contra a sua média</span>
+        <span className={cn("font-display text-lg font-bold tabular", text(value))}>
+          {value > 0 ? "+" : value < 0 ? "−" : ""}
+          {Math.abs(value)}% {value > 3 ? "🔥" : value < -3 ? "🧊" : ""}
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {parts.map((p) => (
+          <div key={p.stat} className="space-y-1">
+            <div className="flex items-baseline justify-between text-xs">
+              <span className="font-semibold">{p.label}</span>
+              <span className={cn("font-bold tabular", text(p.pct))}>
+                {p.pct > 0 ? "+" : p.pct < 0 ? "−" : ""}
+                {Math.abs(p.pct)}%
+              </span>
+            </div>
+            {bar(p.pct)}
+            <div className="text-[11px] text-subtle">
+              {p.now} no mix · média {p.avg}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
