@@ -1,4 +1,8 @@
 import { Crosshair, Flame, Plus, ShieldCheck, Trophy, UserRoundX } from "lucide-react";
+import { LastMixCarousel } from "@/components/dashboard/last-mix-carousel";
+import { getLastMixSummary } from "@/services/last-mix";
+import { getCurrentLeague } from "@/services/league";
+import { leagueIdsWithMixToday } from "@/services/league-today";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { DemoBadge } from "@/components/demo-notice";
@@ -43,29 +47,40 @@ export const metadata: Metadata = {
 const RECENT_WINDOW = 10;
 
 export default async function DashboardPage() {
-  const [{ kind, profile, highlights }, { session, canManageMixes }, championships] = await Promise.all([
-    getDashboard(),
-    getPermissions(),
-    // Campeonatos com inscrições abertas ou em andamento (sem as migrações: nenhum).
-    dashboardChampionships().catch(() => []),
-  ]);
+  const [{ kind, profile, highlights }, { session, canManageMixes }, championships, league, mixToday] =
+    await Promise.all([
+      getDashboard(),
+      getPermissions(),
+      // Campeonatos com inscrições abertas ou em andamento (sem as migrações: nenhum).
+      dashboardChampionships().catch(() => []),
+      getCurrentLeague(),
+      leagueIdsWithMixToday().catch(() => new Set<string>()),
+    ]);
+  // Resumo do último mix no topo (no lugar do banner); em dia de mix, abaixo do "Participar do mix".
+  const lastMix = await getLastMixSummary(session?.id ?? null);
+  const isMixDay = !!league && !league.none && mixToday.has(league.id);
+  const carouselTop = lastMix && !isMixDay ? <LastMixCarousel data={lastMix} /> : null;
+  const carouselBelow = lastMix && isMixDay ? <LastMixCarousel data={lastMix} compact /> : null;
 
   if (!profile || !highlights) {
     return (
       <>
-        <HeroBanner
-          eyebrow={session ? `Olá, ${session.displayName}` : "Mixes de CS2"}
-          title="Bem-vindo ao MeuMix"
-          description="Inscreva-se no próximo mix e acompanhe seu desempenho."
-          actions={
-            <Button variant="secondary" asChild>
-              <Link href="/rankings">Ver ranking</Link>
-            </Button>
-          }
-        />
+        {carouselTop ?? (
+          <HeroBanner
+            eyebrow={session ? `Olá, ${session.displayName}` : "Mixes de CS2"}
+            title="Bem-vindo ao MeuMix"
+            description="Inscreva-se no próximo mix e acompanhe seu desempenho."
+            actions={
+              <Button variant="secondary" asChild>
+                <Link href="/rankings">Ver ranking</Link>
+              </Button>
+            }
+          />
+        )}
         {session && pushConfigured() && <PushPrompt />}
         <LiveNow />
         <NextMixPanel />
+        {carouselBelow}
         <ChampionshipHome items={championships} loggedIn={!!session} />
         <Card>
           <EmptyState
@@ -104,30 +119,33 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <HeroBanner
-        eyebrow={session ? `Olá, ${session.displayName}` : undefined}
-        title="Seu resumo competitivo"
-        description="Inscreva-se no próximo mix, acompanhe seu ELO, nível e desempenho na comunidade."
-        actions={
-          <>
-            {canManageMixes && (
-              <Button variant="primary" asChild>
-                <Link href="/admin">
-                  <Plus /> Novo mix
-                </Link>
+      {carouselTop ?? (
+        <HeroBanner
+          eyebrow={session ? `Olá, ${session.displayName}` : undefined}
+          title="Seu resumo competitivo"
+          description="Inscreva-se no próximo mix, acompanhe seu ELO, nível e desempenho na comunidade."
+          actions={
+            <>
+              {canManageMixes && (
+                <Button variant="primary" asChild>
+                  <Link href="/admin">
+                    <Plus /> Novo mix
+                  </Link>
+                </Button>
+              )}
+              <Button variant="secondary" asChild>
+                <Link href="/rankings">Ver ranking</Link>
               </Button>
-            )}
-            <Button variant="secondary" asChild>
-              <Link href="/rankings">Ver ranking</Link>
-            </Button>
-            <DemoBadge kind={kind} />
-          </>
-        }
-      />
+              <DemoBadge kind={kind} />
+            </>
+          }
+        />
+      )}
 
       {session && pushConfigured() && <PushPrompt />}
       <LiveNow />
       <NextMixPanel />
+      {carouselBelow}
       <ChampionshipHome items={championships} loggedIn={!!session} />
 
       {/* Resumo competitivo */}
