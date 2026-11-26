@@ -177,6 +177,18 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
 
         {/* Os 3 números grandes */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="rounded-xl border border-border bg-bg/70 px-3 py-2.5 sm:px-4">
+            <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">K / A / D</div>
+            <div className="font-display text-xl leading-tight font-bold tabular sm:text-4xl">
+              {me.k}/{me.a}/{me.d}
+            </div>
+            <div className="text-[11px] text-muted sm:text-xs">{num(me.kdr, 2)} KDR</div>
+          </div>
+          <div className="rounded-xl border border-border bg-bg/70 px-3 py-2.5 sm:px-4">
+            <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">PTS</div>
+            <div className="font-display text-2xl leading-tight font-bold tabular sm:text-4xl">{me.pts}</div>
+            <div className="text-[11px] text-muted sm:text-xs">pontuação do mix</div>
+          </div>
           <div
             className={cn(
               "rounded-xl border bg-bg/70 px-3 py-2.5 sm:px-4",
@@ -199,18 +211,6 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
             <div className="text-[11px] text-muted sm:text-xs">
               {eloBefore != null ? `${eloBefore} → ${me.eloAfter}` : (me.eloAfter ?? "")}
             </div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg/70 px-3 py-2.5 sm:px-4">
-            <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">PTS</div>
-            <div className="font-display text-2xl leading-tight font-bold tabular sm:text-4xl">{me.pts}</div>
-            <div className="text-[11px] text-muted sm:text-xs">pontuação do mix</div>
-          </div>
-          <div className="rounded-xl border border-border bg-bg/70 px-3 py-2.5 sm:px-4">
-            <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">K / A / D</div>
-            <div className="font-display text-xl leading-tight font-bold tabular sm:text-4xl">
-              {me.k}/{me.a}/{me.d}
-            </div>
-            <div className="text-[11px] text-muted sm:text-xs">{num(me.kdr, 2)} KDR</div>
           </div>
         </div>
 
