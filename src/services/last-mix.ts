@@ -62,6 +62,11 @@ export interface LastMixSummary {
     /** Dados da GC (mix importado da GC). */
     hsRate: number | null;
     rating: number | null;
+    /** "Seu jogo no mix" (dados da GC): cada área com a posição no lobby; sem GC, null. */
+    game: {
+      role: { emoji: string; label: string };
+      items: { key: string; emoji: string; label: string; value: string; detail: string; rank: number }[];
+    } | null;
     /** Comparado com a própria média (Geral e cada estatística, em %); estreia: null. */
     perf: { value: number; parts: { stat: string; label: string; pct: number; now: string; avg: string }[] } | null;
   } | null;
@@ -165,6 +170,53 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
     const mine = viewerId ? rows.find((r) => r.userId === viewerId) : undefined;
     const myLine = mine ? lines.find((l) => l.userId === mine.userId) : undefined;
     const score = seriesScore(mix);
+    // Seu jogo no mix: aberturas, trades, clutch e utilitária, com a posição entre os 10.
+    const myGame = () => {
+      if (!myLine || lines.length < 2) return null;
+      const rank = (f: (l: (typeof lines)[number]) => number) => 1 + lines.filter((l) => f(l) > f(myLine)).length;
+      const items = [
+        {
+          key: "entry",
+          emoji: "🚪",
+          label: "Aberturas",
+          value: `${myLine.entries.won}/${myLine.entries.duels}`,
+          detail: myLine.entries.duels ? `${Math.round((myLine.entries.won / myLine.entries.duels) * 100)}%` : "—",
+          rank: rank((l) => l.entries.duels * 1000 + l.entries.won),
+        },
+        {
+          key: "trade",
+          emoji: "🔁",
+          label: "Trades",
+          value: String(myLine.trades.made),
+          detail: `${myLine.trades.traded} suas trocadas`,
+          rank: rank((l) => l.trades.made),
+        },
+        {
+          key: "clutch",
+          emoji: "🎯",
+          label: "Clutch",
+          value: `${myLine.clutch.won}/${myLine.clutch.situations}`,
+          detail: myLine.clutch.biggest ? `maior 1v${myLine.clutch.biggest}` : "—",
+          rank: rank((l) => l.clutch.won * 1000 + (l.clutch.biggest ?? 0)),
+        },
+        {
+          key: "util",
+          emoji: "💥",
+          label: "Utilitária",
+          value: `${myLine.utility.flashed} cegos`,
+          detail: `${myLine.utility.damage} dano`,
+          rank: rank((l) => l.utility.flashed * 10000 + l.utility.damage),
+        },
+      ];
+      const ROLE: Record<string, { emoji: string; label: string }> = {
+        entry: { emoji: "🚪", label: "Abridor de rounds" },
+        trade: { emoji: "🔁", label: "Cobertura do time" },
+        clutch: { emoji: "🎯", label: "Clutcher" },
+        util: { emoji: "💥", label: "Rei da utilitária" },
+      };
+      const best = items.reduce((a, b) => (b.rank < a.rank ? b : a));
+      return { role: ROLE[best.key]!, items };
+    };
     const winnerSide = seriesWinner(mix);
     const date = mix.scheduledAt.slice(0, 10);
     const roundsOf = (i: number) => (gcMaps[i]?.rounds ?? []).map((x) => x.w);
@@ -226,6 +278,7 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
             roast: roastOf(mine)?.roast?.trim() || null,
             tip: roastOf(mine)?.tip?.trim() || null,
             perf: myPerf(mine),
+            game: myGame(),
             result: !winnerSide ? "draw" : winnerSide === mine.team ? "win" : "loss",
             teamName: mix.teams.find((t) => t.side === mine.team)?.name ?? "",
             ownScore: score ? (mine.team === "A" ? score : [score[1], score[0]]) : null,

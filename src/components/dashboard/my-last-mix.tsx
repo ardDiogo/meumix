@@ -80,7 +80,9 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
         {/* Logo, título e quando foi */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <span className="font-display text-sm font-bold tracking-[0.12em] text-brand uppercase">Seu último mix</span>
+            <span className="font-display text-sm font-bold tracking-[0.12em] text-brand uppercase">
+              Seu último mix
+            </span>
           </div>
           <span className="text-xs text-muted">
             <span className="font-semibold text-fg">{data.name}</span>
@@ -222,6 +224,49 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
             </span>
           ))}
         </div>
+
+        {/* Seu jogo no mix (GC): compacto, uma linha no computador e 2×2 no celular */}
+        {me.game && (
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.14em] text-muted uppercase">
+              Seu jogo no mix
+              <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[11px] tracking-normal text-orange-300 normal-case">
+                {me.game.role.emoji} {me.game.role.label}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 lg:grid-cols-4">
+              {me.game.items.map((g) => (
+                <div
+                  key={g.key}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border bg-bg/70 px-2.5 py-1.5"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate text-[11px] text-muted">
+                      {g.emoji} {g.label}
+                    </div>
+                    <div className="text-sm leading-tight">
+                      <b className="font-display tabular">{g.value}</b>{" "}
+                      <span className="text-[11px] text-muted">{g.detail}</span>
+                    </div>
+                  </div>
+                  <span
+                    title="Posição entre os jogadores do mix"
+                    className={cn(
+                      "shrink-0 rounded-full px-1.5 py-0.5 font-display text-[11px] font-bold tabular",
+                      g.rank <= 3
+                        ? "bg-win/15 text-win"
+                        : g.rank >= 8
+                          ? "bg-loss/15 text-loss"
+                          : "bg-yellow-500/15 text-yellow-400",
+                    )}
+                  >
+                    {g.rank}º
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Você contra a sua média */}
         {me.perf ? (
