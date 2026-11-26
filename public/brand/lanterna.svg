@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 80">
+  <defs>
+    <linearGradient id="metal" x1="0" x2="1">
+      <stop offset="0" stop-color="#2b2f36"/><stop offset=".45" stop-color="#5b6270"/><stop offset=".55" stop-color="#3a3f48"/><stop offset="1" stop-color="#16181c"/>
+    </linearGradient>
+    <linearGradient id="metalV" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6b7280"/><stop offset="1" stop-color="#1f2329"/>
+    </linearGradient>
+    <radialGradient id="glass" cx=".5" cy=".55" r=".6">
+      <stop offset="0" stop-color="#fff3c4"/><stop offset=".25" stop-color="#ffc35a"/><stop offset=".6" stop-color="#F97316"/><stop offset="1" stop-color="#9a3412"/>
+    </radialGradient>
+    <radialGradient id="flame" cx=".5" cy=".7" r=".6">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="#ffe08a"/><stop offset="1" stop-color="#ff8a00" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="halo" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#F97316" stop-opacity=".55"/><stop offset="1" stop-color="#F97316" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <ellipse cx="32" cy="46" rx="30" ry="30" fill="url(#halo)"/>
+  <!-- alça -->
+  <path d="M22 16 C22 3, 42 3, 42 16" fill="none" stroke="url(#metalV)" stroke-width="3.2" stroke-linecap="round"/>
+  <!-- topo -->
+  <path d="M18 22 L32 12 L46 22 Z" fill="url(#metal)"/>
+  <rect x="16" y="21" width="32" height="5" rx="2" fill="url(#metal)"/>
+  <!-- vidro -->
+  <path d="M19 26 H45 L43 58 H21 Z" fill="url(#glass)"/>
+  <!-- chama -->
+  <path d="M32 33 C36 40, 38 45, 32 52 C26 45, 28 40, 32 33 Z" fill="url(#flame)"/>
+  <!-- reflexo do vidro -->
+  <path d="M23 29 L26 29 L25 54 L23 54 Z" fill="#fff" opacity=".35"/>
+  <!-- grades -->
+  <rect x="31" y="26" width="2" height="32" fill="#1f2329" opacity=".85"/>
+  <rect x="19" y="26" width="2.4" height="32" fill="url(#metal)"/>
+  <rect x="42.6" y="26" width="2.4" height="32" fill="url(#metal)"/>
+  <!-- base -->
+  <rect x="17" y="57" width="30" height="6" rx="2" fill="url(#metal)"/>
+  <rect x="21" y="62" width="22" height="5" rx="2" fill="url(#metalV)"/>
+</svg>

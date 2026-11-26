@@ -10,6 +10,7 @@ import {
   Swords,
   Trophy,
 } from "lucide-react";
+import { Lantern } from "@/components/ui/lantern";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -457,8 +458,11 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                       </Link>
                       {r.isMvp && <span className="ml-2 text-[10px] font-bold text-brand uppercase">MVP</span>}
                       {r.isLanterna && (
-                        <span className="ml-2 text-[10px] font-bold text-loss uppercase" title="Pior desempenho do mix">
-                          Lanterna
+                        <span
+                          className="ml-2 inline-flex items-center gap-0.5 text-[10px] font-bold text-loss uppercase"
+                          title="Pior desempenho do mix"
+                        >
+                          <Lantern className="size-3.5" glow={false} /> Lanterna
                         </span>
                       )}
                     </TD>

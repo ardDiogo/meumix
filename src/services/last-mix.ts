@@ -140,7 +140,15 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
       const o = r.userId ? overall(r, avg) : null;
       if (!o || !avg) return null;
       const fmt = (k: string, v: number | null) =>
-        v == null ? "—" : k === "kast" ? `${Math.round(v)}%` : k === "fk" ? dec(v, 1) : k === "adr" ? dec(v, 1) : dec(v);
+        v == null
+          ? "—"
+          : k === "kast"
+            ? `${Math.round(v)}%`
+            : k === "fk"
+              ? dec(v, 1)
+              : k === "adr"
+                ? dec(v, 1)
+                : dec(v);
       return {
         value: Math.round(o.value),
         parts: o.parts.map((p) => ({

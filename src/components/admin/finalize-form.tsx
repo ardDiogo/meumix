@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle, Crown, Flag, Loader2, Plus, Trash2, UserPlus } from "lucide-react";
+import { Lantern } from "@/components/ui/lantern";
+import { AlertCircle, Crown, Loader2, Plus, Trash2, UserPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { aliasKey } from "@/lib/alias";
@@ -615,7 +616,7 @@ export function FinalizeForm({
                         )}
                         {i === lanterna && (
                           <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-loss uppercase">
-                            <Flag className="size-3" /> Lanterna
+                            <Lantern className="size-3.5" glow={false} /> Lanterna
                           </span>
                         )}
                       </div>

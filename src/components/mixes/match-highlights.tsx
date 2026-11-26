@@ -14,6 +14,7 @@ import {
   Trophy,
   Zap,
 } from "lucide-react";
+import { Lantern, LanternCorner } from "@/components/ui/lantern";
 import type { GcMapStored } from "@/lib/gc-api";
 import {
   aggregateGc,
@@ -198,14 +199,19 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
           </ul>
           {worst && (
             <div className="flex items-center gap-3 rounded-xl border border-loss/50 bg-gradient-to-r from-loss/20 via-surface/90 to-surface px-3 py-3 sm:gap-4 sm:px-4">
-              <Avatar
-                name={worst.name}
-                src={worst.avatarUrl}
-                size="lg"
-                className="size-14 shrink-0 rounded-xl border-2 border-loss sm:size-16"
-              />
+              <div className="relative shrink-0">
+                <Avatar
+                  name={worst.name}
+                  src={worst.avatarUrl}
+                  size="lg"
+                  className="size-14 rounded-xl border-2 border-loss sm:size-16"
+                />
+                <LanternCorner className="-right-3 -bottom-3 size-9 sm:-right-4 sm:-bottom-4 sm:size-11" />
+              </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[11px] font-bold tracking-[0.25em] text-loss uppercase">Lanterna</div>
+                <div className="flex items-center gap-1 text-[11px] font-bold tracking-[0.25em] text-loss uppercase">
+                  <Lantern className="size-4" glow={false} /> Lanterna
+                </div>
                 <div className="truncate font-display text-xl font-bold" title={worst.name}>
                   {worst.name}
                 </div>

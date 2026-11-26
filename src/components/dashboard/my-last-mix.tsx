@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Lantern, LanternCorner } from "@/components/ui/lantern";
 import Link from "next/link";
 import hero from "../../../public/brand/hero.webp";
 import type { LastMixSummary } from "@/services/last-mix";
@@ -108,6 +109,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
               size="xl"
               className={cn("size-16 shadow-lg ring-3 sm:size-20", teamRing)}
             />
+            {me.isLanterna && <LanternCorner />}
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -120,7 +122,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
               )}
               {me.isLanterna && (
                 <span className="inline-flex items-center gap-1 rounded-full border border-loss/40 bg-loss/15 px-2.5 py-0.5 text-xs font-bold text-loss">
-                  <Image src="/badges/lanternavermelha.png" alt="" width={16} height={16} className="size-4" />
+                  <Lantern className="size-4" glow={false} />
                   LANTERNA
                 </span>
               )}

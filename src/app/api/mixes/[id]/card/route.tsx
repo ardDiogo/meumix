@@ -263,10 +263,11 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
   const score = seriesScore(mix) ?? [0, 0];
   const origin = new URL(request.url).origin;
 
-  const [fonts, logo, hero, ...avatars] = await Promise.all([
+  const [fonts, logo, hero, lanternImg, ...avatars] = await Promise.all([
     loadFonts(),
     toDataUri(`${origin}/brand/logo.png`),
     toDataUri(`${origin}/brand/share-hero.jpg`),
+    toDataUri(`${origin}/brand/lanterna.svg`),
     ...rows.map((r) => toDataUri(r.avatarUrl)),
   ]);
   const avatarOf = new Map(rows.map((r, i) => [r.key, avatars[i] ?? null]));
@@ -735,8 +736,21 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                   backgroundImage: "linear-gradient(90deg, rgba(240,82,82,0.2), rgba(18,20,25,0.92) 70%)",
                 }}
               >
-                <div style={{ display: "flex", borderRadius: 14, border: `2px solid ${C.loss}` }}>
-                  <Avatar name={worst.name} src={avatar(worst)} size={72} ring={ring(worst)} />
+                <div style={{ display: "flex", position: "relative" }}>
+                  <div style={{ display: "flex", borderRadius: 14, border: `2px solid ${C.loss}` }}>
+                    <Avatar name={worst.name} src={avatar(worst)} size={72} ring={ring(worst)} />
+                  </div>
+                  {lanternImg && (
+                    // Lanterna no canto inferior direito da foto (como a coroa do MVP).
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={lanternImg}
+                      width={52}
+                      height={65}
+                      alt=""
+                      style={{ position: "absolute", right: -22, bottom: -18 }}
+                    />
+                  )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
                   <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: 3, color: C.loss }}>LANTERNA</span>
@@ -848,6 +862,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/mixes/[id]/c
                       background: r === mvp ? "rgba(168,85,247,0.18)" : "rgba(240,82,82,0.14)",
                     }}
                   >
+                    {r !== mvp && lanternImg ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={lanternImg} width={11} height={14} alt="" style={{ marginRight: 3 }} />
+                    ) : null}
                     {r === mvp ? "MVP" : "LANTERNA"}
                   </span>
                 )}
