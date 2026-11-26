@@ -134,6 +134,8 @@ export interface Mix {
   maps: MapResult[];
   stats: PlayerMapStats[];
   mvpPlayerId: ID | null;
+  /** Lanterna do mix (pior desempenho), se calculado. */
+  lanternaPlayerId?: ID | null;
   twitchUrl: string | null;
   highlightIds: ID[];
 }

@@ -139,6 +139,7 @@ export function playerMixResult(mix: Mix, playerId: ID): PlayerMixResult | null 
     deaths: sum(rows.map((r) => r.deaths)),
     adr: adrOf(rows),
     isMvp: mix.mvpPlayerId === playerId,
+    isLanterna: mix.lanternaPlayerId === playerId,
   };
 }
 

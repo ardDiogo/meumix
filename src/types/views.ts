@@ -62,6 +62,7 @@ export interface PlayerMixResult {
   deaths: number;
   adr: number | null;
   isMvp: boolean;
+  isLanterna: boolean;
 }
 
 export interface PlayerProfile {

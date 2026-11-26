@@ -46,6 +46,7 @@ interface RecordRow {
   adr: number | null;
   kast: number | null;
   is_mvp: boolean;
+  is_lanterna?: boolean;
 }
 
 async function client() {
@@ -95,6 +96,7 @@ function toMix(match: MatchRow, records: RecordRow[], names: Map<string, string>
     maps,
     stats,
     mvpPlayerId: linked.find((r) => r.is_mvp)?.user_id ?? null,
+    lanternaPlayerId: linked.find((r) => r.is_lanterna)?.user_id ?? null,
     twitchUrl: null,
     highlightIds: [],
   };
@@ -123,7 +125,7 @@ async function loadMixes(filter?: { id?: string; playerId?: string }) {
   const [{ data: records }, { data: profiles }] = await Promise.all([
     supabase
       .from("player_match_records")
-      .select("match_id, user_id, player_name, team, kills, deaths, assists, first_kills, adr, kast, is_mvp")
+      .select("match_id, user_id, player_name, team, kills, deaths, assists, first_kills, adr, kast, is_mvp, is_lanterna")
       .in(
         "match_id",
         matches.map((m) => m.id),

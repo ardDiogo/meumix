@@ -456,6 +456,11 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                         {r.mix.name}
                       </Link>
                       {r.isMvp && <span className="ml-2 text-[10px] font-bold text-brand uppercase">MVP</span>}
+                      {r.isLanterna && (
+                        <span className="ml-2 text-[10px] font-bold text-loss uppercase" title="Pior desempenho do mix">
+                          Lanterna
+                        </span>
+                      )}
                     </TD>
                     <TD className="text-muted">
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
