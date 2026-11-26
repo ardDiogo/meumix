@@ -178,22 +178,22 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
         )}
 
         {/* Os 3 números grandes */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          <div className="rounded-xl border border-border bg-bg/70 px-3 py-2.5 sm:px-4">
+        <div className="grid grid-cols-3 gap-2">
+          <div className="rounded-lg border border-border bg-bg/70 px-3 py-1.5 sm:px-4">
             <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">K / A / D</div>
-            <div className="font-display text-xl leading-tight font-bold tabular sm:text-4xl">
+            <div className="font-display text-lg leading-tight font-bold tabular sm:text-2xl">
               {me.k}/{me.a}/{me.d}
             </div>
-            <div className="text-[11px] text-muted sm:text-xs">{num(me.kdr, 2)} KDR</div>
+            <div className="text-[11px] text-muted">{num(me.kdr, 2)} KDR</div>
           </div>
-          <div className="rounded-xl border border-border bg-bg/70 px-3 py-2.5 sm:px-4">
+          <div className="rounded-lg border border-border bg-bg/70 px-3 py-1.5 sm:px-4">
             <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">PTS</div>
-            <div className="font-display text-2xl leading-tight font-bold tabular sm:text-4xl">{me.pts}</div>
-            <div className="text-[11px] text-muted sm:text-xs">pontuação do mix</div>
+            <div className="font-display text-xl leading-tight font-bold tabular sm:text-2xl">{me.pts}</div>
+            <div className="text-[11px] text-muted">pontuação</div>
           </div>
           <div
             className={cn(
-              "rounded-xl border bg-bg/70 px-3 py-2.5 sm:px-4",
+              "rounded-lg border bg-bg/70 px-3 py-1.5 sm:px-4",
               me.eloDelta == null
                 ? "border-border"
                 : me.eloDelta >= 0
@@ -204,13 +204,13 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
             <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">ELO</div>
             <div
               className={cn(
-                "font-display text-2xl leading-tight font-bold tabular sm:text-4xl",
+                "font-display text-xl leading-tight font-bold tabular sm:text-2xl",
                 me.eloDelta == null ? "" : me.eloDelta >= 0 ? "text-win" : "text-loss",
               )}
             >
               {me.eloDelta == null ? "—" : signed(me.eloDelta)}
             </div>
-            <div className="text-[11px] text-muted sm:text-xs">
+            <div className="text-[11px] text-muted">
               {eloBefore != null ? `${eloBefore} → ${me.eloAfter}` : (me.eloAfter ?? "")}
             </div>
           </div>
