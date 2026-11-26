@@ -36,7 +36,7 @@ const RESULT = {
 } as const;
 
 /**
- * Topo do Dashboard: o seu último mix (logo do MeuMix, arte de fundo com o brilho da cor
+ * Topo do Dashboard: o seu último mix (arte de fundo com o brilho da cor
  * do resultado, você em destaque, os mapas, ELO/PTS/K/A/D grandes, a ficha técnica,
  * você contra a sua média e a resenha da IA em balão).
  */
@@ -80,9 +80,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
         {/* Logo, título e quando foi */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
-            <Image src="/brand/logo.png" alt="MeuMix" width={98} height={24} className="h-5 w-auto sm:h-6" />
-            <span className="h-4 w-px bg-border-strong" aria-hidden />
-            <span className="font-display text-sm font-bold tracking-wide text-muted uppercase">Seu último mix</span>
+            <span className="font-display text-sm font-bold tracking-[0.12em] text-brand uppercase">Seu último mix</span>
           </div>
           <span className="text-xs text-muted">
             <span className="font-semibold text-fg">{data.name}</span>
