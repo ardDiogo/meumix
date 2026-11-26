@@ -1,5 +1,5 @@
 import { Crosshair, Flame, Plus, ShieldCheck, Trophy, UserRoundX } from "lucide-react";
-import { LastMixCarousel } from "@/components/dashboard/last-mix-carousel";
+import { MyLastMix } from "@/components/dashboard/my-last-mix";
 import { getLastMixSummary } from "@/services/last-mix";
 import { getCurrentLeague } from "@/services/league";
 import { leagueIdsWithMixToday } from "@/services/league-today";
@@ -56,11 +56,13 @@ export default async function DashboardPage() {
       getCurrentLeague(),
       leagueIdsWithMixToday().catch(() => new Set<string>()),
     ]);
-  // Resumo do último mix no topo (no lugar do banner); em dia de mix, abaixo do "Participar do mix".
+  // O seu último mix no topo (no lugar do banner); em dia de mix, abaixo do "Participar do mix".
   const lastMix = await getLastMixSummary(session?.id ?? null);
   const isMixDay = !!league && !league.none && mixToday.has(league.id);
-  const carouselTop = lastMix && !isMixDay ? <LastMixCarousel data={lastMix} /> : null;
-  const carouselBelow = lastMix && isMixDay ? <LastMixCarousel data={lastMix} compact /> : null;
+  // Só para quem jogou o último mix; os outros veem o banner de sempre.
+  const mine = lastMix?.me ? lastMix : null;
+  const carouselTop = mine && !isMixDay ? <MyLastMix data={mine} /> : null;
+  const carouselBelow = mine && isMixDay ? <MyLastMix data={mine} compact /> : null;
 
   if (!profile || !highlights) {
     return (

@@ -52,6 +52,16 @@ export interface LastMixSummary {
     isLanterna: boolean;
     roast: string | null;
     tip: string | null;
+    /** Resultado do time do jogador e o placar do ponto de vista dele. */
+    result: "win" | "loss" | "draw";
+    teamName: string;
+    ownScore: [number, number] | null;
+    kdr: number;
+    fk: number;
+    kast: number | null;
+    /** Dados da GC (mix importado da GC). */
+    hsRate: number | null;
+    rating: number | null;
     /** Comparado com a própria média (Geral e cada estatística, em %); estreia: null. */
     perf: { value: number; parts: { stat: string; label: string; pct: number; now: string; avg: string }[] } | null;
   } | null;
@@ -145,6 +155,9 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
     const debuts = rows.filter((r) => r.userId && !averages[r.userId]).map((r) => r.name);
 
     const mine = viewerId ? rows.find((r) => r.userId === viewerId) : undefined;
+    const myLine = mine ? lines.find((l) => l.userId === mine.userId) : undefined;
+    const score = seriesScore(mix);
+    const winnerSide = seriesWinner(mix);
     const date = mix.scheduledAt.slice(0, 10);
     const roundsOf = (i: number) => (gcMaps[i]?.rounds ?? []).map((x) => x.w);
     return {
@@ -205,6 +218,14 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
             roast: roastOf(mine)?.roast?.trim() || null,
             tip: roastOf(mine)?.tip?.trim() || null,
             perf: myPerf(mine),
+            result: !winnerSide ? "draw" : winnerSide === mine.team ? "win" : "loss",
+            teamName: mix.teams.find((t) => t.side === mine.team)?.name ?? "",
+            ownScore: score ? (mine.team === "A" ? score : [score[1], score[0]]) : null,
+            kdr: kdrOf(mine),
+            fk: mine.fk,
+            kast: mine.kast,
+            hsRate: myLine?.hsRate ?? null,
+            rating: myLine?.rating ?? null,
           }
         : null,
     };
