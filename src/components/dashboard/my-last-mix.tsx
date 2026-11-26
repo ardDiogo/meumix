@@ -48,6 +48,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
   const up = (v: number) => (Math.abs(v) <= 3 ? "text-yellow-400" : v > 0 ? "text-win" : "text-loss");
   const eloBefore = me.eloAfter != null && me.eloDelta != null ? me.eloAfter - me.eloDelta : null;
   const tech: [string, string][] = [
+    ["KDR", num(me.kdr, 2)],
     ["ADR", num(me.adr)],
     ["FK", String(me.fk)],
     ["KAST", me.kast == null ? "—" : `${Math.round(me.kast)}%`],
@@ -76,7 +77,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
       <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/80 to-bg/40" aria-hidden />
       <div className={cn("absolute inset-0 bg-gradient-to-br via-transparent to-transparent", r.glow)} aria-hidden />
 
-      <div className="relative space-y-4 p-4 sm:p-5">
+      <div className="relative space-y-3 p-4 sm:p-5">
         {/* Logo, título e quando foi */}
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
@@ -84,10 +85,18 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
               Seu último mix
             </span>
           </div>
-          <span className="text-xs text-muted">
-            <span className="font-semibold text-fg">{data.name}</span>
-            {data.league ? ` · ${data.league}` : ""} · {ago(data.date)}
-          </span>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-xs text-muted">
+              <span className="font-semibold text-fg">{data.name}</span>
+              {data.league ? ` · ${data.league}` : ""} · {ago(data.date)}
+            </span>
+            <Link
+              href={data.href}
+              className="rounded-md border border-brand/50 bg-brand/15 px-2.5 py-1 text-xs font-bold text-brand hover:bg-brand/25"
+            >
+              Ver o mix completo →
+            </Link>
+          </div>
         </div>
 
         {/* Você e o resultado */}
@@ -216,21 +225,51 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
           </div>
         </div>
 
-        {/* Ficha técnica */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-          {tech.map(([label, value]) => (
-            <span key={label}>
-              {label} <b className="font-display text-base text-fg tabular">{value}</b>
+        {/* Ficha técnica com a comparação com a sua média ao lado de cada número */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+          {me.perf && (
+            <span
+              className={cn(
+                "rounded-full border px-2 py-0.5 text-xs font-bold",
+                Math.abs(me.perf.value) <= 3
+                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400"
+                  : me.perf.value > 0
+                    ? "border-win/40 bg-win/10 text-win"
+                    : "border-loss/40 bg-loss/10 text-loss",
+              )}
+              title="Média de KDR, ADR, FK e KAST contra a sua média nos outros mixes"
+            >
+              {me.perf.value > 3 ? "🔥 " : me.perf.value < -3 ? "🧊 " : ""}
+              {signed(me.perf.value)}% {me.perf.value >= 0 ? "acima" : "abaixo"} da média
             </span>
-          ))}
+          )}
+          {tech.map(([label, value]) => {
+            const part = me.perf?.parts.find((p) => p.label === label);
+            return (
+              <span key={label} title={part ? `${part.now} no mix · média ${part.avg}` : undefined}>
+                {label} <b className="font-display text-base text-fg tabular">{value}</b>
+                {part && (
+                  <b className={cn("ml-1 text-xs", up(part.pct))}>
+                    {part.pct > 3 ? "▲" : part.pct < -3 ? "▼" : "●"}
+                    {Math.abs(part.pct)}%
+                  </b>
+                )}
+              </span>
+            );
+          })}
         </div>
+        {!me.perf && (
+          <p className="text-xs text-muted">
+            🆕 Primeiro mix na liga: a comparação com a sua média vem a partir do próximo.
+          </p>
+        )}
 
         {/* Seu jogo no mix (GC): compacto, uma linha no computador e 2×2 no celular */}
         {me.game && (
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold tracking-[0.14em] text-muted uppercase">
               Seu jogo no mix
-              <span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-0.5 text-[11px] tracking-normal text-orange-300 normal-case">
+              <span className="text-xs font-bold tracking-normal text-orange-300 normal-case">
                 {me.game.role.emoji} {me.game.role.label}
               </span>
             </div>
@@ -268,62 +307,20 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
           </div>
         )}
 
-        {/* Você contra a sua média */}
-        {me.perf ? (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs font-bold sm:text-sm",
-                Math.abs(me.perf.value) <= 3
-                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400"
-                  : me.perf.value > 0
-                    ? "border-win/40 bg-win/10 text-win"
-                    : "border-loss/40 bg-loss/10 text-loss",
-              )}
-            >
-              {me.perf.value > 3 ? "🔥 " : me.perf.value < -3 ? "🧊 " : ""}
-              {signed(me.perf.value)}% {me.perf.value >= 0 ? "acima" : "abaixo"} da sua média
-            </span>
-            {me.perf.parts.map((p) => (
-              <span
-                key={p.stat}
-                title={`${p.now} no mix · média ${p.avg}`}
-                className={cn(
-                  "rounded-full border bg-bg/70 px-2.5 py-1 text-xs",
-                  Math.abs(p.pct) <= 3 ? "border-border" : p.pct > 0 ? "border-win/30" : "border-loss/30",
-                  up(p.pct),
-                )}
-              >
-                {p.pct > 3 ? "▲" : p.pct < -3 ? "▼" : "●"} {p.label} {signed(p.pct)}%
-              </span>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted">
-            🆕 Primeiro mix na liga: a comparação com a sua média vem a partir do próximo.
-          </p>
-        )}
-
         {/* Resenha em balão e dica */}
         {me.roast && (
-          <p className="relative rounded-xl border border-brand/30 bg-brand/10 py-3 pr-4 pl-11 text-[15px] leading-snug text-orange-300 italic">
+          <p className="relative rounded-xl border border-brand/30 bg-brand/10 py-2.5 pr-4 pl-11 text-sm leading-snug text-orange-300 italic sm:text-[15px]">
             <span className="absolute top-2.5 left-3.5 text-lg not-italic" aria-hidden>
               🤖
             </span>
-            “{me.roast}”
+            <span className="line-clamp-2 sm:line-clamp-none">“{me.roast}”</span>
           </p>
         )}
         {me.tip && (
-          <p className="text-xs text-muted sm:text-sm">
+          <p className="hidden text-sm text-muted sm:block">
             💡 Dica: <b className="text-fg">{me.tip}</b>
           </p>
         )}
-
-        <div className="text-right">
-          <Link href={data.href} className="text-sm font-semibold text-brand hover:text-brand-hover">
-            Ver o mix completo →
-          </Link>
-        </div>
       </div>
     </section>
   );
