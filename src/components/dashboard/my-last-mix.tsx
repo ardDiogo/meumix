@@ -313,7 +313,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
             <span className="absolute top-2.5 left-3.5 text-lg not-italic" aria-hidden>
               🤖
             </span>
-            <span className="line-clamp-2 sm:line-clamp-none">“{me.roast}”</span>
+            “{me.roast}”
           </p>
         )}
         {me.tip && (
