@@ -186,7 +186,7 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
       below: sorted
         .filter((p) => p.value < 0)
         .reverse()
-        .slice(0, 2),
+        .slice(0, 3),
       debuts,
       me: mine
         ? {
