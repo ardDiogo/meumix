@@ -14,6 +14,7 @@ export function DeleteMixButton({
   compact,
   text,
   redirectTo,
+  subtle,
 }: {
   scheduleId: string;
   date: string;
@@ -24,14 +25,22 @@ export function DeleteMixButton({
   text?: string;
   /** Página para onde ir depois de excluir. */
   redirectTo?: string;
+  /** Botão pequeno com contorno (zona de risco no fim do card), em vez do vermelho cheio. */
+  subtle?: boolean;
 }) {
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
     <Button
-      variant={compact ? "ghost" : "danger"}
-      size={compact ? "sm" : undefined}
-      className={compact ? "text-loss hover:text-loss" : "w-full"}
+      variant={compact ? "ghost" : subtle ? "outline" : "danger"}
+      size={compact || subtle ? "sm" : undefined}
+      className={
+        compact
+          ? "text-loss hover:text-loss"
+          : subtle
+            ? "border-loss/40 text-loss hover:border-loss hover:bg-loss/10 hover:text-loss"
+            : "w-full"
+      }
       disabled={pending}
       onClick={() =>
         confirm(

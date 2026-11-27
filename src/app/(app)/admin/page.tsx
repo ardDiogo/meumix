@@ -1,3 +1,4 @@
+import { MixTimeline } from "@/components/admin/mix-timeline";
 import {
   Award,
   Bell,
@@ -66,6 +67,7 @@ import { listAllMaps } from "@/services/maps";
 import { getAppSetting } from "@/services/settings";
 import { getPermissions } from "@/services/auth";
 import { getNextMix, listPendingFinalization, listSchedules } from "@/services/mix-events";
+import { nextOccurrence } from "@/lib/mix-schedule";
 import { MapIcon as MapEmblem } from "@/components/maps/map-icon";
 import { VapidKeyGenerator } from "@/components/admin/push-admin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -151,40 +153,59 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           <CurrentMix viewerId={session!.id} />
           <GcExample />
           <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
-            <div className="space-y-4">
-              <CreateMixForm leagues={await manageableLeagues()} />
+            <CreateMixForm
+              leagues={await manageableLeagues()}
+              existing={(schedules ?? []).map((sc) => ({
+                recurrence: sc.recurrence,
+                eventTime: sc.eventTime,
+              }))}
+            />
+            <div className="space-y-4 self-start">
+              <Card>
+                <CardHeader title="Mixes ativos" />
+                {schedules ? (
+                  <ScheduleList
+                    schedules={schedules}
+                    nextDates={Object.fromEntries(
+                      schedules.map((sc) => [sc.id, nextOccurrence(sc.recurrence, getDataSource().now())]),
+                    )}
+                  />
+                ) : upcoming.length ? (
+                  <ul className="divide-y divide-border">
+                    {upcoming.map((m) => (
+                      <li key={m.id}>
+                        <Link href={`/mixes/${m.id}`} className="block px-4 py-3 transition-colors hover:bg-surface-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{m.name}</span>
+                            <StatusBadge status={m.status} />
+                          </div>
+                          <div className="mt-0.5 text-xs text-muted">
+                            {formatDateTime(m.scheduledAt)} ·{" "}
+                            {m.maps.map((x) => (
+                              <span key={x.order} className="mr-1.5 inline-flex items-center gap-1 align-middle">
+                                <MapEmblem id={x.mapId} size={14} />
+                                {mapName(x.mapId)}
+                              </span>
+                            ))}
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <EmptyState icon={CalendarClock} title="Nenhum mix agendado" className="py-8" />
+                )}
+              </Card>
               <PendingFinalization viewerId={session!.id} />
+              <Card>
+                <CardHeader title="Importar da GC" description="Mapas enviados pelo botão “Enviar ao MeuMix” na GC." />
+                <CardContent className="pt-3">
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link href="/admin/importar-gc">Abrir mapas recebidos →</Link>
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
-            <Card className="self-start">
-              <CardHeader title="Mixes ativos" />
-              {schedules ? (
-                <ScheduleList schedules={schedules} />
-              ) : upcoming.length ? (
-                <ul className="divide-y divide-border">
-                  {upcoming.map((m) => (
-                    <li key={m.id}>
-                      <Link href={`/mixes/${m.id}`} className="block px-4 py-3 transition-colors hover:bg-surface-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium">{m.name}</span>
-                          <StatusBadge status={m.status} />
-                        </div>
-                        <div className="mt-0.5 text-xs text-muted">
-                          {formatDateTime(m.scheduledAt)} ·{" "}
-                          {m.maps.map((x) => (
-                            <span key={x.order} className="mr-1.5 inline-flex items-center gap-1 align-middle">
-                              <MapEmblem id={x.mapId} size={14} />
-                              {mapName(x.mapId)}
-                            </span>
-                          ))}
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <EmptyState icon={CalendarClock} title="Nenhum mix agendado" className="py-8" />
-              )}
-            </Card>
           </div>
         </div>
       )}
@@ -628,10 +649,13 @@ async function CurrentMix({ viewerId }: { viewerId: string }) {
       />
       <CardContent className="space-y-5">
         {current && !current.finalizedMatchId && (
-          <DeleteMixButton
-            scheduleId={current.schedule.id}
-            date={current.occurrence.date}
-            label={`${brDate(current.occurrence.date)} às ${current.schedule.eventTime}`}
+          <MixTimeline
+            opensAt={current.occurrence.opensAt}
+            eventAt={current.occurrence.eventAt}
+            now={getDataSource().now()}
+            classified={current.registrations.filter((r) => r.status === "classified").length}
+            max={current.schedule.maxPlayers}
+            reserves={current.registrations.filter((r) => r.status === "reserve").length}
           />
         )}
         {current?.finalizedMatchId && (
@@ -658,6 +682,19 @@ async function CurrentMix({ viewerId }: { viewerId: string }) {
             </p>
           )}
         </div>
+        {/* Zona de risco: discreta, no fim do card. */}
+        {current && !current.finalizedMatchId && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+            <p className="text-xs text-muted">O mix não vai acontecer? Descarte só esta data; a agenda continua.</p>
+            <DeleteMixButton
+              scheduleId={current.schedule.id}
+              date={current.occurrence.date}
+              label={`${brDate(current.occurrence.date)} às ${current.schedule.eventTime}`}
+              text="Descartar este mix"
+              subtle
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

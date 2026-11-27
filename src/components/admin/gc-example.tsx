@@ -1,5 +1,5 @@
-import { Info } from "lucide-react";
-import { Card, CardContent, CardHeader } from "../ui/card";
+import { ChevronDown, Info } from "lucide-react";
+import { Card, CardContent } from "../ui/card";
 
 const COLS = ["K", "A", "D", "DIFF", "ADR", "KDR", "KAST", "S", "FA", "MK", "FK", "RP", "DROP"];
 
@@ -30,80 +30,93 @@ const TEAMS = [
   },
 ] as const;
 
-/** Exemplo ilustrativo do print do placar da GC (dados fictícios). */
+/**
+ * Exemplo ilustrativo do print do placar da GC (dados fictícios). Recolhido:
+ * os prints viraram o método alternativo (o principal é importar da GC).
+ */
 export function GcExample() {
   return (
     <Card>
-      <CardHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Info className="size-4 text-win" aria-hidden /> Como enviar as imagens
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+          <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="flex items-center gap-2 font-display text-sm font-semibold tracking-wide uppercase">
+              <Info className="size-4 text-muted" aria-hidden /> Como enviar as imagens
+            </span>
+            <span className="text-xs text-muted">método alternativo · só se não der para importar da GC</span>
           </span>
-        }
-        description="Tire prints da tabela de estatísticas do jogo mostrando claramente todos os jogadores, suas kills (K), assists (A), mortes (D) e demais estatísticas de cada mapa jogado. Envie uma imagem por mapa, com o nome do mapa no nome do arquivo (ex.: mirage.png, nuke.png)."
-      />
-      <CardContent>
-        <figure className="overflow-hidden rounded-lg border border-border bg-[#14161b]">
-          <div className="overflow-x-auto p-3">
-            <div className="min-w-[640px] space-y-3 text-[11px]">
-              {TEAMS.map((t, ti) => (
-                <div key={t.name}>
-                  {ti > 0 && (
-                    <div className="mb-3 flex items-center justify-center">
-                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-subtle">vs</span>
+          <ChevronDown className="size-4 shrink-0 text-muted transition-transform group-open:rotate-180" aria-hidden />
+        </summary>
+        <p className="border-t border-border px-4 pt-3 text-xs text-muted">
+          Tire prints da tabela de estatísticas do jogo mostrando claramente todos os jogadores, suas kills (K), assists
+          (A), mortes (D) e demais estatísticas de cada mapa jogado. Envie uma imagem por mapa, com o nome do mapa no
+          nome do arquivo (ex.: mirage.png, nuke.png).
+        </p>
+        <CardContent className="pt-3">
+          <figure className="overflow-hidden rounded-lg border border-border bg-[#14161b]">
+            <div className="overflow-x-auto p-3">
+              <div className="min-w-[640px] space-y-3 text-[11px]">
+                {TEAMS.map((t, ti) => (
+                  <div key={t.name}>
+                    {ti > 0 && (
+                      <div className="mb-3 flex items-center justify-center">
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-subtle">
+                          vs
+                        </span>
+                      </div>
+                    )}
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-display text-lg font-bold ${t.win ? "text-win" : "text-loss"}`}>
+                          {t.score}
+                        </span>
+                        <span className="font-semibold">{t.name}</span>
+                      </div>
+                      <span className="text-[10px] text-subtle uppercase">Probabilidade de vitória</span>
                     </div>
-                  )}
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={`font-display text-lg font-bold ${t.win ? "text-win" : "text-loss"}`}>
-                        {t.score}
-                      </span>
-                      <span className="font-semibold">{t.name}</span>
-                    </div>
-                    <span className="text-[10px] text-subtle uppercase">Probabilidade de vitória</span>
-                  </div>
-                  <table className="w-full border-separate border-spacing-y-0.5">
-                    <thead>
-                      <tr className="text-subtle">
-                        <th className="w-28 text-left font-medium">Jogador</th>
-                        {COLS.map((c) => (
-                          <th key={c} className="px-1 text-right font-medium">
-                            {c}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {t.players.map(([nick, ...stats]) => (
-                        <tr key={nick} className="bg-surface-2/60">
-                          <td className="rounded-l px-1.5 py-1 font-medium">{nick}</td>
-                          {stats.map((v, i) => (
-                            <td
-                              key={i}
-                              className={`px-1 py-1 text-right tabular last:rounded-r ${
-                                COLS[i] === "RP" && typeof v === "number"
-                                  ? v >= 0
-                                    ? "text-win"
-                                    : "text-loss"
-                                  : "text-muted"
-                              }`}
-                            >
-                              {v}
-                            </td>
+                    <table className="w-full border-separate border-spacing-y-0.5">
+                      <thead>
+                        <tr className="text-subtle">
+                          <th className="w-28 text-left font-medium">Jogador</th>
+                          {COLS.map((c) => (
+                            <th key={c} className="px-1 text-right font-medium">
+                              {c}
+                            </th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
+                      </thead>
+                      <tbody>
+                        {t.players.map(([nick, ...stats]) => (
+                          <tr key={nick} className="bg-surface-2/60">
+                            <td className="rounded-l px-1.5 py-1 font-medium">{nick}</td>
+                            {stats.map((v, i) => (
+                              <td
+                                key={i}
+                                className={`px-1 py-1 text-right tabular last:rounded-r ${
+                                  COLS[i] === "RP" && typeof v === "number"
+                                    ? v >= 0
+                                      ? "text-win"
+                                      : "text-loss"
+                                    : "text-muted"
+                                }`}
+                              >
+                                {v}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <figcaption className="border-t border-border px-3 py-2 text-center text-xs text-brand">
-            Exemplo: tabela de estatísticas do jogo (dados fictícios)
-          </figcaption>
-        </figure>
-      </CardContent>
+            <figcaption className="border-t border-border px-3 py-2 text-center text-xs text-brand">
+              Exemplo: tabela de estatísticas do jogo (dados fictícios)
+            </figcaption>
+          </figure>
+        </CardContent>
+      </details>
     </Card>
   );
 }
