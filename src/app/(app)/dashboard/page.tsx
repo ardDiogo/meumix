@@ -311,6 +311,7 @@ export default async function DashboardPage() {
             mixes={recentMixes.slice(0, 6).map((r) => r.mix)}
             perspectiveId={player.id}
             lines={lines}
+            players={nickOf}
             now={nowMs}
             compact
           />

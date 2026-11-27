@@ -11,10 +11,13 @@ export function DeleteMatchButton({
   matchId,
   label,
   redirectTo,
+  subtle,
 }: {
   matchId: string;
   label: string;
   redirectTo?: string;
+  /** Cinza até passar o mouse (nas listas, para não chamar mais atenção que o mix). */
+  subtle?: boolean;
 }) {
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -25,7 +28,7 @@ export function DeleteMatchButton({
       aria-label={`Excluir ${label}`}
       title="Excluir mix (desfaz o ELO)"
       disabled={pending}
-      className="px-2 text-loss hover:text-loss"
+      className={subtle ? "px-2 text-subtle hover:text-loss" : "px-2 text-loss hover:text-loss"}
       onClick={() =>
         confirm(
           `Excluir o ${label}? O resultado e as estatísticas somem e o ELO que essa partida deu ou tirou de cada jogador é desfeito. Não dá para desfazer.`,
