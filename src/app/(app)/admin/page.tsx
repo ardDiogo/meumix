@@ -24,7 +24,7 @@ import { StrikesPanel } from "@/components/admin/strikes-panel";
 import { activeSuspensions, profileNames, recentStrikes } from "@/services/strikes";
 import type { Metadata } from "next";
 import { cache } from "react";
-import { BulkUsersForm } from "@/components/admin/bulk-users-form";
+import { BulkUsersDialog } from "@/components/admin/bulk-users-form";
 import { BulkConfirmLinks } from "@/components/admin/bulk-confirm-links";
 import { AuditLogTable } from "@/components/admin/audit-log-table";
 import { BadgesAdmin } from "@/components/admin/badges-admin";
@@ -221,7 +221,6 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
       )}
       {tab === "usuarios" && (
         <div className="space-y-4">
-          {canManageAdmins && <BulkUsersForm />}
           <StrikesSection />
           <UsersPanel canManageAdmins={canManageAdmins} currentUserId={session!.id} />
         </div>
@@ -346,17 +345,41 @@ async function StrikesSection() {
 }
 
 async function UsersPanel({ canManageAdmins, currentUserId }: { canManageAdmins: boolean; currentUserId: string }) {
-  const result = await listManagedUsers();
+  const ds = getDataSource();
+  const [result, league, mixes, elos] = await Promise.all([
+    listManagedUsers(),
+    getCurrentLeague(),
+    ds.listMixes({ status: "finished" }).catch(() => []),
+    ds.getElos().catch(() => new Map<string, number>()),
+  ]);
+  // Último mix de cada jogador na liga do topo (mais recente primeiro).
+  const lastMix: Record<string, string> = {};
+  for (const m of [...mixes].sort((a, b) => b.scheduledAt.localeCompare(a.scheduledAt)))
+    for (const t of m.teams) for (const id of t.playerIds) lastMix[id] ??= m.scheduledAt;
+  const leagueName = league && !league.none ? league.name : null;
   return (
     <Card>
       <CardHeader
         title="Jogadores cadastrados"
-        description="Edite dados e Steam, ajuste o ELO, redefina a senha ou exclua contas. Somente o master concede ou remove o papel de administrador e altera outros administradores."
-        action={<BulkConfirmLinks />}
+        description="Edite dados e Steam; no ⋯, ajuste o ELO, redefina a senha, gere o link pessoal ou exclua a conta. Só o super admin concede ou remove o papel de administrador."
+        action={
+          <div className="flex flex-wrap justify-end gap-2">
+            {canManageAdmins && <BulkUsersDialog />}
+            <BulkConfirmLinks />
+          </div>
+        }
       />
       {result.status === "ok" ? (
         result.users.length ? (
-          <UsersTable users={result.users} canManageAdmins={canManageAdmins} currentUserId={currentUserId} />
+          <UsersTable
+            users={result.users}
+            canManageAdmins={canManageAdmins}
+            currentUserId={currentUserId}
+            leagueName={leagueName}
+            lastMix={lastMix}
+            inLeague={leagueName ? [...elos.keys()] : null}
+            now={ds.now().getTime()}
+          />
         ) : (
           <EmptyState icon={UsersRound} title="Nenhum usuário cadastrado ainda" />
         )

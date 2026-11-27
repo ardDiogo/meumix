@@ -10,7 +10,9 @@ import {
   KeyRound,
   Link2,
   Loader2,
+  MoreHorizontal,
   Pencil,
+  Search,
   ShieldMinus,
   ShieldPlus,
   Trash2,
@@ -38,6 +40,13 @@ import { Avatar } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Dialog, DialogClose, DialogContent } from "../ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { Input, Label, Select } from "../ui/input";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 
@@ -45,19 +54,63 @@ type Action = "edit" | "elo" | "password" | "link" | "role" | "delete";
 
 /**
  * Gerenciamento de usuários (admin): editar dados e Steam, ELO, senha,
- * papel (só o master) e exclusão. O servidor confere a hierarquia de novo.
+ * papel (só o super admin) e exclusão. O servidor confere a hierarquia de novo.
  */
+const DAY = 86_400_000;
+const ago = (iso: string | null | undefined, now: number) => {
+  if (!iso) return null;
+  const d = Math.floor((now - new Date(iso).getTime()) / DAY);
+  return d <= 0 ? "hoje" : d === 1 ? "ontem" : d < 60 ? `há ${d} dias` : `há ${Math.round(d / 30)} meses`;
+};
+
 export function UsersTable({
   users,
   canManageAdmins,
   currentUserId,
+  leagueName,
+  lastMix = {},
+  inLeague,
+  now,
 }: {
   users: ManagedUser[];
   canManageAdmins: boolean;
   currentUserId: string;
+  /** Liga do topo (o ELO mostrado é o dela). */
+  leagueName?: string | null;
+  /** Data do último mix de cada jogador na liga. */
+  lastMix?: Record<string, string>;
+  /** Quem é membro da liga do topo (sem ligas: null). */
+  inLeague?: string[] | null;
+  now: number;
 }) {
   const [open, setOpen] = useState<{ action: Action; user: ManagedUser } | null>(null);
   const close = () => setOpen(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("");
+  const members = inLeague ? new Set(inLeague) : null;
+  const norm = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase();
+  const FILTERS: Record<string, { label: string; match: (u: ManagedUser) => boolean }> = {
+    admins: { label: "Admins", match: (u) => u.isSuperAdmin || u.role === "admin" },
+    jogadores: { label: "Jogadores", match: (u) => !u.isSuperAdmin && u.role !== "admin" },
+    ...(members
+      ? {
+          liga: { label: `Na liga${leagueName ? ` (${leagueName})` : ""}`, match: (u) => members.has(u.id) },
+          fora: { label: "Fora da liga", match: (u) => !members.has(u.id) },
+        }
+      : {}),
+    semsteam: { label: "Sem Steam", match: (u) => !u.steamUrl },
+    semavisos: { label: "Sem avisos no celular", match: (u) => !!u.push && !u.push.devices },
+    nunca: { label: "Nunca jogou (na liga)", match: (u) => !lastMix[u.id] },
+  };
+  const shown = users.filter(
+    (u) =>
+      (!query || norm(`${u.displayName} ${u.fullName ?? ""} ${u.email}`).includes(norm(query))) &&
+      (!filter || FILTERS[filter]?.match(u)),
+  );
 
   return (
     <>
@@ -78,12 +131,43 @@ export function UsersTable({
           <span className="text-subtle">Passe o mouse no sino para ver os aparelhos e o último aviso.</span>
         </p>
       )}
+      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
+          <Input
+            aria-label="Buscar jogador"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nick, nome ou e-mail…"
+            className="h-9 pl-9"
+          />
+        </div>
+        <Select
+          aria-label="Filtrar"
+          className="h-9 w-auto text-sm"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="">Todos ({users.length})</option>
+          {Object.entries(FILTERS).map(([k, f]) => (
+            <option key={k} value={k}>
+              {f.label} ({users.filter(f.match).length})
+            </option>
+          ))}
+        </Select>
+        {(query || filter) && (
+          <span className="text-xs text-muted">
+            {shown.length} de {users.length}
+          </span>
+        )}
+      </div>
       <div className="overflow-x-auto">
         <Table>
           <THead>
             <TR>
               <TH className="min-w-56">Usuário</TH>
-              <TH>ELO</TH>
+              <TH title="ELO na liga escolhida no topo">ELO{leagueName ? ` (${leagueName})` : ""}</TH>
+              <TH title="Último mix jogado na liga">Último mix</TH>
               <TH>Steam</TH>
               <TH>Cadastro</TH>
               <TH>Papel</TH>
@@ -91,7 +175,14 @@ export function UsersTable({
             </TR>
           </THead>
           <tbody>
-            {users.map((u) => {
+            {!shown.length && (
+              <TR>
+                <TD colSpan={7} className="py-6 text-center text-muted">
+                  Ninguém com esse filtro.
+                </TD>
+              </TR>
+            )}
+            {shown.map((u) => {
               const self = u.id === currentUserId;
               // Admins gerenciam jogadores; só o master mexe em administradores; o master só em si mesmo.
               const manageable = self || (!u.isSuperAdmin && (u.role !== "admin" || canManageAdmins));
@@ -120,6 +211,20 @@ export function UsersTable({
                       <span className="font-semibold tabular">{u.elo}</span>
                     </div>
                   </TD>
+                  <TD className="text-sm whitespace-nowrap">
+                    {lastMix[u.id] ? (
+                      <span
+                        className={cn(
+                          now - new Date(lastMix[u.id]!).getTime() > 60 * DAY ? "text-subtle" : "text-muted",
+                        )}
+                        title={formatDate(lastMix[u.id]!)}
+                      >
+                        {ago(lastMix[u.id], now)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-subtle">nunca</span>
+                    )}
+                  </TD>
                   <TD>
                     {u.steamUrl ? (
                       <a
@@ -131,7 +236,15 @@ export function UsersTable({
                         Perfil ↗
                       </a>
                     ) : (
-                      <span className="text-xs text-subtle">—</span>
+                      // Sem Steam: o admin precisa agir (foto e importação da GC dependem dela).
+                      <button
+                        type="button"
+                        onClick={manageable ? act("edit") : undefined}
+                        className="text-xs font-semibold whitespace-nowrap text-yellow-400 hover:underline"
+                        title="Sem Steam vinculada: clique para vincular"
+                      >
+                        sem Steam
+                      </button>
                     )}
                   </TD>
                   <TD className="text-muted">{formatDate(u.createdAt)}</TD>
@@ -150,37 +263,46 @@ export function UsersTable({
                         <IconButton label="Editar dados, Steam e Twitch" onClick={act("edit")}>
                           <Pencil />
                         </IconButton>
-                        <IconButton label="Editar nível e ELO" onClick={act("elo")}>
-                          <TrendingUp />
-                        </IconButton>
-                        <IconButton label="Resetar senha" onClick={act("password")}>
-                          <KeyRound />
-                        </IconButton>
-                        <IconButton label="Link pessoal de confirmação" onClick={act("link")}>
-                          <Link2 />
-                        </IconButton>
-                        {canManageAdmins && !u.isSuperAdmin && (
-                          <IconButton
-                            label={u.role === "admin" ? "Remover administrador" : "Tornar administrador"}
-                            onClick={act("role")}
-                            className={
-                              u.role === "admin"
-                                ? "border-brand/40 bg-brand/15 text-brand hover:bg-brand/25"
-                                : "border-win/40 bg-win/15 text-win hover:bg-win/25"
-                            }
-                          >
-                            {u.role === "admin" ? <ShieldMinus /> : <ShieldPlus />}
-                          </IconButton>
-                        )}
-                        {!self && !u.isSuperAdmin && (
-                          <IconButton
-                            label="Excluir usuário"
-                            onClick={act("delete")}
-                            className="border-loss/40 bg-loss/15 text-loss hover:bg-loss/25"
-                          >
-                            <Trash2 />
-                          </IconButton>
-                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label={`Mais ações para ${u.displayName}`}
+                              title="Mais ações"
+                              className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted transition-colors hover:border-border-strong hover:text-fg [&_svg]:size-4"
+                            >
+                              <MoreHorizontal />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={act("elo")}>
+                              <TrendingUp /> Ajustar nível e ELO
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={act("password")}>
+                              <KeyRound /> Redefinir senha
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={act("link")}>
+                              <Link2 /> Link pessoal de confirmação
+                            </DropdownMenuItem>
+                            {canManageAdmins && !u.isSuperAdmin && (
+                              <DropdownMenuItem onSelect={act("role")}>
+                                {u.role === "admin" ? <ShieldMinus /> : <ShieldPlus />}
+                                {u.role === "admin" ? "Remover administrador" : "Tornar administrador"}
+                              </DropdownMenuItem>
+                            )}
+                            {!self && !u.isSuperAdmin && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onSelect={act("delete")}
+                                  className="text-loss data-[highlighted]:bg-loss/15 [&_svg]:text-loss"
+                                >
+                                  <Trash2 /> Excluir conta
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     )}
                   </TD>

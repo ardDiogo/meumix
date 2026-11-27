@@ -8,7 +8,6 @@ import { formatDate } from "@/lib/format";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { Card, CardHeader } from "../ui/card";
-import { EmptyState } from "../ui/empty-state";
 
 export interface SuspensionItem {
   id: number;
@@ -102,7 +101,7 @@ export function StrikesPanel({ suspensions, strikes }: { suspensions: Suspension
           ))}
         </ul>
       ) : (
-        <EmptyState icon={ShieldAlert} title="Nenhuma falta nos últimos 60 dias" />
+        <p className="px-4 py-3 text-sm text-muted">Nenhuma falta nos últimos 60 dias.</p>
       )}
     </Card>
   );
