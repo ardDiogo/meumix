@@ -24,10 +24,15 @@ export function MapWinners({
   maps,
   names,
   avatars,
+  minGames = 3,
+  viewerId,
 }: {
   maps: MapWinnersData[];
   names: Record<string, string>;
   avatars: Record<string, string | null>;
+  /** Menos jogos que isso no mapa: vai para o fim da lista, apagado. */
+  minGames?: number;
+  viewerId?: string | null;
 }) {
   const gamesOf = (m: MapWinnersData) => Math.max(...m.players.map((p) => p.played), 0);
   // Mais jogados primeiro; mapas novos entram sozinhos.
@@ -38,8 +43,10 @@ export function MapWinners({
 
   const name = (id: string) => names[id] ?? "Jogador";
   const games = gamesOf(m);
+  const few = (p: { played: number }) => p.played < minGames;
   const players = [...m.players].sort(
     (a, b) =>
+      Number(few(a)) - Number(few(b)) ||
       b.wins - a.wins ||
       pct(b.wins, b.played) - pct(a.wins, a.played) ||
       b.played - a.played ||
@@ -98,8 +105,12 @@ export function MapWinners({
           return (
             <li
               key={p.playerId}
-              className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-md px-1 py-1 hover:bg-surface-2/60 sm:grid-cols-[1.5rem_minmax(0,12rem)_1fr_8rem] sm:gap-x-3"
-              title={`${name(p.playerId)}: ${p.wins} ${p.wins === 1 ? "vitória" : "vitórias"} e ${losses} ${losses === 1 ? "derrota" : "derrotas"} em ${p.played} ${p.played === 1 ? "jogo" : "jogos"} (${rate}%)`}
+              className={cn(
+                "grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-md px-1 py-1 hover:bg-surface-2/60 sm:grid-cols-[1.5rem_minmax(0,12rem)_1fr_8rem] sm:gap-x-3",
+                few(p) && "opacity-45",
+                p.playerId === viewerId && "bg-brand/8 ring-1 ring-brand/30",
+              )}
+              title={`${few(p) ? `Poucos jogos neste mapa (menos de ${minGames}) · ` : ""}${name(p.playerId)}: ${p.wins} ${p.wins === 1 ? "vitória" : "vitórias"} e ${losses} ${losses === 1 ? "derrota" : "derrotas"} em ${p.played} ${p.played === 1 ? "jogo" : "jogos"} (${rate}%)`}
             >
               <span className="text-center text-xs text-muted tabular">{i + 1}</span>
               <span className="flex min-w-0 items-center gap-2">

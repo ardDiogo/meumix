@@ -208,23 +208,30 @@ export async function getDashboard() {
 
 /* ----------------------------- Estatísticas ------------------------------ */
 
-export async function getCommunityStats() {
+export async function getCommunityStats({ period = "all" }: { period?: RankingPeriod } = {}) {
   const ds = getDataSource();
-  const [mixes, players, community] = await Promise.all([
+  const [allMixes, players, community] = await Promise.all([
     ds.listMixes({ status: "finished" }),
     ds.listPlayers(),
     ds.getCommunity(),
   ]);
-  const maps = new Map<MapId, { played: number; rounds: number; sideAWins: number }>();
+  const since = sinceDate(ds.now(), period);
+  const mixes = since ? allMixes.filter((m) => new Date(m.scheduledAt) >= since) : allMixes;
+  const maps = new Map<MapId, { played: number; rounds: number; sideAWins: number; diff: number }>();
   for (const mix of mixes) {
     for (const m of mix.maps) {
-      const entry = maps.get(m.mapId) ?? { played: 0, rounds: 0, sideAWins: 0 };
+      const entry = maps.get(m.mapId) ?? { played: 0, rounds: 0, sideAWins: 0, diff: 0 };
       entry.played += 1;
       entry.rounds += (m.scoreA ?? 0) + (m.scoreB ?? 0);
+      // Diferença de rounds: quanto o mapa costuma ser equilibrado.
+      entry.diff += Math.abs((m.scoreA ?? 0) - (m.scoreB ?? 0));
       if (m.winner === "A") entry.sideAWins += 1;
       maps.set(m.mapId, entry);
     }
   }
+  // Quem jogou no período (com conta) e quantos jogaram no total (com convidados).
+  const registered = new Set(players.map((p) => p.id));
+  const inMixes = new Set(mixes.flatMap((m) => m.teams.flatMap((t) => t.playerIds)));
   // Vitórias de cada jogador em cada mapa (cada mapa vencido conta 1 para os 5 do time).
   const mapWins = new Map<MapId, Map<string, { wins: number; played: number }>>();
   for (const mix of mixes) {
@@ -256,7 +263,9 @@ export async function getCommunityStats() {
       maps: mixes.reduce((s, m) => s + m.maps.length, 0),
       rounds: [...maps.values()].reduce((s, m) => s + m.rounds, 0),
       players: players.length,
+      played: [...inMixes].filter((id) => registered.has(id)).length,
     },
+    since,
     maps: [...maps.entries()].map(([mapId, v]) => ({ mapId, ...v })).sort((a, b) => b.played - a.played),
     leaders,
     minMixes,
