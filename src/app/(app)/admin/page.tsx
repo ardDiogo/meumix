@@ -581,7 +581,12 @@ async function SettingsTab({ canManageAdmins, secao }: { canManageAdmins: boolea
                     Sem dados de trade da GC: −1,5 por morte.
                   </div>
                 </div>
-                <RecalcPtsButton />
+                <div className="flex flex-wrap items-center gap-2">
+                  <RecalcPtsButton />
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/admin/simulacao">Simular mudanças na PTS →</Link>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
