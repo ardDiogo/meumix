@@ -84,24 +84,16 @@ const BASE_COLS: Col[] = [
   },
   {
     key: "k",
-    label: "K",
-    title: "Kills",
+    label: "K/A/D",
+    title: "Kills / assistências / mortes (ordena por kills)",
     value: (r) => r.k,
     render: (r) => (
-      <span className="inline-flex min-w-9 justify-center rounded-md border border-win/30 bg-win/10 px-1.5 py-0.5 text-win">
-        {r.k}
-      </span>
-    ),
-  },
-  { key: "a", label: "A", title: "Assistências", value: (r) => r.a },
-  {
-    key: "d",
-    label: "D",
-    title: "Mortes",
-    value: (r) => r.d,
-    render: (r) => (
-      <span className="inline-flex min-w-9 justify-center rounded-md border border-loss/30 bg-loss/10 px-1.5 py-0.5 text-loss">
-        {r.d}
+      <span className="whitespace-nowrap">
+        <b className="font-semibold text-win">{r.k}</b>
+        <span className="text-subtle">/</span>
+        {r.a}
+        <span className="text-subtle">/</span>
+        <span className="text-loss">{r.d}</span>
       </span>
     ),
   },
@@ -361,7 +353,23 @@ function geralCols(withGc: boolean) {
  * Mix importado da GC: abas da GC (Geral, Entries, Trades, Clutch,
  * Utilitárias, Mira) e escolha do mapa (o placar round a round fica no placar do topo).
  */
-export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps?: GcMapStored[] }) {
+/** Colunas que somem quando ninguém tem o dado (ex.: S e DROP, que a GC não informa). */
+const HIDE_IF_EMPTY = ["s", "drop", "fa", "mk", "rpgc"];
+/** Num mapa só não existe ELO (ele é do mix inteiro). */
+const MIX_ONLY = ["rp", "rpgc", "drop", "s"];
+
+export function MatchStatsTable({
+  rows,
+  gcMaps = [],
+  viewerId,
+  teamNames,
+}: {
+  rows: StatRow[];
+  gcMaps?: GcMapStored[];
+  viewerId?: string | null;
+  teamNames?: [string, string];
+}) {
+  const [byTeam, setByTeam] = useState(false);
   const withGc = gcMaps.length > 0;
   const [tab, setTab] = useState<Tab>("geral");
   const [only, setOnly] = useState<number | null>(null);
@@ -369,26 +377,47 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
   const [open, setOpen] = useState<{ key: string; kind: "pts" | "rp" } | null>(null);
   const spec = TABS.find((t) => t.key === tab)!;
   const hasRpGc = rows.some((r) => r.rpGc != null);
+  const perMap = tab === "geral" && only != null;
   const cols = useMemo(() => {
     if (tab !== "geral") return spec.cols;
-    const base = geralCols(withGc);
-    if (!hasRpGc) return base;
-    const at = base.findIndex((c) => c.key === "rp") + 1;
-    return [...base.slice(0, at), RP_GC, ...base.slice(at)];
-  }, [tab, withGc, spec, hasRpGc]);
+    let base = geralCols(withGc);
+    if (hasRpGc) {
+      const at = base.findIndex((c) => c.key === "rp") + 1;
+      base = [...base.slice(0, at), RP_GC, ...base.slice(at)];
+    }
+    if (perMap) base = base.filter((c) => !MIX_ONLY.includes(c.key));
+    return base.filter(
+      (c) => !HIDE_IF_EMPTY.includes(c.key) || rows.some((r) => ((c.value(r as Row) as number | null) ?? 0) !== 0),
+    );
+  }, [tab, withGc, spec, hasRpGc, perMap, rows]);
   // Trocar de aba volta para a ordenação padrão dela.
   const [sort, setSort] = useState<{ key: string; desc: boolean }>({ key: "pts", desc: true });
 
   // Dados da GC por jogador (pelo ID do MeuMix; convidado, pelo nick). A Geral usa o mix inteiro.
   const lines = useMemo(
-    () => (withGc ? aggregateGc(tab === "geral" || only == null ? gcMaps : [gcMaps[only]!]) : []),
-    [withGc, gcMaps, tab, only],
+    () => (withGc ? aggregateGc(only == null ? gcMaps : [gcMaps[only]!]) : []),
+    [withGc, gcMaps, only],
   );
   const sorted = useMemo(() => {
-    const withLines: Row[] = rows.map((r) => ({
-      ...r,
-      gc: lines.find((l) => (r.userId ? l.userId === r.userId : l.nick === r.name)),
-    }));
+    const withLines: Row[] = rows.map((r) => {
+      const gc = lines.find((l) => (r.userId ? l.userId === r.userId : l.nick === r.name));
+      // Geral num mapa só: os números do mapa (da GC) no lugar dos totais do mix.
+      if (perMap && gc)
+        return {
+          ...r,
+          gc,
+          k: gc.k,
+          a: gc.a,
+          d: gc.d,
+          adr: gc.adr,
+          kast: gc.kast,
+          fa: gc.fa,
+          fk: gc.entries.won,
+          mk: gc.multi.slice(1).reduce((x, y) => x + y, 0),
+          tradedDeaths: gc.trades.traded,
+        };
+      return { ...r, gc };
+    });
     // Padrão (PTS): MVP primeiro, lanterna por último, o resto pela pontuação do mix.
     if (sort.key === "pts") return withLines.sort((x, y) => (sort.desc ? byMixScore(x, y) : byMixScore(y, x)));
     const col = cols.find((c) => c.key === sort.key) ?? cols[0]!;
@@ -400,7 +429,9 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
       // Empate: a ordem padrão (pontuação do mix).
       return (sort.desc ? b - a : a - b) || byMixScore(x, y);
     });
-  }, [rows, lines, cols, sort]);
+  }, [rows, lines, cols, sort, perMap]);
+  // Agrupado por time: o time A e depois o B, cada um na ordem escolhida.
+  const shown = byTeam ? [...sorted.filter((r) => r.team === "A"), ...sorted.filter((r) => r.team === "B")] : sorted;
 
   return (
     <div>
@@ -430,8 +461,8 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
               </button>
             ))}
           </div>
-          {/* Um mapa só: nas abas da GC (a Geral é sempre o mix inteiro). */}
-          {tab !== "geral" && gcMaps.length > 1 && (
+          {/* Um mapa só (na Geral, o ELO some: ele é do mix inteiro). */}
+          {gcMaps.length > 1 && (
             <div role="tablist" aria-label="Mapa" className="flex flex-wrap gap-1.5">
               {[null, ...gcMaps.map((_, i) => i)].map((i) => (
                 <button
@@ -459,7 +490,22 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
               ))}
             </div>
           )}
+          <label className="ml-auto flex cursor-pointer items-center gap-2 text-xs text-muted">
+            <input
+              type="checkbox"
+              className="accent-brand"
+              checked={byTeam}
+              onChange={(e) => setByTeam(e.target.checked)}
+            />
+            Agrupar por time
+          </label>
         </div>
+      )}
+      {perMap && (
+        <p className="border-b border-border bg-surface-2/40 px-4 py-2 text-xs text-muted">
+          Números de {mapName(gcMaps[only!]!.mapId as MapId)} (dados da GC). O ELO é do mix inteiro: volte para “Todos
+          os mapas” para ver.
+        </p>
       )}
       <div className="overflow-x-auto">
         <table className={cn("w-full text-sm", tab === "geral" ? "min-w-[860px]" : "min-w-[640px]")}>
@@ -485,9 +531,24 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
             </tr>
           </thead>
           <tbody>
-            {sorted.map((r) => (
+            {shown.map((r, i) => (
               <Fragment key={r.key}>
-                <tr className="border-b border-border last:border-0 hover:bg-surface-2/50">
+                {byTeam && (i === 0 || shown[i - 1]!.team !== r.team) && (
+                  <tr className="border-b border-border bg-surface-2/60">
+                    <td colSpan={cols.length + 1} className="px-4 py-1.5 text-xs font-bold tracking-wider uppercase">
+                      <span className="flex items-center gap-2">
+                        <TeamDot side={r.team} />
+                        {teamNames?.[r.team === "A" ? 0 : 1] ?? `Time ${r.team}`}
+                      </span>
+                    </td>
+                  </tr>
+                )}
+                <tr
+                  className={cn(
+                    "border-b border-border last:border-0 hover:bg-surface-2/50",
+                    !!viewerId && r.userId === viewerId && "bg-brand/8 hover:bg-brand/12",
+                  )}
+                >
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2 font-semibold">
                       <TeamDot side={r.team} />
@@ -506,11 +567,16 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
                         </span>
                       )}
                       {r.elo != null && <LevelBadge elo={r.elo} />}
+                      {!!viewerId && r.userId === viewerId && (
+                        <span className="rounded bg-brand/15 px-1 text-[10px] font-bold text-brand uppercase">
+                          você
+                        </span>
+                      )}
                     </div>
                   </td>
                   {cols.map((c) => (
                     <td key={c.key} className="px-2 py-2.5 text-center tabular">
-                      {c.key === "pts" || (c.key === "rp" && r.rpResult != null) ? (
+                      {(c.key === "pts" && !perMap) || (c.key === "rp" && r.rpResult != null) ? (
                         <button
                           type="button"
                           aria-expanded={open?.key === r.key && open.kind === c.key}
@@ -549,10 +615,9 @@ export function MatchStatsTable({ rows, gcMaps = [] }: { rows: StatRow[]; gcMaps
           </tbody>
         </table>
       </div>
-      <p className="border-t border-border px-4 py-3 text-xs text-muted">
-        <b className="text-fg">Ordem da planilha:</b> 1º o MVP, último o lanterna; o resto pela maior PTS (3 × K + 1,5 ×
-        A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte não trocada). Se empatar, mais kills fica na frente,
-        depois mais assistências. Toque na PTS de um jogador para ver a conta dele; no ELO, a conta do ELO.
+      <p className="border-t border-border px-4 py-2.5 text-xs text-muted">
+        Ordem padrão: o MVP primeiro, o lanterna por último, o resto pela PTS. Toque na PTS ou no ELO de um jogador para
+        ver a conta.
       </p>
       <details className="group border-t border-border px-4 py-3 text-xs text-muted">
         <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>

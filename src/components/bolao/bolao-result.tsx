@@ -21,6 +21,23 @@ export async function BolaoResult({ matchId }: { matchId: string }) {
           Ranking do bolão →
         </Link>
       </div>
+      {/* O resultado oficial uma vez, para comparar com os palpites. */}
+      <p className="border-b border-border bg-surface-2/40 px-4 py-2 text-xs text-muted">
+        Resultado:{" "}
+        <span className="font-semibold text-fg">
+          {result.outcome.winnerCaptain ? `Time ${result.names[result.outcome.winnerCaptain] ?? "?"}` : "Empate"}{" "}
+          {result.outcome.mapsWon}×{result.outcome.mapsLost}
+        </span>
+        {result.outcome.kind && result.outcome.kind !== "draw"
+          ? ` (${result.outcome.kind === "sweep" ? "vitória seca" : "com deslize"})`
+          : ""}
+        {" · "}MVP{" "}
+        <span className="text-fg">{result.outcome.mvpId ? (result.names[result.outcome.mvpId] ?? "?") : "—"}</span>
+        {" · "}Lanterna{" "}
+        <span className="text-fg">
+          {result.outcome.lanternaId ? (result.names[result.outcome.lanternaId] ?? "?") : "—"}
+        </span>
+      </p>
       <ul className="divide-y divide-border">
         {result.entries.map((e) => (
           <li key={e.userId} className="flex items-center gap-3 px-4 py-2">

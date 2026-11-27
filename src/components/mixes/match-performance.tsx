@@ -39,12 +39,14 @@ export function MatchPerformance({
   averages,
   teamNames,
   gcNow = {},
+  viewerId,
 }: {
   rows: StatRow[];
   averages: Record<string, PlayerAverage>;
   teamNames: [string, string];
   /** GC Rating e Swing deste mix por jogador (mix importado da GC). */
   gcNow?: Record<string, { rating: number | null; swing: number | null }>;
+  viewerId?: string | null;
 }) {
   const [metric, setMetric] = useState<Metric>("geral");
   const hasGc = Object.keys(gcNow).length > 0;
@@ -76,8 +78,11 @@ export function MatchPerformance({
   // Ordem: quem mais passou da própria média primeiro; sem média (estreia,
   // convidado) vai para o fim, pelo valor. No ELO, pelo ganho.
   const diffOf = (x: { v: number | null; avg: number | null }) => (x.v != null && x.avg != null ? x.v - x.avg : null);
-  const items = rows
-    .map((r) => ({ r, v: valueOf(r), avg: avgOf(r) }))
+  const all = rows.map((r) => ({ r, v: valueOf(r), avg: avgOf(r) }));
+  // Geral: estreia e convidado não têm média para comparar; viram uma nota embaixo.
+  const noBase = geral ? all.filter((x) => x.v == null) : [];
+  const items = all
+    .filter((x) => !noBase.includes(x))
     .sort(
       (a, b) =>
         Number(diffOf(b) != null) - Number(diffOf(a) != null) ||
@@ -183,7 +188,10 @@ export function MatchPerformance({
             <li
               key={r.key}
               title={breakdown}
-              className="grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-md px-1 py-1 hover:bg-surface-2/60 sm:grid-cols-[1.5rem_minmax(0,11rem)_1fr_9rem] sm:gap-x-3"
+              className={cn(
+                "grid grid-cols-[1.5rem_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-md px-1 py-1 hover:bg-surface-2/60 sm:grid-cols-[1.5rem_minmax(0,11rem)_1fr_9rem] sm:gap-x-3",
+                !!viewerId && r.userId === viewerId && "bg-brand/8 ring-1 ring-brand/30",
+              )}
             >
               <span className="text-center text-xs text-muted tabular">{i + 1}</span>
               <span className="flex min-w-0 items-center gap-2">
@@ -280,6 +288,12 @@ export function MatchPerformance({
           );
         })}
       </ol>
+      {noBase.length > 0 && (
+        <p className="mt-3 text-xs text-subtle">
+          Sem média para comparar:{" "}
+          {noBase.map(({ r }) => `${name(r)} (${r.userId ? "estreia" : "convidado"})`).join(", ")}.
+        </p>
+      )}
     </div>
   );
 }

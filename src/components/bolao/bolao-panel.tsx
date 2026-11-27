@@ -423,7 +423,12 @@ function Hit({ ok, children }: { ok: boolean | null; children: React.ReactNode }
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5",
-        ok == null ? "bg-surface-2 text-muted" : ok ? "bg-win/12 text-win" : "bg-surface-2 text-subtle line-through",
+        // Errou: vermelho legível (sem riscar), para dar para ler o palpite.
+        ok == null
+          ? "bg-surface-2 text-muted"
+          : ok
+            ? "border border-win/30 bg-win/12 text-win"
+            : "border border-loss/25 bg-loss/10 text-loss/90",
       )}
     >
       {ok != null &&

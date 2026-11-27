@@ -41,14 +41,20 @@ export function MatchAnalysis({
   teamNames,
   avatars,
   ai,
+  viewerId,
 }: {
+  viewerId?: string | null;
   teams: AnalysisTeam[];
   teamNames: [string, string];
   avatars: Record<string, string | null>;
   /** Escrita pela IA (ao menos um jogador com texto da IA). */
   ai: boolean;
 }) {
-  const [side, setSide] = useState(teams[0]?.side ?? "A");
+  // Abre no time de quem está vendo (se jogou); senão, no primeiro (vencedor).
+  const mineSide = teams.find((t) => t.players.some((p) => !!viewerId && p.userId === viewerId))?.side;
+  const [side, setSide] = useState(mineSide ?? teams[0]?.side ?? "A");
+  // Quem está com a análise completa aberta (o padrão mostra só a dica e a resenha).
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const team = teams.find((t) => t.side === side) ?? teams[0];
   if (!team) return null;
   const nameOf = (s: "A" | "B") => teamNames[s === "A" ? 0 : 1];
@@ -81,23 +87,56 @@ export function MatchAnalysis({
         ))}
       </div>
       <ul className="space-y-2.5">
-        {team.players.map((p) => (
-          <li key={p.key} className="flex gap-3 rounded-lg border border-border bg-surface-2/40 px-4 py-3">
-            <Avatar name={p.name} src={p.userId ? (avatars[p.userId] ?? null) : null} size="sm" className="mt-0.5" />
-            <div className="min-w-0 space-y-1.5">
-              <p className="text-sm leading-relaxed text-muted">
-                <span className="font-semibold text-fg">{p.name}.</span> {p.text ?? joinFacts(p.facts)}
-                {p.tip && <span className="text-fg"> {p.tip}</span>}
-              </p>
-              {p.roast && (
-                <p className="border-l-2 border-brand/60 pl-2.5 text-sm leading-relaxed text-brand italic">
-                  <span className="mr-1 text-xs font-semibold tracking-wide uppercase not-italic">Resenha</span>
-                  {p.roast}
-                </p>
+        {team.players.map((p) => {
+          const me = !!viewerId && p.userId === viewerId;
+          const full = open.has(p.key);
+          const body = p.text ?? joinFacts(p.facts);
+          return (
+            <li
+              key={p.key}
+              className={cn(
+                "flex gap-3 rounded-lg border px-4 py-3",
+                me ? "border-brand/50 bg-brand/8" : "border-border bg-surface-2/40",
               )}
-            </div>
-          </li>
-        ))}
+            >
+              <Avatar name={p.name} src={p.userId ? (avatars[p.userId] ?? null) : null} size="sm" className="mt-0.5" />
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <p className="text-sm leading-relaxed text-muted">
+                  <span className="font-semibold text-fg">{p.name}.</span>
+                  {me && (
+                    <span className="ml-1 rounded bg-brand/15 px-1 text-[10px] font-bold text-brand uppercase">
+                      você
+                    </span>
+                  )}{" "}
+                  {full && body}
+                  {p.tip && <span className="text-fg"> {p.tip}</span>}
+                  {body && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setOpen((s) => {
+                          const n = new Set(s);
+                          if (n.has(p.key)) n.delete(p.key);
+                          else n.add(p.key);
+                          return n;
+                        })
+                      }
+                      className="ml-1.5 text-xs font-medium text-brand hover:underline"
+                    >
+                      {full ? "ver menos" : "ver análise"}
+                    </button>
+                  )}
+                </p>
+                {p.roast && (
+                  <p className="border-l-2 border-brand/60 pl-2.5 text-sm leading-relaxed text-brand italic">
+                    <span className="mr-1 text-xs font-semibold tracking-wide uppercase not-italic">Resenha</span>
+                    {p.roast}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
       <p className="text-xs text-subtle">
         {ai

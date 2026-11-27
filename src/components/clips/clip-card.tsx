@@ -72,7 +72,7 @@ export function ClipCard({ clip, featured = false }: { clip: ClipView; featured?
             {/* Sem miniatura: o emblema do mapa, grande e apagado, no fundo. */}
             {!clip.thumbnailUrl && clip.meta.mapId && (
               <span className="absolute inset-0 flex items-center justify-center" aria-hidden>
-                <MapIcon id={clip.meta.mapId} size={featured ? 220 : 150} className="opacity-25 blur-[1px]" />
+                <MapIcon id={clip.meta.mapId} size={featured ? 220 : 150} className="opacity-45" />
               </span>
             )}
             {/* Nem miniatura nem mapa: o ícone do tipo, grande e apagado. */}

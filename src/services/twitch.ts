@@ -162,6 +162,14 @@ export function toStreamItems(
         url: videoId ? twitchVideoUrl(videoId) : twitchChannelUrl(e.login),
         title: e.title,
         meta,
+        thumbnailUrl:
+          ("thumbnailUrl" in e && e.thumbnailUrl
+            ? e.thumbnailUrl
+                .replace("%{width}", "640")
+                .replace("%{height}", "360")
+                .replace("{width}", "640")
+                .replace("{height}", "360")
+            : null) ?? null,
       },
     ];
   });

@@ -9,17 +9,38 @@ import { Dialog, DialogContent, DialogTrigger } from "../ui/dialog";
 import { Input, Label } from "../ui/input";
 
 /** Admin: corrige a data de um mix finalizado. */
-export function EditMatchDate({ matchId, date }: { matchId: string; date: string }) {
-  const [open, setOpen] = useState(false);
+export function EditMatchDate({
+  matchId,
+  date,
+  open: controlled,
+  onOpenChange,
+}: {
+  matchId: string;
+  date: string;
+  /** Aberto por fora (menu "⋯"): sem o botão próprio. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [own, setOwn] = useState(false);
+  const open = controlled ?? own;
+  const setOpen = onOpenChange ?? setOwn;
   const [value, setValue] = useState(date);
   const [pending, start] = useTransition();
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="px-2" aria-label="Alterar data do mix" title="Alterar data do mix">
-          <CalendarDays />
-        </Button>
-      </DialogTrigger>
+      {controlled == null && (
+        <DialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="px-2"
+            aria-label="Alterar data do mix"
+            title="Alterar data do mix"
+          >
+            <CalendarDays />
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent
         title="Alterar data do mix"
         description="Use se o mix foi finalizado com a data errada. ELO e estatísticas não mudam."

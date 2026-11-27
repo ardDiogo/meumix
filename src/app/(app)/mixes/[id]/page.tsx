@@ -29,8 +29,7 @@ import { MatchHighlights } from "@/components/mixes/match-highlights";
 import { MatchStatsTable } from "@/components/mixes/match-stats-table";
 import { LinkGuests } from "@/components/mixes/link-guests";
 import { ShareResult } from "@/components/mixes/share-result";
-import { DeleteMatchButton } from "@/components/mixes/delete-match-button";
-import { EditMatchDate } from "@/components/mixes/edit-match-date";
+import { MatchAdminMenu } from "@/components/mixes/match-admin-menu";
 import { getPermissions } from "@/services/auth";
 import { getDataSource } from "@/services";
 import { Badge } from "@/components/ui/badge";
@@ -139,8 +138,9 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
             {report?.rows.length ? (
               <ShareResult matchId={mix.id} fileName={`meumix-${mix.scheduledAt.slice(0, 10)}.png`} />
             ) : null}
-            {canManageMixes && report && <EditMatchDate matchId={mix.id} date={mix.scheduledAt.slice(0, 10)} />}
-            {canManageMixes && report && <DeleteMatchButton matchId={mix.id} label={mix.name} redirectTo="/mixes" />}
+            {canManageMixes && report && (
+              <MatchAdminMenu matchId={mix.id} date={mix.scheduledAt.slice(0, 10)} label={mix.name} />
+            )}
             <DemoBadge kind={kind} />
             <StatusBadge status={mix.status} />
           </>
@@ -272,7 +272,12 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                       : `Estatísticas de ${mapName(mix.maps[0]!.mapId)}`}
                   </p>
                 </div>
-                <MatchStatsTable rows={report.rows} gcMaps={gcMaps} />
+                <MatchStatsTable
+                  rows={report.rows}
+                  gcMaps={gcMaps}
+                  viewerId={session?.id ?? null}
+                  teamNames={[mix.teams[0].name, mix.teams[1].name]}
+                />
               </Card>
               {canManageMixes && guests.length > 0 && (
                 <LinkGuests
@@ -292,6 +297,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                     rows={report.rows}
                     averages={averages}
                     teamNames={[mix.teams[0].name, mix.teams[1].name]}
+                    viewerId={session?.id ?? null}
                     gcNow={Object.fromEntries(
                       aggregateGc(gcMaps)
                         .filter((l) => l.userId)
@@ -316,6 +322,7 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
                         ai: aiAnalysis?.content,
                       })}
                       ai={!!aiAnalysis}
+                      viewerId={session?.id ?? null}
                       teamNames={[mix.teams[0].name, mix.teams[1].name]}
                       avatars={Object.fromEntries(
                         report.rows.filter((r) => r.userId).map((r) => [r.userId!, r.avatarUrl]),
@@ -422,7 +429,13 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
               }
             />
             {clips.length ? (
-              <ul className="space-y-3 p-4 pt-0">
+              <ul
+                className={cn(
+                  "grid gap-3 p-4 pt-0",
+                  // Com o placar, o painel usa a largura toda: grade como na página de Clipes.
+                  report?.rows.length ? "sm:grid-cols-2 xl:grid-cols-3" : "",
+                )}
+              >
                 {clips.map((c) => (
                   <li key={c.id}>
                     <ClipCard clip={{ ...c, mix: null }} />
@@ -440,20 +453,30 @@ export default async function MixDetailPage({ params }: PageProps<"/mixes/[id]">
             {allstarLinks.length > 0 && (
               <div className="border-t border-border px-4 py-3">
                 <p className="mb-2 text-xs text-muted">
-                  Procure os clipes de {formatDateTime(mix.scheduledAt)} no Allstar de cada jogador:
+                  Procure os clipes de {formatDateTime(mix.scheduledAt)} no Allstar de cada jogador (em verde: quem já
+                  tem clipe no site):
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {allstarLinks.map((l) => (
-                    <a
-                      key={l.url}
-                      href={l.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md border border-border bg-surface-2 px-2 py-1 text-xs text-fg transition-colors hover:border-brand/50 hover:text-brand"
-                    >
-                      {l.name} <ExternalLink className="size-3" />
-                    </a>
-                  ))}
+                  {allstarLinks.map((l) => {
+                    const n = clips.filter((c) => c.player?.name === l.name).length;
+                    return (
+                      <a
+                        key={l.url}
+                        href={l.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={n ? `${n} clipe(s) deste mix já no site` : "Nenhum clipe deste mix no site ainda"}
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs transition-colors hover:border-brand/50 hover:text-brand",
+                          n ? "border-win/40 bg-win/10 text-fg" : "border-border bg-surface-2 text-muted",
+                        )}
+                      >
+                        {l.name}
+                        {n > 0 && <span className="font-semibold text-win">· {n}</span>}
+                        <ExternalLink className="size-3" />
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             )}
