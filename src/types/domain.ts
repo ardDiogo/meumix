@@ -69,7 +69,8 @@ export type MapId =
   | "de_train"
   | "de_overpass"
   | "de_vertigo"
-  | "de_cache";
+  | "de_cache"
+  | "de_cobblestone";
 
 export interface GameMap {
   id: MapId;

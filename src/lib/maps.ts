@@ -11,6 +11,7 @@ export const MAPS: Record<MapId, GameMap> = {
   de_overpass: { id: "de_overpass", name: "Overpass", active: false },
   de_vertigo: { id: "de_vertigo", name: "Vertigo", active: false },
   de_cache: { id: "de_cache", name: "Cache", active: false },
+  de_cobblestone: { id: "de_cobblestone", name: "Cobblestone", active: false },
 };
 
 export const ACTIVE_MAP_POOL = Object.values(MAPS).filter((m) => m.active);
@@ -31,6 +32,7 @@ const LOCAL_ICONS = new Set([
   "de_train",
   "de_overpass",
   "de_vertigo",
+  "de_cobblestone",
 ]);
 const REMOTE_ICONS: Record<string, string> = {
   de_ancient:
