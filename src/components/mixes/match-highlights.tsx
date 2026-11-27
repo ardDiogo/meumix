@@ -157,12 +157,20 @@ export function MatchHighlights({ rows, gc = [] }: { rows: StatRow[]; gc?: GcMap
         {mvp && (
           <div className="flex flex-col items-center justify-center rounded-xl border border-purple-500/55 bg-gradient-to-b from-purple-500/25 via-surface/90 to-surface px-4 py-5 text-center shadow-[0_0_28px_-8px] shadow-purple-500/50">
             <span className="text-[11px] font-bold tracking-[0.25em] text-purple-400 uppercase">MVP da partida</span>
-            <Avatar
-              name={mvp.name}
-              src={mvp.avatarUrl}
-              size="xl"
-              className="mt-3 size-24 rounded-2xl border-[3px] border-purple-500 text-3xl"
-            />
+            <div className="relative mt-3">
+              <Avatar
+                name={mvp.name}
+                src={mvp.avatarUrl}
+                size="xl"
+                className="size-24 rounded-2xl border-[3px] border-purple-500 text-3xl"
+              />
+              {/* Coroa do MVP no canto superior esquerdo da foto (a lanterna fica embaixo, no lanterna). */}
+              <Crown
+                aria-hidden
+                strokeWidth={1.75}
+                className="pointer-events-none absolute -top-5 -left-5 size-10 -rotate-[28deg] fill-amber-400 text-amber-600 drop-shadow-[0_0_10px_rgba(251,191,36,0.7)]"
+              />
+            </div>
             <span className="mt-3 max-w-full truncate font-display text-2xl font-bold" title={mvp.name}>
               {mvp.name}
             </span>
