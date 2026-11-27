@@ -143,24 +143,70 @@ export async function fetchAllstarMatch(matchId: string, playerGameId: string): 
 export const clipKindFromAllstar = kindFromTitle;
 
 /**
- * Miniatura de um clipe enviado pelo link: a imagem de prévia (og:image) da página
- * pública do clipe. Melhor esforço: se o Allstar mudar a página, fica sem miniatura.
+ * Miniatura de um clipe enviado pelo link. Melhor esforço, em ordem:
+ * 1) a API GraphQL (a mesma da importação por partida), com o clipe pelo shareId;
+ * 2) a imagem de prévia (og:image) da página pública e do player do clipe.
+ * Devolve também o motivo da falha, para o log do admin mostrar o que aconteceu.
  */
-export async function fetchAllstarThumbnail(shareId: string): Promise<string | null> {
-  try {
-    const res = await fetch(`https://allstar.gg/clip/${encodeURIComponent(shareId)}`, {
-      headers: { "user-agent": "MeuMix/1.0 (+https://meumix.vercel.app)", accept: "text/html" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
-    });
-    if (!res.ok) return null;
-    const html = (await res.text()).slice(0, 300_000);
-    const tag =
-      html.match(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]*>/i)?.[0] ??
-      html.match(/<meta[^>]+name=["']twitter:image["'][^>]*>/i)?.[0];
-    const url = tag?.match(/content=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, "&");
-    return httpsUrl(url);
-  } catch {
-    return null;
+export async function fetchAllstarThumbnailInfo(
+  shareId: string,
+): Promise<{ url: string | null; video: string | null; reason: string | null }> {
+  const reasons: string[] = [];
+  const ua = { "user-agent": "MeuMix/1.0 (+https://meumix.vercel.app)" };
+  // 1) GraphQL: o nome do campo não é documentado; tenta as formas mais prováveis.
+  const queries = [
+    `query Clip($id: String!) { clip(shareId: $id) { thumbnailUrl(style: STANDARD) url(orientation: LANDSCAPE) } }`,
+    `query Clip($id: String!) { clip(id: $id) { thumbnailUrl(style: STANDARD) url(orientation: LANDSCAPE) } }`,
+  ];
+  for (const query of queries) {
+    try {
+      const res = await fetch(process.env.ALLSTAR_API_URL?.trim() || DEFAULT_URL, {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json", ...ua },
+        body: JSON.stringify({ operationName: "Clip", query, variables: { id: shareId } }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        data?: { clip?: { thumbnailUrl?: unknown; url?: unknown } | null };
+        errors?: { message?: string }[];
+      } | null;
+      const thumb = httpsUrl(body?.data?.clip?.thumbnailUrl);
+      if (thumb) return { url: thumb, video: httpsUrl(body?.data?.clip?.url), reason: null };
+      reasons.push(`api: ${body?.errors?.[0]?.message?.slice(0, 80) ?? `HTTP ${res.status}`}`);
+    } catch (e) {
+      reasons.push(`api: ${e instanceof Error ? e.name : "falhou"}`);
+    }
   }
+  // 2) Páginas públicas: a imagem de prévia.
+  for (const page of [
+    `https://allstar.gg/clip/${encodeURIComponent(shareId)}`,
+    `https://allstar.gg/iframe?clip=${encodeURIComponent(shareId)}`,
+  ]) {
+    try {
+      const res = await fetch(page, {
+        headers: { ...ua, accept: "text/html" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
+      });
+      if (!res.ok) {
+        reasons.push(`página: HTTP ${res.status}`);
+        continue;
+      }
+      const html = (await res.text()).slice(0, 400_000);
+      const tag =
+        html.match(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]*>/i)?.[0] ??
+        html.match(/<meta[^>]+name=["']twitter:image["'][^>]*>/i)?.[0];
+      const url = httpsUrl(tag?.match(/content=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, "&"));
+      if (url) return { url, video: null, reason: null };
+      reasons.push("página: sem imagem de prévia");
+    } catch (e) {
+      reasons.push(`página: ${e instanceof Error ? e.name : "falhou"}`);
+    }
+  }
+  return { url: null, video: null, reason: reasons.join(" | ") };
+}
+
+export async function fetchAllstarThumbnail(shareId: string): Promise<string | null> {
+  return (await fetchAllstarThumbnailInfo(shareId)).url;
 }

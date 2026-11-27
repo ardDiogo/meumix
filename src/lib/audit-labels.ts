@@ -109,6 +109,62 @@ export const AUDIT_LABELS: Record<string, string> = {
   "clip.delete": "Excluiu clipe",
   "clip.import": "Importou clipes do Allstar",
   "clip.import_twitch": "Importou clipes da Twitch",
+  "clip.fill": "Completou clipes (miniaturas e tipos)",
+};
+
+/**
+ * Ações dos próprios jogadores (inscrição, votos, bolão, perfil…). O resto é
+ * administração. Usado para separar "Admin" de "Jogadores" nos logs.
+ */
+export const PLAYER_ACTION_PREFIXES = ["registration.", "vote.", "push.", "profile.", "player."] as const;
+export const PLAYER_ACTIONS = [
+  "league.join",
+  "draft.review",
+  "championship.self_register",
+  "championship.self_unregister",
+  "championship.team_join",
+  "championship.team_leave",
+  "championship.draft_pick",
+  "championship.match_propose",
+  "championship.match_accept",
+  "championship.match_decline",
+  "clip.add",
+] as const;
+export const isPlayerAction = (action: string) =>
+  PLAYER_ACTION_PREFIXES.some((p) => action.startsWith(p)) || (PLAYER_ACTIONS as readonly string[]).includes(action);
+
+/** Nomes em português das chaves que aparecem nos detalhes. */
+export const DETAIL_KEYS: Record<string, string> = {
+  name: "nome",
+  title: "título",
+  maps: "mapas",
+  map: "mapa",
+  candidates: "candidatos",
+  players: "jogadores",
+  platform: "plataforma",
+  nick: "nick",
+  inseridas: "inseridas",
+  removidas: "removidas",
+  atualizadas: "atualizadas",
+  thumbs: "miniaturas",
+  kinds: "tipos corrigidos",
+  allstar: "Allstar",
+  reason: "motivo",
+  role: "papel",
+  elo: "ELO",
+  old: "antes",
+  new: "depois",
+  from: "de",
+  to: "para",
+  delay: "atraso",
+  enabled: "ligado",
+  feature: "funcionalidade",
+  count: "quantidade",
+  created: "criados",
+  date: "data",
+  winner: "vencedor",
+  kind: "tipo",
+  points: "pontos",
 };
 
 export const AUDIT_CATEGORIES = {

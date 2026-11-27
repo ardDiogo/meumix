@@ -217,6 +217,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           resultado={typeof params.resultado === "string" ? params.resultado : undefined}
           jogador={typeof params.jogador === "string" ? params.jogador : undefined}
           pagina={typeof params.pagina === "string" ? Number(params.pagina) || 1 : 1}
+          grupo={typeof params.grupo === "string" ? params.grupo : undefined}
+          periodo={typeof params.periodo === "string" ? params.periodo : undefined}
+          q={typeof params.q === "string" ? params.q : undefined}
         />
       )}
       {tab === "usuarios" && (
@@ -433,17 +436,35 @@ async function LogsTab({
   resultado,
   jogador,
   pagina,
+  grupo,
+  periodo,
+  q,
 }: {
   categoria?: string;
   resultado?: string;
   jogador?: string;
   pagina: number;
+  grupo?: string;
+  periodo?: string;
+  q?: string;
 }) {
   const category = categoria && categoria in AUDIT_CATEGORIES ? categoria : undefined;
   const outcome = resultado === "sucesso" ? "success" : resultado === "recusado" ? "other" : undefined;
   const actorId = jogador && /^[0-9a-f-]{36}$/i.test(jogador) ? jogador : undefined;
+  // Padrão: só administração (os votos dos jogadores ficam em "Jogadores").
+  const group = grupo === "jogadores" ? "jogadores" : grupo === "tudo" ? undefined : "admin";
+  const now = getDataSource().now();
+  const since =
+    periodo === "hoje"
+      ? new Date(`${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now)}T00:00:00-03:00`)
+      : periodo === "7d"
+        ? new Date(now.getTime() - 7 * 86_400_000)
+        : periodo === "30d"
+          ? new Date(now.getTime() - 30 * 86_400_000)
+          : null;
+  const search = q?.slice(0, 40);
   const [result, players] = await Promise.all([
-    listAuditLog({ category, outcome, actorId, page: pagina }),
+    listAuditLog({ category, outcome, actorId, page: pagina, group, since, q: search }),
     getDataSource().listPlayers(),
   ]);
   if (!result) {
@@ -463,7 +484,14 @@ async function LogsTab({
       names={result.names}
       hasMore={result.hasMore}
       page={pagina}
-      filters={{ categoria: category, resultado, jogador: actorId }}
+      filters={{
+        categoria: category,
+        resultado,
+        jogador: actorId,
+        grupo: grupo === "jogadores" || grupo === "tudo" ? grupo : undefined,
+        periodo: since ? periodo : undefined,
+        q: search || undefined,
+      }}
       players={players.map((p) => ({ id: p.id, name: p.nickname })).sort((a, b) => a.name.localeCompare(b.name))}
     />
   );

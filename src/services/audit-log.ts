@@ -1,5 +1,6 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { AUDIT_LABELS, PLAYER_ACTION_PREFIXES, PLAYER_ACTIONS } from "@/lib/audit-labels";
 
 export interface AuditRow {
   id: number;
@@ -20,6 +21,12 @@ export async function listAuditLog(opts: {
   outcome?: "success" | "other";
   actorId?: string;
   page?: number;
+  /** "admin": só administração; "jogadores": só ações dos jogadores. */
+  group?: "admin" | "jogadores";
+  /** A partir de quando. */
+  since?: Date | null;
+  /** Busca no nick de quem fez e no nome da ação. */
+  q?: string;
 }): Promise<{ rows: AuditRow[]; hasMore: boolean; names: Map<string, string> } | null> {
   const admin = createSupabaseAdminClient();
   if (!admin) return null;
@@ -33,11 +40,48 @@ export async function listAuditLog(opts: {
   if (opts.outcome === "success") query = query.eq("outcome", "success");
   if (opts.outcome === "other") query = query.neq("outcome", "success");
   if (opts.actorId) query = query.eq("actor_id", opts.actorId);
-  const [{ data, error }, { data: profiles }, { data: badges }] = await Promise.all([
-    query,
+  if (opts.since) query = query.gte("created_at", opts.since.toISOString());
+  const playerList = `(${PLAYER_ACTIONS.join(",")})`;
+  if (opts.group === "admin") {
+    for (const p of PLAYER_ACTION_PREFIXES) query = query.not("action", "like", `${p}%`);
+    query = query.not("action", "in", playerList);
+  }
+  if (opts.group === "jogadores") {
+    query = query.or([...PLAYER_ACTION_PREFIXES.map((p) => `action.like.${p}%`), `action.in.${playerList}`].join(","));
+  }
+  const [{ data: profiles }, { data: badges }] = await Promise.all([
     admin.from("profiles").select("id, display_name"),
     admin.from("badges").select("id, name"),
   ]);
+  // Busca: nick de quem fez ou nome da ação (em português).
+  const q = opts.q
+    ?.trim()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+  if (q) {
+    const norm = (t: string) =>
+      t
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toLowerCase();
+    const actors = (profiles ?? [])
+      .filter((p) => norm(p.display_name as string).includes(q))
+      .map((p) => p.id as string);
+    const actions = Object.entries(AUDIT_LABELS)
+      .filter(([k, v]) => norm(v).includes(q) || k.includes(q))
+      .map(([k]) => k);
+    if (!actors.length && !actions.length) return { rows: [], hasMore: false, names: new Map() };
+    query = query.or(
+      [
+        actors.length ? `actor_id.in.(${actors.join(",")})` : null,
+        actions.length ? `action.in.(${actions.join(",")})` : null,
+      ]
+        .filter(Boolean)
+        .join(","),
+    );
+  }
+  const { data, error } = await query;
   if (error) return null;
   // Ids nos detalhes viram nomes (jogadores e insígnias).
   const names = new Map([

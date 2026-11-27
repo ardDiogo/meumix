@@ -7,6 +7,7 @@ import {
   clipKindFromAllstar,
   fetchAllstarMatch,
   fetchAllstarThumbnail,
+  fetchAllstarThumbnailInfo,
   parseAllstarMatchUrl,
 } from "@/lib/integrations/allstar-api";
 import { kindFromTitle } from "@/lib/clip-meta";
@@ -115,7 +116,7 @@ export async function fillClips(): Promise<ClipResult> {
   if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
   const { data, error } = await admin
     .from("clips")
-    .select("id, provider, clip_id, title, kind, thumbnail_url")
+    .select("id, provider, clip_id, title, kind, thumbnail_url, video_url")
     .or("thumbnail_url.is.null,kind.eq.clip")
     .limit(200);
   if (error) return { ok: false, message: "Não foi possível ler os clipes." };
@@ -124,13 +125,19 @@ export async function fillClips(): Promise<ClipResult> {
   const twitchThumbs = twitchIds.length ? await getClipThumbnails(twitchIds).catch(() => new Map()) : new Map();
   let thumbs = 0;
   let kinds = 0;
+  // O primeiro motivo de falha do Allstar vai para o log (para saber o que mudar).
+  let allstarReason: string | null = null;
   for (const r of rows) {
     const patch: Record<string, string> = {};
     if (!r.thumbnail_url) {
-      const t =
-        r.provider === "twitch"
-          ? (twitchThumbs.get(r.clip_id as string) ?? null)
-          : await fetchAllstarThumbnail(r.clip_id as string);
+      let t: string | null = null;
+      if (r.provider === "twitch") t = twitchThumbs.get(r.clip_id as string) ?? null;
+      else {
+        const info = await fetchAllstarThumbnailInfo(r.clip_id as string);
+        t = info.url;
+        if (info.video && !r.video_url) patch.video_url = info.video;
+        if (!t) allstarReason ??= info.reason;
+      }
       if (t) {
         patch.thumbnail_url = t;
         thumbs++;
@@ -145,7 +152,12 @@ export async function fillClips(): Promise<ClipResult> {
     }
     if (Object.keys(patch).length) await admin.from("clips").update(patch).eq("id", r.id);
   }
-  await audit({ action: "clip.fill", outcome: "success", actorId: session!.id, detail: { thumbs, kinds } });
+  await audit({
+    action: "clip.fill",
+    outcome: "success",
+    actorId: session!.id,
+    detail: { thumbs, kinds, ...(allstarReason ? { allstar: allstarReason.slice(0, 200) } : {}) },
+  });
   refresh();
   const missing = rows.filter((r) => !r.thumbnail_url).length - thumbs;
   return {
