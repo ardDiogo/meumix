@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { mixRp, rpPerformance, rpResult, winChance } from "./rp";
-import { mvpScore } from "./match-rules";
+import { mvpScore, pickMvpAndLanterna } from "./match-rules";
 
 describe("RP do MeuMix", () => {
   it("times parelhos: +20 / −20 no resultado", () => {
@@ -63,5 +63,27 @@ describe("PTS (migração 0063)", () => {
   it("Swing: 5 por round ganho (ou perdido) para o time", () => {
     assert.equal(mvpScore({ ...base, kills: 0, firstKills: 0, deaths: 0, tradedDeaths: 0, swingRounds: 2 }), 10);
     assert.equal(mvpScore({ ...base, kills: 0, firstKills: 0, deaths: 0, tradedDeaths: 0, swingRounds: -1 }), -5);
+  });
+});
+
+describe("MVP e lanterna pela PTS", () => {
+  const p = (kills: number, deaths: number, extra: Partial<Parameters<typeof mvpScore>[0]> = {}) => ({
+    kills,
+    deaths,
+    assists: 0,
+    firstKills: 0,
+    adr: 0,
+    tradedDeaths: 0,
+    ...extra,
+  });
+  it("lanterna é a menor PTS (não a conta antiga de kills + ADR + KDR)", () => {
+    // O 2º tem menos kills, mas o 3º morreu muito mais sozinho e entregou rounds (Swing).
+    const players = [p(20, 10), p(10, 12), p(14, 25, { swingRounds: -4 })];
+    const { mvp, lanterna } = pickMvpAndLanterna(players);
+    assert.equal(mvp, 0);
+    assert.equal(lanterna, 2);
+  });
+  it("um jogador só: sem lanterna", () => {
+    assert.equal(pickMvpAndLanterna([p(10, 5)]).lanterna, -1);
   });
 });

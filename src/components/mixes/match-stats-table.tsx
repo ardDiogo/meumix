@@ -708,7 +708,8 @@ export function MatchStatsTable({
                 <b className="text-fg">Desempate:</b> mais kills e, se empatar, mais assistências.
               </li>
               <li>
-                <b className="text-fg">Lanterna:</b> o menor valor de Kills + (ADR ÷ 100) + (KDR × 10).
+                <b className="text-fg">Lanterna:</b> a menor PTS do mix (o contrário do MVP). No empate, quem tem menos
+                kills e, depois, menos assistências.
               </li>
             </ul>
           </details>

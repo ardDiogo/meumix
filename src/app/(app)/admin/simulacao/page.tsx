@@ -116,8 +116,9 @@ export default async function SimulationPage() {
             mais +5; perder clutch não tira nada). Uma versão só com o clutch e outra com clutch + Swing ×5.
           </p>
           <p className="text-xs text-subtle">
-            O lanterna tem conta própria e não muda. O ELO simulado parte do ELO de antes de cada jogador no primeiro
-            mix e soma o RP mix a mix: é uma aproximação do recálculo do site (ajustes manuais de ELO ficam de fora).
+            O lanterna agora é a menor PTS (como o MVP é a maior). O ELO simulado parte do ELO de antes de cada jogador
+            no primeiro mix e soma o RP mix a mix: é uma aproximação do recálculo do site (ajustes manuais de ELO ficam
+            de fora).
           </p>
         </CardContent>
       </Card>

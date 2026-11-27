@@ -9,7 +9,8 @@
 --   ("rounds que o jogador ganhou ou perdeu para o time"); clutch_1v1_won e clutch_nv_won:
 --   clutches vencidos. O site preenche ao finalizar; os mixes antigos, em Admin → Configurações
 --   → "Recalcular PTS com os dados da GC".
--- • Recalcula o MVP de todos os mixes e o ELO das ligas (o desempenho do ELO usa a PTS).
+-- • O lanterna passa a ser a menor PTS (como o MVP é a maior).
+-- • Recalcula o MVP e o lanterna de todos os mixes e o ELO das ligas (o desempenho do ELO usa a PTS).
 
 alter table public.player_match_records add column if not exists swing_rounds numeric;
 alter table public.player_match_records add column if not exists clutch_1v1_won int;
@@ -165,7 +166,8 @@ $$;
 revoke all on function public.league_elo_compute(uuid) from public, anon, authenticated;
 grant execute on function public.league_elo_compute(uuid) to service_role;
 
--- MVP de cada mix pela PTS (empate: mais kills, depois mais assistências). Sem estatísticas, sem MVP.
+-- MVP (maior PTS) e lanterna (menor PTS) de cada mix. Desempate do MVP: mais kills, depois mais
+-- assistências; do lanterna, o contrário. Sem estatísticas (ou um jogador só), sem MVP e sem lanterna.
 create or replace function public.recalc_mvps(p_matches uuid[] default null)
 returns int
 language plpgsql
@@ -175,21 +177,28 @@ as $$
 declare
   v int;
 begin
-  with ranked as (
-    select p.id,
-      row_number() over (
-        partition by p.match_id
-        order by public.mix_pts(p.kills, p.assists, p.first_kills, p.adr, p.deaths, p.traded_deaths, p.swing_rounds, p.clutch_1v1_won, p.clutch_nv_won) desc,
-                 p.kills desc, p.assists desc
-      ) as pos,
-      bool_or(p.kills > 0 or p.deaths > 0) over (partition by p.match_id) as has_stats
+  with scored as (
+    select p.id, p.match_id, p.kills, p.assists, p.deaths,
+      public.mix_pts(p.kills, p.assists, p.first_kills, p.adr, p.deaths, p.traded_deaths,
+                     p.swing_rounds, p.clutch_1v1_won, p.clutch_nv_won) as pts
     from public.player_match_records p
     where p_matches is null or p.match_id = any (p_matches)
+  ),
+  ranked as (
+    select s.id,
+      row_number() over (partition by s.match_id order by s.pts desc, s.kills desc, s.assists desc, s.id) as top,
+      row_number() over (partition by s.match_id order by s.pts asc, s.kills asc, s.assists asc, s.id desc) as bottom,
+      count(*) over (partition by s.match_id) as n,
+      bool_or(s.kills > 0 or s.deaths > 0) over (partition by s.match_id) as has_stats
+    from scored s
   )
   update public.player_match_records p
-  set is_mvp = (r.pos = 1 and r.has_stats)
+  set is_mvp = (r.top = 1 and r.has_stats),
+      is_lanterna = (r.bottom = 1 and r.top <> 1 and r.n > 1 and r.has_stats)
   from ranked r
-  where r.id = p.id and p.is_mvp is distinct from (r.pos = 1 and r.has_stats);
+  where r.id = p.id
+    and (p.is_mvp is distinct from (r.top = 1 and r.has_stats)
+      or p.is_lanterna is distinct from (r.bottom = 1 and r.top <> 1 and r.n > 1 and r.has_stats));
   get diagnostics v = row_count;
   return v;
 end;

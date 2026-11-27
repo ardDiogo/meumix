@@ -63,16 +63,20 @@ export const mvpScore = (p: ScoreLine) => {
 /** PTS para mostrar: nunca abaixo de 0 (a conta e o ELO usam o valor real). */
 export const ptsShown = (v: number) => Math.max(0, v);
 
+/** Conta antiga do lanterna (até a migração 0063); hoje o lanterna é a menor PTS. */
 export const lanternaScore = (p: ScoreLine) => p.kills + (p.adr ?? 0) / 100 + (p.kills / Math.max(p.deaths, 1)) * 10;
 
 /** Índices do MVP (maior pontuação) e do lanterna (menor). */
+/**
+ * MVP = maior PTS; lanterna = menor PTS (a mesma conta, migração 0063). Desempate do MVP:
+ * mais kills, depois mais assistências; do lanterna, o contrário (menos kills, menos assistências).
+ */
 export function pickMvpAndLanterna(players: ScoreLine[]) {
   if (!players.length) return { mvp: -1, lanterna: -1 };
-  let mvp = 0;
-  let lanterna = 0;
-  players.forEach((p, i) => {
-    if (mvpScore(p) > mvpScore(players[mvp]!)) mvp = i;
-    if (lanternaScore(p) < lanternaScore(players[lanterna]!)) lanterna = i;
-  });
-  return { mvp, lanterna: players.length > 1 ? lanterna : -1 };
+  const order = players
+    .map((p, i) => ({ i, pts: mvpScore(p), k: p.kills, a: p.assists }))
+    .sort((x, y) => y.pts - x.pts || y.k - x.k || y.a - x.a || x.i - y.i);
+  const mvp = order[0]!.i;
+  const lanterna = order.at(-1)!.i;
+  return { mvp, lanterna: players.length > 1 && lanterna !== mvp ? lanterna : -1 };
 }
