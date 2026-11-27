@@ -64,6 +64,8 @@ export default async function SimulationPage() {
           tradedDeaths: r.tradedDeaths ?? null,
           swing: l?.swing ?? null,
           rounds: l?.rounds ?? null,
+          clutch1Won: l?.clutch.v1Won ?? 0,
+          clutchNWon: l?.clutch.vnWon ?? 0,
           eloBefore: r.elo != null && r.eloDelta != null ? r.elo - r.eloDelta : r.elo,
           score: !winner ? 0.5 : winner === r.team ? 1 : 0,
         };
@@ -109,6 +111,10 @@ export default async function SimulationPage() {
             <b className="text-fg">Novas:</b> morte não trocada −2,5 (sem dados de trade: −2 por morte) + peso × (Swing
             × rounds ÷ 100), ou seja, pontos por round que o jogador ganhou ou perdeu para o time. Peso 2, 5 e 6.
           </p>
+          <p>
+            <b className="text-fg">Com clutch:</b> morte não trocada −2,5 + bônus por clutch vencido (1v1 +3, 1v2 ou
+            mais +5; perder clutch não tira nada). Uma versão só com o clutch e outra com clutch + Swing ×5.
+          </p>
           <p className="text-xs text-subtle">
             O lanterna tem conta própria e não muda. O ELO simulado parte do ELO de antes de cada jogador no primeiro
             mix e soma o RP mix a mix: é uma aproximação do recálculo do site (ajustes manuais de ELO ficam de fora).
@@ -131,11 +137,14 @@ export default async function SimulationPage() {
             }
           />
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead className="border-b border-border text-xs text-muted">
                 <tr>
                   <th className="px-4 py-2 text-left">Jogador</th>
                   <th className="px-2 py-2 text-right">Swing</th>
+                  <th className="px-2 py-2 text-right" title="Clutches vencidos: 1v1 / 1v2 ou mais">
+                    Clutch
+                  </th>
                   {SIM_VARIANTS.map((v) => (
                     <th key={v.key} className="px-2 py-2 text-right">
                       {v.label}
@@ -154,6 +163,9 @@ export default async function SimulationPage() {
                       )}
                     >
                       {p.swing == null ? "—" : `${p.swing > 0 ? "+" : ""}${f1(p.swing * 100)}%`}
+                    </td>
+                    <td className="px-2 py-2 text-right text-muted tabular">
+                      {p.clutch1Won || p.clutchNWon ? `${p.clutch1Won} / ${p.clutchNWon}` : "—"}
                     </td>
                     {lastRanks.map((rank, vi) => {
                       const i = rank.findIndex((x) => x.p.key === p.key);

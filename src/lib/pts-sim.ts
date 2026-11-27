@@ -16,6 +16,9 @@ export interface SimVariant {
   noTradeData: number;
   /** Peso do Swing: pontos por round que o jogador "ganhou" para o time. */
   swing: number;
+  /** Bônus por clutch vencido: 1v1 e 1v2 ou mais. */
+  clutch1?: number;
+  clutchN?: number;
 }
 
 export const SIM_VARIANTS: SimVariant[] = [
@@ -23,6 +26,8 @@ export const SIM_VARIANTS: SimVariant[] = [
   { key: "s2", label: "−2,5 + Swing ×2", untraded: 2.5, noTradeData: 2, swing: 2 },
   { key: "s5", label: "−2,5 + Swing ×5", untraded: 2.5, noTradeData: 2, swing: 5 },
   { key: "s6", label: "−2,5 + Swing ×6", untraded: 2.5, noTradeData: 2, swing: 6 },
+  { key: "c", label: "−2,5 + clutch", untraded: 2.5, noTradeData: 2, swing: 0, clutch1: 3, clutchN: 5 },
+  { key: "c5", label: "−2,5 + clutch + Swing ×5", untraded: 2.5, noTradeData: 2, swing: 5, clutch1: 3, clutchN: 5 },
 ];
 
 export interface SimPlayer {
@@ -39,6 +44,9 @@ export interface SimPlayer {
   /** Swing médio por round (0,021 = +2,1%) e rounds jogados (dados da GC). */
   swing: number | null;
   rounds: number | null;
+  /** Clutches vencidos (dados da GC): 1v1 e 1v2 ou mais. */
+  clutch1Won: number;
+  clutchNWon: number;
   /** ELO antes do mix (o gravado). */
   eloBefore: number | null;
   /** 1 vitória, 0,5 empate, 0 derrota. */
@@ -56,7 +64,8 @@ export function simPts(p: SimPlayer, v: SimVariant) {
   const traded = p.tradedDeaths == null ? 0 : Math.min(Math.max(p.tradedDeaths, 0), p.d);
   const deaths = p.tradedDeaths == null ? p.d * v.noTradeData : traded * 0.5 + (p.d - traded) * v.untraded;
   const swing = p.swing != null && p.rounds ? v.swing * p.swing * p.rounds : 0;
-  return 3 * p.k + 1.5 * p.a + 2 * p.fk + 0.2 * (p.adr ?? 0) - deaths + swing;
+  const clutch = (v.clutch1 ?? 0) * p.clutch1Won + (v.clutchN ?? 0) * p.clutchNWon;
+  return 3 * p.k + 1.5 * p.a + 2 * p.fk + 0.2 * (p.adr ?? 0) - deaths + swing + clutch;
 }
 
 /** Ordem pela PTS (empate: mais kills, depois mais assistências). O 1º é o MVP. */
