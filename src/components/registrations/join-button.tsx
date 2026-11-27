@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { joinMix, leaveMix } from "@/app/(app)/inscricoes/actions";
 import { useServerClock, useTick } from "@/hooks/use-server-clock";
 import { isLateLeave, STRIKES_TO_SUSPEND, SUSPENSION_MIXES } from "@/lib/strikes";
+import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Dialog, DialogClose, DialogContent, DialogTrigger } from "../ui/dialog";
 
@@ -56,11 +57,13 @@ function countdown(ms: number) {
 const BAR_WINDOW_MS = 7 * 86_400_000;
 
 /**
- * Contagem até a abertura das inscrições como uma barra laranja que enche aos
- * poucos (anda a cada segundo, com transição suave e um brilho correndo).
+ * Contagem até a abertura das inscrições: o botão cinza com o tempo e uma linha
+ * laranja fina embaixo que enche aos poucos. Nas últimas 24h ela engrossa e brilha.
  */
 function OpeningBar({ opensAt, now, children }: { opensAt: number; now: number; children: React.ReactNode }) {
-  const pct = Math.min(100, Math.max(0, (1 - (opensAt - now) / BAR_WINDOW_MS) * 100));
+  const left = opensAt - now;
+  const pct = Math.min(100, Math.max(0, (1 - left / BAR_WINDOW_MS) * 100));
+  const today = left <= 86_400_000;
   return (
     <div
       role="progressbar"
@@ -68,16 +71,20 @@ function OpeningBar({ opensAt, now, children }: { opensAt: number; now: number; 
       aria-valuemax={100}
       aria-valuenow={Math.round(pct)}
       aria-label="Tempo até as inscrições abrirem"
-      className="relative flex h-10 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-surface-2 text-sm font-medium tabular"
+      className="relative flex h-10 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-surface-2 text-sm font-medium text-muted tabular"
     >
-      <div
-        className="absolute inset-y-0 left-0 overflow-hidden bg-gradient-to-r from-brand/70 to-brand transition-[width] duration-1000 ease-linear"
-        style={{ width: `${pct}%` }}
-        aria-hidden
-      >
-        <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+      <span className="relative px-3">{children}</span>
+      <div className={cn("absolute inset-x-0 bottom-0 bg-surface-3", today ? "h-1.5" : "h-1")} aria-hidden>
+        <div
+          className={cn(
+            "relative h-full overflow-hidden bg-brand transition-[width] duration-1000 ease-linear",
+            today && "shadow-[0_0_10px_1px] shadow-brand/70",
+          )}
+          style={{ width: `${pct}%` }}
+        >
+          <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+        </div>
       </div>
-      <span className="relative z-10 px-3 text-fg drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{children}</span>
     </div>
   );
 }

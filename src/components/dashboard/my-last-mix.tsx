@@ -147,7 +147,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
                     className="inline-flex items-center gap-1 rounded-full border border-border bg-bg/70 py-0.5 pr-2.5 pl-0.5 text-xs font-semibold"
                   >
                     <BadgeIcon icon={b.icon} color={b.color} size="xs" />
-                    <span className="max-w-32 truncate">{b.name}</span>
+                    <span className="whitespace-nowrap">{b.name}</span>
                   </span>
                 ))}
                 <span className="text-[11px] text-muted">conquistada{me.badges.length > 1 ? "s" : ""} no mix</span>
