@@ -38,7 +38,7 @@ export function BolaoPanel({
   const teamName = (i: 0 | 1) => `Time ${name(bolao.captains[i])}`;
 
   return (
-    <Card>
+    <Card id="bolao" className="scroll-mt-20">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <Target className="size-4 text-brand" aria-hidden />

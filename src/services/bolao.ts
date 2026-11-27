@@ -273,3 +273,12 @@ export async function bolaoPointsForMatch(matchId: string) {
   const result = await bolaoForMatch(matchId, { withProfiles: false });
   return result?.entries.map((e) => ({ userId: e.userId, points: e.score?.points ?? 0 })) ?? [];
 }
+
+/** Último mix conferido da liga atual: resultado oficial e quem acertou cada item. */
+export async function lastBolaoResult(matchIds: string[]) {
+  for (const id of matchIds.slice(0, 5)) {
+    const r = await bolaoForMatch(id).catch(() => null);
+    if (r?.entries.length) return { matchId: id, ...r };
+  }
+  return null;
+}
