@@ -262,7 +262,7 @@ export default async function BolaoPage({ searchParams }: PageProps<"/bolao">) {
                       <span
                         title={
                           r.shared
-                            ? "Empate completo: mesma posição"
+                            ? "Empatado em tudo (pontos e critérios de desempate): mesma posição"
                             : r.tiebreak
                               ? "Mesmos pontos: desempate por seca/deslize, depois MVP, depois menos palpites"
                               : undefined
@@ -276,7 +276,7 @@ export default async function BolaoPage({ searchParams }: PageProps<"/bolao">) {
                           (r.shared || r.tiebreak) && "cursor-help",
                         )}
                       >
-                        {r.shared ? `=${r.position}` : r.position}
+                        {r.position}
                       </span>
                     </TD>
                     <TD>
@@ -335,9 +335,10 @@ export default async function BolaoPage({ searchParams }: PageProps<"/bolao">) {
       {ranking && ranking.mixes > 0 && (
         <p className="mt-2 text-xs text-subtle">
           {ranking.mixes} mix{ranking.mixes > 1 ? "es" : ""} conferido{ranking.mixes > 1 ? "s" : ""}. Mesmos pontos:
-          desempate por seca/deslize, depois MVP, depois menos palpites (=1 = empate completo). Aproveitamento = pontos
-          ÷ máximo possível ({BOLAO_MAX} por mix). Insígnias do bolão: Rei do Pitaco, Alambrado do Mix, Mãe Diná, Zicado
-          e Chutômetro Quebrado. Os pontos seguem o resultado oficial: se um mix for corrigido, o bolão é recalculado.
+          desempate por seca/deslize, depois MVP, depois menos palpites; empatados em tudo dividem a posição.
+          Aproveitamento = pontos ÷ máximo possível ({BOLAO_MAX} por mix). Insígnias do bolão: Rei do Pitaco, Alambrado
+          do Mix, Mãe Diná, Zicado e Chutômetro Quebrado. Os pontos seguem o resultado oficial: se um mix for corrigido,
+          o bolão é recalculado.
         </p>
       )}
     </>

@@ -196,7 +196,13 @@ export async function bolaoForMatch(matchId: string, { withProfiles = true } = {
   if (!outcome) return null;
   const ids = [
     ...new Set(
-      rows.flatMap((r) => [r.user_id, r.winner_captain, r.mvp_id, r.lanterna_id]).filter((id): id is string => !!id),
+      [
+        ...rows.flatMap((r) => [r.user_id, r.winner_captain, r.mvp_id, r.lanterna_id]),
+        // O resultado oficial também (MVP ou lanterna em quem ninguém apostou).
+        ...captains,
+        outcome.mvpId,
+        outcome.lanternaId,
+      ].filter((id): id is string => !!id),
     ),
   ];
   // Fora de uma página (avisos), não precisa de nomes e fotos.
