@@ -55,4 +55,15 @@ export const BADGE_IMAGES: Record<string, { label: string; src: string }> = {
   "img:maedina": { label: "Bola de cristal", src: "/badges/maedina.png" },
   "img:zicado": { label: "Gato preto", src: "/badges/zicado.png" },
   "img:chutometro": { label: "Tonto", src: "/badges/chutometro.png" },
+  // Insígnias da GC (0036): as imagens já estavam em /public/badges, faltava a chave.
+  "img:ace": { label: "100", src: "/badges/ace.png" },
+  "img:clutch": { label: "Espadas cruzadas", src: "/badges/clutch.png" },
+  "img:virada": { label: "Virada", src: "/badges/virada.png" },
+  "img:abrealas": { label: "Porta aberta", src: "/badges/abrealas.png" },
+  "img:cabecudo": { label: "Alvo (HS)", src: "/badges/cabecudo.png" },
+  "img:alface": { label: "Alface", src: "/badges/alface.png" },
+  // Para não repetir ícones (0062).
+  "img:clutchmaster": { label: "Sangue frio", src: "/badges/clutchmaster.png" },
+  "img:cabecudo2": { label: "Cabeça explodindo", src: "/badges/cabecudo2.png" },
+  "img:mapa": { label: "Mapa", src: "/badges/mapa.png" },
 };

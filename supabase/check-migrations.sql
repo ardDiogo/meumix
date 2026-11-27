@@ -67,7 +67,9 @@ c(migracao, ok) as (values
   ('0059_tiebreaker_captains', exists (select 1 from col where t = 'map_tiebreaker_rounds' and c = 'mode')),
   ('0060_pts_trades', exists (select 1 from col where t = 'player_match_records' and c = 'traded_deaths')),
   ('0061_map_cobblestone', case when to_regclass('public.maps') is null then false
-     else query_to_xml('select 1 from public.maps where id = ''de_cobblestone''', false, false, '')::text like '%<row>%' end)
+     else query_to_xml('select 1 from public.maps where id = ''de_cobblestone''', false, false, '')::text like '%<row>%' end),
+  ('0062_badges_cleanup', exists (select 1 from public.badges where icon = 'img:clutchmaster')
+     or not exists (select 1 from public.badges where auto_rule = 'gc_clutch_master'))
 )
 select migracao, case when ok then 'ok' else 'FALTA RODAR' end as situacao
 from c

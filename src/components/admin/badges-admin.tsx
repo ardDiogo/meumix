@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2, Pencil, Plus, Power, RefreshCw, Search, SlidersHorizontal, Trash2, X } from "lucide-react";
-import { useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 import {
   createBadge,
@@ -25,6 +25,7 @@ import { Badge as Tag } from "../ui/badge";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { EmptyState } from "../ui/empty-state";
 import { Input, Label, Select, Textarea } from "../ui/input";
+import { Dialog, DialogContent, DialogTrigger } from "../ui/dialog";
 
 function useRun() {
   const [pending, start] = useTransition();
@@ -39,6 +40,9 @@ function useRun() {
   return [pending, run] as const;
 }
 
+type Section = "auto" | "manual" | "off";
+const CONCEDIDAS_PAGE = 30;
+
 export function BadgesAdmin({
   badges,
   granted,
@@ -49,52 +53,241 @@ export function BadgesAdmin({
   players: { id: string; name: string }[];
 }) {
   const names = new Map(players.map((p) => [p.id, p.name]));
-  const grantable = badges.filter((b) => b.enabled);
+  // Conceder à mão: só as manuais habilitadas (as automáticas seguem a regra).
+  const grantable = badges.filter((b) => b.enabled && !b.autoRule);
+  const [section, setSection] = useState<Section>("auto");
+  const [query, setQuery] = useState("");
+  const norm = (t: string) =>
+    t
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase();
+  const inSection = (b: Badge) =>
+    section === "off" ? !b.enabled : b.enabled && (section === "auto" ? !!b.autoRule : !b.autoRule);
+  const count = (sec: Section) =>
+    badges.filter((b) => (sec === "off" ? !b.enabled : b.enabled && (sec === "auto" ? !!b.autoRule : !b.autoRule)))
+      .length;
+  const list = badges
+    .filter((b) => inSection(b) && (!query || norm(`${b.name} ${b.description ?? ""}`).includes(norm(query))))
+    .sort((a, b) => b.holders - a.holders || b.conquests - a.conquests || a.name.localeCompare(b.name, "pt-BR"));
+  // Manuais nunca concedidas ficam recolhidas no fim.
+  const conquered = section === "manual" ? list.filter((b) => b.conquests > 0) : list;
+  const never = section === "manual" ? list.filter((b) => b.conquests === 0) : [];
+  const SECTIONS: [Section, string][] = [
+    ["auto", "Automáticas"],
+    ["manual", "Manuais"],
+    ["off", "Desabilitadas"],
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[24rem_1fr]">
-        <CreateBadge />
-        <Card className="self-start">
-          <CardHeader
-            title="Insígnias"
-            description="Automáticas são concedidas e removidas pelos resultados; manuais, pelo admin. Desabilitar esconde sem apagar o histórico."
-            action={<RecomputeButton />}
-          />
-          {badges.length ? (
-            <ul className="divide-y divide-border">
-              {/* Automáticas primeiro. */}
-              {[...badges]
-                .sort((a, b) => Number(!!b.autoRule) - Number(!!a.autoRule))
-                .map((b) => (
-                  <BadgeRow key={b.id} badge={b} />
-                ))}
-            </ul>
-          ) : (
-            <EmptyState icon={Plus} title="Nenhuma insígnia criada ainda" className="py-8" />
-          )}
-        </Card>
-      </div>
-      {grantable.length > 0 && <GrantBadge badges={grantable} players={players} />}
       <Card>
         <CardHeader
-          title={`Concedidas (${granted.length})`}
-          description="Ativas agora e as desativadas pelo admin. Automáticas: Desativar trava para o jogador; Reativar devolve à regra."
+          title="Insígnias"
+          description="Automáticas são concedidas e removidas pelos resultados; manuais, pelo admin. Desabilitar esconde sem apagar o histórico; excluir só depois de desabilitar."
+          action={
+            <div className="flex gap-2">
+              <NewBadgeButton />
+              <RecomputeButton />
+            </div>
+          }
         />
-        {granted.length ? (
-          <ul className="divide-y divide-border">
-            {granted.map((g) => (
-              <GrantedRow key={g.id} item={g} player={names.get(g.userId) ?? "Jogador"} />
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <div role="tablist" aria-label="Tipo de insígnia" className="flex rounded-md border border-border p-0.5">
+            {SECTIONS.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={section === value}
+                onClick={() => setSection(value)}
+                className={cn(
+                  "rounded px-3 py-1 text-sm transition-colors",
+                  section === value ? "bg-surface-2 font-semibold text-fg" : "text-muted hover:text-fg",
+                )}
+              >
+                {label} <span className="text-xs text-subtle tabular">{count(value)}</span>
+              </button>
             ))}
-          </ul>
+          </div>
+          <div className="relative ml-auto w-full sm:w-64">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" />
+            <Input
+              aria-label="Buscar insígnia"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar insígnia…"
+              className="h-9 pl-9"
+            />
+          </div>
+        </div>
+        {conquered.length || never.length ? (
+          <>
+            <ul className="divide-y divide-border">
+              {conquered.map((b) => (
+                <BadgeRow key={b.id} badge={b} />
+              ))}
+            </ul>
+            {never.length > 0 && (
+              <details className="group border-t border-border">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm text-muted hover:text-fg [&::-webkit-details-marker]:hidden">
+                  <span className="transition-transform group-open:rotate-90">▸</span>
+                  Nunca concedidas ({never.length})
+                  <span className="text-xs text-subtle">— candidatas a revisar, juntar ou desabilitar</span>
+                </summary>
+                <ul className="divide-y divide-border border-t border-border">
+                  {never.map((b) => (
+                    <BadgeRow key={b.id} badge={b} />
+                  ))}
+                </ul>
+              </details>
+            )}
+          </>
         ) : (
-          <EmptyState icon={Plus} title="Nenhuma insígnia concedida ainda" className="py-8" />
+          <EmptyState
+            icon={Plus}
+            title={
+              query
+                ? "Nenhuma insígnia encontrada"
+                : badges.length
+                  ? "Nenhuma insígnia aqui"
+                  : "Nenhuma insígnia criada ainda"
+            }
+            className="py-8"
+          />
         )}
       </Card>
+      {grantable.length > 0 && <GrantBadge badges={grantable} players={players} granted={granted} />}
+      <GrantedList granted={granted} names={names} />
     </div>
   );
 }
 
-function CreateBadge() {
+/** "+ Nova insígnia": o formulário abre numa janela (a lista fica com a largura toda). */
+function NewBadgeButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="primary" size="sm">
+          <Plus /> Nova insígnia
+        </Button>
+      </DialogTrigger>
+      <DialogContent title="Nova insígnia" className="max-h-[90vh] max-w-lg overflow-y-auto">
+        <CreateBadge onCreated={() => setOpen(false)} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Concedidas: filtros por jogador, insígnia e tipo; agrupadas por dia; "ver mais". */
+function GrantedList({ granted, names }: { granted: PlayerBadge[]; names: Map<string, string> }) {
+  const [player, setPlayer] = useState("");
+  const [badge, setBadge] = useState("");
+  const [kind, setKind] = useState("");
+  const [shown, setShown] = useState(CONCEDIDAS_PAGE);
+  const players = [...new Set(granted.map((g) => g.userId))]
+    .map((id) => ({ id, name: names.get(id) ?? "Jogador" }))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  const badgeOptions = [...new Map(granted.map((g) => [g.badgeId, g.name]))].sort((a, b) =>
+    a[1].localeCompare(b[1], "pt-BR"),
+  );
+  const list = granted.filter(
+    (g) =>
+      (!player || g.userId === player) &&
+      (!badge || g.badgeId === badge) &&
+      (!kind || (kind === "auto" ? g.auto : !g.auto)),
+  );
+  const page = list.slice(0, shown);
+  const day = (iso: string) => iso.slice(0, 10);
+  const reset = () => setShown(CONCEDIDAS_PAGE);
+  return (
+    <Card>
+      <CardHeader
+        title={`Concedidas (${list.length}${list.length !== granted.length ? ` de ${granted.length}` : ""})`}
+        description="Ativas agora e as desativadas pelo admin. Automáticas: Desativar trava para o jogador; Reativar devolve à regra."
+      />
+      {granted.length > 0 && (
+        <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
+          <Select
+            aria-label="Jogador"
+            className="h-9 w-auto min-w-0 flex-1 text-sm sm:flex-none"
+            value={player}
+            onChange={(e) => {
+              setPlayer(e.target.value);
+              reset();
+            }}
+          >
+            <option value="">Jogador: todos</option>
+            {players.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Insígnia"
+            className="h-9 w-auto min-w-0 flex-1 text-sm sm:flex-none"
+            value={badge}
+            onChange={(e) => {
+              setBadge(e.target.value);
+              reset();
+            }}
+          >
+            <option value="">Insígnia: todas</option>
+            {badgeOptions.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </Select>
+          <Select
+            aria-label="Tipo"
+            className="h-9 w-auto min-w-0 flex-1 text-sm sm:flex-none"
+            value={kind}
+            onChange={(e) => {
+              setKind(e.target.value);
+              reset();
+            }}
+          >
+            <option value="">Tipo: todos</option>
+            <option value="auto">Automáticas</option>
+            <option value="manual">Manuais</option>
+          </Select>
+        </div>
+      )}
+      {page.length ? (
+        <ul className="divide-y divide-border">
+          {page.map((g, i) => (
+            <Fragment key={g.id}>
+              {(i === 0 || day(page[i - 1]!.createdAt) !== day(g.createdAt)) && (
+                <li className="bg-surface-2/60 px-4 py-1.5 text-[11px] font-bold tracking-wider text-muted uppercase">
+                  {formatDate(g.createdAt)}
+                </li>
+              )}
+              <GrantedRow item={g} player={names.get(g.userId) ?? "Jogador"} />
+            </Fragment>
+          ))}
+        </ul>
+      ) : (
+        <EmptyState
+          icon={Plus}
+          title={granted.length ? "Nada com esses filtros" : "Nenhuma insígnia concedida ainda"}
+          className="py-8"
+        />
+      )}
+      {list.length > shown && (
+        <div className="flex justify-center border-t border-border p-3">
+          <Button variant="secondary" size="sm" onClick={() => setShown((n) => n + CONCEDIDAS_PAGE)}>
+            Ver mais ({list.length - shown})
+          </Button>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function CreateBadge({ onCreated }: { onCreated?: () => void }) {
   const [pending, run] = useRun();
   const [form, setForm] = useState({
     name: "",
@@ -104,118 +297,118 @@ function CreateBadge() {
     color: BADGE_COLORS[0]!,
   });
   return (
-    <Card className="self-start">
-      <CardHeader title="Criar insígnia" description="Escolha nome, ícone e cor." />
-      <CardContent className="space-y-3">
-        <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-2/50 p-3">
-          <BadgeIcon icon={form.icon} color={form.color} size="md" />
-          <div className="min-w-0">
-            <div className="truncate font-semibold">{form.name || "Nome da insígnia"}</div>
-            <div className="truncate text-xs text-muted">{form.description || "Descrição"}</div>
-          </div>
+    <div className="space-y-3">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-surface-2/50 p-3">
+        <BadgeIcon icon={form.icon} color={form.color} size="md" />
+        <div className="min-w-0">
+          <div className="truncate font-semibold">{form.name || "Nome da insígnia"}</div>
+          <div className="truncate text-xs text-muted">{form.description || "Descrição"}</div>
         </div>
-        <div>
-          <Label htmlFor="badge-name">Nome</Label>
-          <Input
-            id="badge-name"
-            maxLength={40}
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="Ex.: Rei do clutch"
-          />
+      </div>
+      <div>
+        <Label htmlFor="badge-name">Nome</Label>
+        <Input
+          id="badge-name"
+          maxLength={40}
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          placeholder="Ex.: Rei do clutch"
+        />
+      </div>
+      <div>
+        <Label htmlFor="badge-desc">Descrição</Label>
+        <Textarea
+          id="badge-desc"
+          rows={2}
+          maxLength={200}
+          value={form.description}
+          onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+          placeholder="Ex.: Venceu 3 clutches 1v3 no mesmo mix"
+        />
+      </div>
+      <div>
+        <Label htmlFor="badge-unlock">Como desbloquear (opcional)</Label>
+        <Input
+          id="badge-unlock"
+          maxLength={200}
+          value={form.unlock}
+          onChange={(e) => setForm((f) => ({ ...f, unlock: e.target.value }))}
+          placeholder="Ex.: Participar de 50 mixes completos"
+        />
+      </div>
+      <div>
+        <Label>Ícone</Label>
+        <div className="grid grid-cols-7 gap-1.5">
+          {Object.entries(BADGE_ICONS).map(([key, { icon: Icon, label }]) => (
+            <button
+              key={key}
+              type="button"
+              title={label}
+              aria-label={label}
+              aria-pressed={form.icon === key}
+              onClick={() => setForm((f) => ({ ...f, icon: key }))}
+              className={cn(
+                "flex h-9 items-center justify-center rounded-md border transition-colors",
+                form.icon === key ? "border-brand bg-brand/10 text-brand" : "border-border text-muted hover:text-fg",
+              )}
+            >
+              <Icon className="size-4" />
+            </button>
+          ))}
         </div>
-        <div>
-          <Label htmlFor="badge-desc">Descrição</Label>
-          <Textarea
-            id="badge-desc"
-            rows={2}
-            maxLength={200}
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            placeholder="Ex.: Venceu 3 clutches 1v3 no mesmo mix"
-          />
+        <div className="mt-2 grid grid-cols-7 gap-1.5">
+          {Object.entries(BADGE_IMAGES).map(([key, { label, src }]) => (
+            <button
+              key={key}
+              type="button"
+              title={label}
+              aria-label={label}
+              aria-pressed={form.icon === key}
+              onClick={() => setForm((f) => ({ ...f, icon: key }))}
+              className={cn(
+                "flex h-11 items-center justify-center rounded-md border p-1 transition-colors",
+                form.icon === key ? "border-brand bg-brand/10" : "border-border hover:border-border-strong",
+              )}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" className="size-8 object-contain" />
+            </button>
+          ))}
         </div>
-        <div>
-          <Label htmlFor="badge-unlock">Como desbloquear (opcional)</Label>
-          <Input
-            id="badge-unlock"
-            maxLength={200}
-            value={form.unlock}
-            onChange={(e) => setForm((f) => ({ ...f, unlock: e.target.value }))}
-            placeholder="Ex.: Participar de 50 mixes completos"
-          />
+      </div>
+      <div>
+        <Label>Cor</Label>
+        <div className="flex flex-wrap gap-2">
+          {BADGE_COLORS.map((c) => (
+            <button
+              key={c}
+              type="button"
+              aria-label={`Cor ${c}`}
+              aria-pressed={form.color === c}
+              onClick={() => setForm((f) => ({ ...f, color: c }))}
+              className={cn("size-7 rounded-full border-2", form.color === c ? "border-fg" : "border-transparent")}
+              style={{ background: c }}
+            />
+          ))}
         </div>
-        <div>
-          <Label>Ícone</Label>
-          <div className="grid grid-cols-7 gap-1.5">
-            {Object.entries(BADGE_ICONS).map(([key, { icon: Icon, label }]) => (
-              <button
-                key={key}
-                type="button"
-                title={label}
-                aria-label={label}
-                aria-pressed={form.icon === key}
-                onClick={() => setForm((f) => ({ ...f, icon: key }))}
-                className={cn(
-                  "flex h-9 items-center justify-center rounded-md border transition-colors",
-                  form.icon === key ? "border-brand bg-brand/10 text-brand" : "border-border text-muted hover:text-fg",
-                )}
-              >
-                <Icon className="size-4" />
-              </button>
-            ))}
-          </div>
-          <div className="mt-2 grid grid-cols-7 gap-1.5">
-            {Object.entries(BADGE_IMAGES).map(([key, { label, src }]) => (
-              <button
-                key={key}
-                type="button"
-                title={label}
-                aria-label={label}
-                aria-pressed={form.icon === key}
-                onClick={() => setForm((f) => ({ ...f, icon: key }))}
-                className={cn(
-                  "flex h-11 items-center justify-center rounded-md border p-1 transition-colors",
-                  form.icon === key ? "border-brand bg-brand/10" : "border-border hover:border-border-strong",
-                )}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" className="size-8 object-contain" />
-              </button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <Label>Cor</Label>
-          <div className="flex flex-wrap gap-2">
-            {BADGE_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                aria-label={`Cor ${c}`}
-                aria-pressed={form.color === c}
-                onClick={() => setForm((f) => ({ ...f, color: c }))}
-                className={cn("size-7 rounded-full border-2", form.color === c ? "border-fg" : "border-transparent")}
-                style={{ background: c }}
-              />
-            ))}
-          </div>
-        </div>
-        <Button
-          variant="primary"
-          className="w-full"
-          disabled={pending || form.name.trim().length < 2}
-          onClick={() =>
-            run(
-              () => createBadge(form),
-              () => setForm((f) => ({ ...f, name: "", description: "", unlock: "" })),
-            )
-          }
-        >
-          {pending ? <Loader2 className="animate-spin" /> : <Plus />} Criar insígnia
-        </Button>
-      </CardContent>
-    </Card>
+      </div>
+      <Button
+        variant="primary"
+        className="w-full"
+        disabled={pending || form.name.trim().length < 2}
+        onClick={() =>
+          run(
+            () => createBadge(form),
+            () => {
+              setForm((f) => ({ ...f, name: "", description: "", unlock: "" }));
+              onCreated?.();
+            },
+          )
+        }
+      >
+        {pending ? <Loader2 className="animate-spin" /> : <Plus />} Criar insígnia
+      </Button>
+    </div>
   );
 }
 
@@ -246,7 +439,7 @@ function BadgeRow({ badge }: { badge: Badge }) {
   const [description, setDescription] = useState(badge.description ?? "");
   const [params, setParams] = useState(badge.params);
   return (
-    <li className={cn("px-4 py-3", !badge.enabled && "opacity-60")}>
+    <li className={cn("group/row px-4 py-3", !badge.enabled && "opacity-60")}>
       <div className="flex items-center gap-3">
         <BadgeIcon icon={badge.icon} color={badge.color} size="md" />
         <div className="min-w-0 flex-1">
@@ -257,6 +450,7 @@ function BadgeRow({ badge }: { badge: Badge }) {
             </Tag>
             <Tag variant={badge.autoRule ? "win" : "neutral"}>{badge.autoRule ? "Automática" : "Manual"}</Tag>
             {!badge.enabled && <Tag variant="loss">Desabilitada</Tag>}
+            {badge.enabled && badge.conquests === 0 && <Tag variant="neutral">Nunca concedida</Tag>}
           </div>
           {editingText ? (
             <div className="mt-1 space-y-2">
@@ -348,20 +542,24 @@ function BadgeRow({ badge }: { badge: Badge }) {
         >
           <Power /> {badge.enabled ? "Ativa" : "Desativada"}
         </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-label={`Excluir ${badge.name}`}
-          disabled={pending}
-          className="px-1.5 text-loss hover:text-loss"
-          onClick={() =>
-            confirm(
-              `Excluir a insígnia "${badge.name}"? Isso apaga também o histórico. Para só esconder, desabilite.`,
-            ) && run(() => deleteBadge(badge.id))
-          }
-        >
-          {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
-        </Button>
+        {/* Excluir só aparece com a insígnia desabilitada: apaga o histórico de quem tinha. */}
+        {!badge.enabled && (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={`Excluir ${badge.name}`}
+            title="Excluir (apaga também o histórico)"
+            disabled={pending}
+            className="px-1.5 text-loss hover:text-loss"
+            onClick={() =>
+              confirm(
+                `Excluir a insígnia "${badge.name}"? Isso apaga também o histórico de quem tinha. Não dá para desfazer.`,
+              ) && run(() => deleteBadge(badge.id))
+            }
+          >
+            {pending ? <Loader2 className="animate-spin" /> : <Trash2 />}
+          </Button>
+        )}
       </div>
       {editing && badge.autoRule && (
         <div className="mt-3 rounded-md border border-border bg-surface-2/50 p-3">
@@ -404,7 +602,15 @@ function BadgeRow({ badge }: { badge: Badge }) {
   );
 }
 
-function GrantBadge({ badges, players }: { badges: Badge[]; players: { id: string; name: string }[] }) {
+function GrantBadge({
+  badges,
+  players,
+  granted,
+}: {
+  badges: Badge[];
+  players: { id: string; name: string }[];
+  granted: PlayerBadge[];
+}) {
   const [pending, run] = useRun();
   const [badgeId, setBadgeId] = useState(badges[0]!.id);
   const [selected, setSelected] = useState<string[]>([]);
@@ -414,6 +620,8 @@ function GrantBadge({ badges, players }: { badges: Badge[]; players: { id: strin
     () => players.filter((p) => p.name.toLowerCase().includes(query.trim().toLowerCase())),
     [players, query],
   );
+  // Quem já tem a insígnia escolhida (ativa) não entra de novo.
+  const has = new Set(granted.filter((g) => g.badgeId === badgeId && !g.deactivatedAt).map((g) => g.userId));
   return (
     <Card>
       <CardHeader title="Conceder insígnia" description="Escolha a insígnia e um ou mais jogadores." />
@@ -421,11 +629,17 @@ function GrantBadge({ badges, players }: { badges: Badge[]; players: { id: strin
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <Label htmlFor="grant-badge">Insígnia</Label>
-            <Select id="grant-badge" value={badgeId} onChange={(e) => setBadgeId(e.target.value)}>
+            <Select
+              id="grant-badge"
+              value={badgeId}
+              onChange={(e) => {
+                setBadgeId(e.target.value);
+                setSelected([]);
+              }}
+            >
               {badges.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
-                  {b.autoRule ? " (automática — concedida à mão)" : ""}
                 </option>
               ))}
             </Select>
@@ -454,21 +668,29 @@ function GrantBadge({ badges, players }: { badges: Badge[]; players: { id: strin
         <ul className="grid max-h-64 gap-1.5 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
           {shown.map((p) => {
             const on = selected.includes(p.id);
+            const already = has.has(p.id);
             return (
               <li key={p.id}>
                 <label
+                  title={already ? "Já tem esta insígnia" : undefined}
                   className={cn(
-                    "flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm",
-                    on ? "border-brand bg-brand/10" : "border-border bg-surface-2",
+                    "flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+                    already
+                      ? "cursor-not-allowed border-win/30 bg-win/5 text-muted"
+                      : on
+                        ? "cursor-pointer border-brand bg-brand/10"
+                        : "cursor-pointer border-border bg-surface-2",
                   )}
                 >
                   <input
                     type="checkbox"
-                    checked={on}
+                    checked={on || already}
+                    disabled={already}
                     onChange={() => setSelected((l) => (on ? l.filter((x) => x !== p.id) : [...l, p.id]))}
                     className="size-4 accent-brand"
                   />
                   <span className="truncate">{p.name}</span>
+                  {already && <span className="ml-auto shrink-0 text-[10px] font-semibold text-win">já tem</span>}
                 </label>
               </li>
             );
