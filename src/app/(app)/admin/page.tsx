@@ -79,8 +79,7 @@ export const maxDuration = 60;
 
 const TABS = {
   mix: { label: "Controle de mix", icon: Swords },
-  liga: { label: "Liga", icon: Trophy },
-  comunidade: { label: "Comunidade", icon: Network },
+  liga: { label: "Ligas", icon: Trophy },
   insignias: { label: "Insígnias", icon: Award },
   configuracoes: { label: "Configurações", icon: Settings },
   usuarios: { label: "Jogadores", icon: UsersRound },
@@ -118,12 +117,11 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
 
   const params = await searchParams;
   const rawTab = params.aba;
-  // Punições agora ficam em Configurações (links antigos continuam funcionando).
-  const aba = rawTab === "punicoes" ? "configuracoes" : rawTab;
+  // Links antigos continuam funcionando: Punições está em Configurações, Comunidade em Ligas.
+  const aba = rawTab === "punicoes" ? "configuracoes" : rawTab === "comunidade" ? "liga" : rawTab;
   // Admin da liga (não da plataforma): só o controle de mix e a liga dele.
-  // Comunidade (todas as ligas e jogadores): só o super admin.
-  const visibleTabs = (Object.keys(TABS) as Tab[]).filter((t) =>
-    t === "comunidade" ? !!session?.isSuperAdmin : isPlatformAdmin(session) || t === "mix" || t === "liga",
+  const visibleTabs = (Object.keys(TABS) as Tab[]).filter(
+    (t) => isPlatformAdmin(session) || t === "mix" || t === "liga",
   );
   const tab: Tab = typeof aba === "string" && visibleTabs.includes(aba as Tab) ? (aba as Tab) : "mix";
   const [schedules, upcoming] = await Promise.all([
@@ -209,8 +207,9 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           </div>
         </div>
       )}
-      {tab === "liga" && <LeagueTab viewerId={session!.id} />}
-      {tab === "comunidade" && <CommunityTab viewerId={session!.id} />}
+      {/* Ligas: o super admin vê todas (convites, nomes, jogadores × ligas); o admin da liga, só a dele. */}
+      {tab === "liga" &&
+        (session?.isSuperAdmin ? <CommunityTab viewerId={session.id} /> : <LeagueTab viewerId={session!.id} />)}
       {tab === "insignias" && <BadgesTab />}
       {tab === "logs" && (
         <LogsTab
@@ -232,7 +231,10 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
   );
 }
 
-/** Comunidade (super admin): todas as ligas do sistema e todos os jogadores cadastrados. */
+/**
+ * Ligas (super admin): todas as ligas do sistema, com o convite de cada uma, e todos os
+ * jogadores cadastrados × ligas (incluir, remover, admin e titular). Cobre a aba da liga.
+ */
 async function CommunityTab({ viewerId }: { viewerId: string }) {
   const view = await communityOverview();
   if (!view) {
@@ -247,7 +249,7 @@ async function CommunityTab({ viewerId }: { viewerId: string }) {
       <Card>
         <CardHeader
           title="Ligas"
-          description="Cada liga é um mix com seus jogadores, ranking e ELO. Só ligas sem mixes podem ser excluídas."
+          description="Cada liga é um mix com seus jogadores, ranking e ELO. Em cada card: o convite (link e código) e quem não é titular. Só ligas sem mixes podem ser excluídas."
         />
         <CardContent className="space-y-4">
           <CommunityLeagues leagues={view.leagues} />
@@ -259,8 +261,8 @@ async function CommunityTab({ viewerId }: { viewerId: string }) {
       </Card>
       <Card>
         <CardHeader
-          title="Jogadores cadastrados"
-          description="Inclua ou remova cada jogador das ligas e escolha os admins de cada uma."
+          title="Jogadores × ligas"
+          description="Membros de cada liga: inclua ou remova jogadores, escolha os admins e os titulares. Só os membros veem os mixes, o ranking e as estatísticas da liga."
         />
         <CardContent>
           <CommunityPlayers leagues={view.leagues} players={view.players} viewerId={viewerId} />
