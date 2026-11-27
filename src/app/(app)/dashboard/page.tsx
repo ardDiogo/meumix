@@ -140,6 +140,11 @@ export default async function DashboardPage() {
   );
   // Com a janela cobrindo todos os mixes, "vs. geral" seria sempre zero.
   const compareRecent = recent.length < stats.mixes;
+  // Melhor partida recente sem repetir o mix do último MVP (aí vai a segunda melhor).
+  const bestRecent =
+    [...recent]
+      .sort((a, b) => b.kills - b.deaths - (a.kills - a.deaths))
+      .find((r) => r.mix.id !== highlights.lastMvp?.mix.id) ?? highlights.bestRecent;
   const lastMvpLine = highlights.lastMvp ? recentMixes.find((r) => r.mix.id === highlights.lastMvp!.mix.id) : null;
   const elo30d = eloChangeSince(eloHistory, new Date(ds.now().getTime() - 30 * 86_400_000));
 
@@ -265,17 +270,13 @@ export default async function DashboardPage() {
             <HighlightItem
               icon={Flame}
               label="Melhor partida recente (K/A/D)"
-              value={
-                highlights.bestRecent
-                  ? `${highlights.bestRecent.kills}/${highlights.bestRecent.assists}/${highlights.bestRecent.deaths}`
-                  : "—"
-              }
+              value={bestRecent ? `${bestRecent.kills}/${bestRecent.assists}/${bestRecent.deaths}` : "—"}
               detail={
-                highlights.bestRecent
-                  ? `${highlights.bestRecent.mix.name} · ${highlights.bestRecent.mix.maps.map((m) => mapName(m.mapId)).join(", ")}`
+                bestRecent
+                  ? `${bestRecent.mix.name} · ${bestRecent.mix.maps.map((m) => mapName(m.mapId)).join(", ")}`
                   : undefined
               }
-              href={highlights.bestRecent ? mixHref(highlights.bestRecent.mix) : undefined}
+              href={bestRecent ? mixHref(bestRecent.mix) : undefined}
             />
             <HighlightItem
               icon={ShieldCheck}

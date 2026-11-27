@@ -17,6 +17,8 @@ const DOT: Record<string, string> = {
   loss: "var(--color-loss)",
   draw: "var(--color-draw)",
 };
+const shortFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+const shortDate = (iso: string) => shortFmt.format(new Date(iso));
 const RESULT_LABEL: Record<string, string> = { win: "Vitória", loss: "Derrota", draw: "Empate" };
 
 /**
@@ -50,7 +52,7 @@ export function EloChart({
   return (
     <div style={{ height }} role="img" aria-label={`Evolução do ELO de ${data[0]!.elo} para ${data.at(-1)!.elo}`}>
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -12 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 18, bottom: 0, left: -12 }}>
           <defs>
             <linearGradient id="eloFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="var(--color-brand)" stopOpacity={0.22} />
@@ -60,12 +62,15 @@ export function EloChart({
           <CartesianGrid stroke="var(--color-border)" strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="date"
-            tickFormatter={(v: string) => formatDate(v)}
+            // Com a data de todos os pontos, o formato curto (13/10) cabe também no celular.
+            tickFormatter={(v: string) => (data.length <= 10 ? shortDate(v) : formatDate(v))}
             stroke="var(--color-subtle)"
             tick={{ fontSize: 11 }}
             tickLine={false}
             axisLine={false}
-            minTickGap={24}
+            // Poucos mixes: a data de todos os pontos (senão o recharts pula rótulos).
+            interval={data.length <= 10 ? 0 : "preserveStartEnd"}
+            minTickGap={data.length <= 10 ? 0 : 24}
           />
           <YAxis
             domain={[min, max]}
