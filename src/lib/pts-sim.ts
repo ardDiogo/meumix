@@ -22,12 +22,12 @@ export interface SimVariant {
 }
 
 export const SIM_VARIANTS: SimVariant[] = [
-  { key: "atual", label: "Atual", untraded: 1.5, noTradeData: 1.5, swing: 0 },
+  { key: "atual", label: "Antiga (−1,5)", untraded: 1.5, noTradeData: 1.5, swing: 0 },
   { key: "s2", label: "−2,5 + Swing ×2", untraded: 2.5, noTradeData: 2, swing: 2 },
   { key: "s5", label: "−2,5 + Swing ×5", untraded: 2.5, noTradeData: 2, swing: 5 },
   { key: "s6", label: "−2,5 + Swing ×6", untraded: 2.5, noTradeData: 2, swing: 6 },
   { key: "c", label: "−2,5 + clutch", untraded: 2.5, noTradeData: 2, swing: 0, clutch1: 3, clutchN: 5 },
-  { key: "c5", label: "−2,5 + clutch + Swing ×5", untraded: 2.5, noTradeData: 2, swing: 5, clutch1: 3, clutchN: 5 },
+  { key: "c5", label: "Nova (em uso)", untraded: 2.5, noTradeData: 2, swing: 5, clutch1: 3, clutchN: 5 },
 ];
 
 export interface SimPlayer {

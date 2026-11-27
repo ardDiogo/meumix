@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { recalcPtsFromGc } from "@/app/(app)/admin/actions";
 import { Button } from "../ui/button";
 
-/** Super admin: refaz a PTS dos mixes antigos com as mortes trocadas da GC (MVP e ELO juntos). */
+/** Super admin: refaz a PTS dos mixes da GC com as mortes trocadas, o Swing e os clutches (MVP e ELO juntos). */
 export function RecalcPtsButton() {
   const [pending, start] = useTransition();
   return (
@@ -16,7 +16,7 @@ export function RecalcPtsButton() {
       disabled={pending}
       onClick={() =>
         confirm(
-          "Recalcular a PTS de todos os mixes da GC com as mortes trocadas? O MVP e o ELO das ligas são refeitos.",
+          "Recalcular a PTS de todos os mixes da GC com as mortes trocadas, o Swing e os clutches? O MVP e o ELO das ligas são refeitos.",
         ) &&
         start(async () => {
           const r = await recalcPtsFromGc();
@@ -25,7 +25,7 @@ export function RecalcPtsButton() {
         })
       }
     >
-      {pending ? <Loader2 className="animate-spin" /> : <RefreshCw />} Recalcular PTS com os trades da GC
+      {pending ? <Loader2 className="animate-spin" /> : <RefreshCw />} Recalcular PTS com os dados da GC
     </Button>
   );
 }

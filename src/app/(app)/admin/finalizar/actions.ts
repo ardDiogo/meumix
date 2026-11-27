@@ -14,7 +14,7 @@ import { notifyMixResult } from "@/services/notify";
 import { generateChronicle } from "@/services/chronicle";
 import { generateAnalysis } from "@/services/match-analysis";
 import type { GcMapStored } from "@/lib/gc-api";
-import { tradedDeathsLookup } from "@/lib/gc-analysis";
+import { gcExtrasLookup } from "@/lib/gc-analysis";
 
 export interface FinalizeMap {
   mapId: string;
@@ -104,10 +104,18 @@ export async function finalizeMix(input: {
   if (gcMaps.length && JSON.stringify(gcMaps).length > 400_000)
     return { ok: false, message: "Dados da GC grandes demais. Importe de novo." };
 
-  // Mortes trocadas (dados da GC): pesam menos na PTS, que escolhe o MVP.
-  const tradedOf = tradedDeathsLookup(gcMaps);
-  const traded = players.map((p) => tradedOf(p.userId, p.name));
-  const { mvp, lanterna } = pickMvpAndLanterna(players.map((p, i) => ({ ...p, tradedDeaths: traded[i] })));
+  // Dados da GC que entram na PTS (que escolhe o MVP): mortes trocadas, Swing e clutches.
+  const extrasOf = gcExtrasLookup(gcMaps);
+  const extras = players.map((p) => extrasOf(p.userId, p.name));
+  const { mvp, lanterna } = pickMvpAndLanterna(
+    players.map((p, i) => ({
+      ...p,
+      tradedDeaths: extras[i]?.traded ?? null,
+      swingRounds: extras[i]?.swingRounds ?? null,
+      clutch1v1: extras[i]?.clutch1v1 ?? null,
+      clutchNv: extras[i]?.clutchNv ?? null,
+    })),
+  );
   const { data, error } = await admin.rpc("finalize_mix", {
     p_schedule: input.scheduleId,
     p_date: input.date,
@@ -157,7 +165,7 @@ export async function finalizeMix(input: {
   }
 
   if (gcMaps.length) await saveGcMaps(admin, data as string, gcMaps, inMix as Set<string>, session!.id);
-  if (traded.some((t) => t != null)) await saveTradedDeaths(admin, data as string, players, traded);
+  if (extras.some((t) => t != null)) await saveGcExtras(admin, data as string, players, extras);
 
   // Insígnias automáticas (Foguinho, Rei do Mix, MVP…) seguem o resultado novo.
   await recomputeBadgesSafely();
@@ -176,12 +184,15 @@ export async function finalizeMix(input: {
   return { ok: true, matchId: data as string };
 }
 
-/** Grava as mortes trocadas de cada registro (sem a migração 0060, só avisa no log). */
-async function saveTradedDeaths(
+/**
+ * Grava os dados da GC de cada registro: mortes trocadas, Swing e clutches (migração 0063).
+ * Sem a 0063, grava só as mortes trocadas (0060); sem nenhuma, só avisa no log.
+ */
+async function saveGcExtras(
   admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
   matchId: string,
   players: { userId: string | null; name: string }[],
-  traded: (number | null)[],
+  extras: ({ traded: number; swingRounds: number | null; clutch1v1: number; clutchNv: number } | null)[],
 ) {
   const { data: records } = await admin
     .from("player_match_records")
@@ -191,11 +202,27 @@ async function saveTradedDeaths(
     const i = players.findIndex((p) =>
       r.user_id ? p.userId === r.user_id : !p.userId && p.name.trim() === (r.player_name as string),
     );
-    return i >= 0 && traded[i] != null ? [{ record_id: r.id as string, traded: traded[i] }] : [];
+    const e = i >= 0 ? extras[i] : null;
+    return e
+      ? [
+          {
+            record_id: r.id as string,
+            traded: e.traded,
+            swing_rounds: e.swingRounds,
+            clutch_1v1: e.clutch1v1,
+            clutch_nv: e.clutchNv,
+          },
+        ]
+      : [];
   });
   if (!rows.length) return;
-  const { error } = await admin.rpc("set_traded_deaths", { p_rows: rows });
-  if (error) console.error("[finalize] mortes trocadas:", error.code, error.message);
+  const { error } = await admin.rpc("set_gc_extras", { p_rows: rows });
+  if (!error) return;
+  // Sem a migração 0063: ao menos as mortes trocadas (0060).
+  const { error: old } = await admin.rpc("set_traded_deaths", {
+    p_rows: rows.map((r) => ({ record_id: r.record_id, traded: r.traded })),
+  });
+  if (old) console.error("[finalize] dados da GC:", old.code, old.message);
 }
 
 /**

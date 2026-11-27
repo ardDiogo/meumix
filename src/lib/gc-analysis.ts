@@ -291,6 +291,32 @@ export const winnerFirst = (s: { a: number; b: number }, w: "A" | "B") =>
   w === "A" ? `${s.a}×${s.b}` : `${s.b}×${s.a}`;
 
 /**
+ * Dados da GC que entram na PTS, por jogador do mix (pelo jogador do MeuMix ou, convidado,
+ * pelo nick): mortes trocadas, rounds ganhos pelo Swing (Swing × rounds) e clutches vencidos.
+ * Sem os dados, null.
+ */
+export function gcExtrasLookup(maps: GcMapStored[]) {
+  const lines = maps.length ? aggregateGc(maps) : [];
+  const norm = (s: string) => s.trim().toLowerCase();
+  return (
+    userId: string | null,
+    name: string,
+  ): { traded: number; swingRounds: number | null; clutch1v1: number; clutchNv: number } | null => {
+    if (!lines.length) return null;
+    const line = userId
+      ? lines.find((l) => l.userId === userId)
+      : lines.find((l) => !l.userId && norm(l.nick) === norm(name));
+    if (!line) return null;
+    return {
+      traded: line.trades.traded,
+      swingRounds: line.swing != null && line.rounds ? Math.round(line.swing * line.rounds * 1000) / 1000 : null,
+      clutch1v1: line.clutch.v1Won,
+      clutchNv: line.clutch.vnWon,
+    };
+  };
+}
+
+/**
  * Mortes trocadas (um colega matou quem o matou, na hora) de cada jogador do mix, pelos
  * dados da GC: pelo jogador do MeuMix ou, convidado, pelo nick. Sem os dados, null.
  */

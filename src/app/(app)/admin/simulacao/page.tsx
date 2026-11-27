@@ -104,7 +104,7 @@ export default async function SimulationPage() {
         <CardHeader title="As versões" />
         <CardContent className="space-y-1 pt-3 text-sm text-muted">
           <p>
-            <b className="text-fg">Atual:</b> 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte
+            <b className="text-fg">Antiga:</b> 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte
             não trocada (sem dados de trade: −1,5 por morte).
           </p>
           <p>
@@ -196,7 +196,7 @@ export default async function SimulationPage() {
       )}
 
       <Card className="mb-4">
-        <CardHeader title="MVP de cada mix" description="Em laranja, quando a versão muda o MVP." />
+        <CardHeader title="MVP de cada mix" description="Em laranja, quando a versão muda o MVP em relação à antiga." />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="border-b border-border text-xs text-muted">
@@ -231,7 +231,7 @@ export default async function SimulationPage() {
       <Card>
         <CardHeader
           title="Ranking de ELO refeito"
-          description="ELO final de cada um refazendo o histórico com cada versão. ▲▼ = posições em relação à versão atual."
+          description="ELO final de cada um refazendo o histórico com cada versão. ▲▼ = posições em relação à fórmula antiga."
         />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
@@ -279,8 +279,8 @@ export default async function SimulationPage() {
           </table>
         </div>
         <p className="border-t border-border px-4 py-3 text-xs text-subtle">
-          A coluna “Atual” é a própria simulação com a fórmula de hoje: compare com o ranking do site para ver o quanto
-          a aproximação bate.
+          A coluna “Nova (em uso)” é a fórmula aplicada no site (−2,5 + clutch + Swing ×5): depois de rodar a migração
+          0063 e recalcular, ela deve bater com o ranking do site.
         </p>
       </Card>
     </>

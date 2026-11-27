@@ -302,7 +302,7 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
             a: mine.a,
             d: mine.d,
             adr: mine.adr,
-            pts: Math.round(mixScore(mine)),
+            pts: Math.round(Math.max(0, mixScore(mine))),
             eloDelta: mine.eloDelta ?? null,
             eloAfter: mine.elo,
             isMvp: mine.isMvp,

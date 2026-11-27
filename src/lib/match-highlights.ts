@@ -24,6 +24,10 @@ export interface StatRow {
   fk: number;
   /** Mortes que um colega trocou (dados da GC); sem o dado, null. */
   tradedDeaths?: number | null;
+  /** Swing × rounds ÷ 100 e clutches vencidos (dados da GC; migração 0063). */
+  swingRounds?: number | null;
+  clutch1v1?: number | null;
+  clutchNv?: number | null;
   /** RP do MeuMix (o que entrou no ELO); sem a migração 0057, o RP da GC. */
   rp: number;
   /** RP informado pela GC (só informação). */
@@ -43,7 +47,17 @@ export const kdrOf = (r: StatRow) => (r.d ? r.k / r.d : r.k);
 
 /** Pontuação do mix (a mesma que escolhe o MVP). */
 export const mixScore = (r: StatRow) =>
-  mvpScore({ kills: r.k, deaths: r.d, assists: r.a, firstKills: r.fk, adr: r.adr, tradedDeaths: r.tradedDeaths });
+  mvpScore({
+    kills: r.k,
+    deaths: r.d,
+    assists: r.a,
+    firstKills: r.fk,
+    adr: r.adr,
+    tradedDeaths: r.tradedDeaths,
+    swingRounds: r.swingRounds,
+    clutch1v1: r.clutch1v1,
+    clutchNv: r.clutchNv,
+  });
 
 /**
  * Ordem padrão dos jogadores do mix: MVP primeiro, lanterna por último e o

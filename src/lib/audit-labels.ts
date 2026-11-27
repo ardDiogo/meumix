@@ -80,7 +80,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "admin.penalty_deactivate": "Removeu punição",
   "admin.strike_pardon": "Perdoou falta",
   "admin.force_map_voting": "Encerrou a votação de mapas",
-  "admin.recalc_pts": "Recalculou a PTS com os trades da GC",
+  "admin.recalc_pts": "Recalculou a PTS com os dados da GC",
   "admin.suspension_end": "Encerrou suspensão",
   "admin.feature_toggle": "Ligou/desligou funcionalidade",
   "admin.music": "Alterou a música de fundo",

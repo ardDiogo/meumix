@@ -8,7 +8,7 @@ import type { GcMapStored } from "@/lib/gc-api";
 import { aggregateGc, type GcLine } from "@/lib/gc-analysis";
 import { mapName } from "@/lib/maps";
 import { byMixScore, diffOf, kdrOf, mixScore, type StatRow } from "@/lib/match-highlights";
-import { deathSplit, PTS } from "@/lib/match-rules";
+import { deathSplit, PTS, ptsShown } from "@/lib/match-rules";
 import type { MapId } from "@/types/domain";
 import { cn } from "@/lib/utils";
 import { LevelBadge } from "../players/level-badge";
@@ -36,13 +36,25 @@ const scoreBreakdown = (r: StatRow) => {
   const adr = r.adr ?? 0;
   const { traded, untraded, known } = deathSplit({ deaths: r.d, tradedDeaths: r.tradedDeaths });
   const deaths = known
-    ? `0,5 × ${traded} mortes trocadas (${n(PTS.tradedDeath * traded)}) − 1,5 × ${untraded} não trocadas (${n(
+    ? `0,5 × ${traded} mortes trocadas (${n(PTS.tradedDeath * traded)}) − 2,5 × ${untraded} não trocadas (${n(
         PTS.death * untraded,
       )})`
-    : `1,5 × ${r.d} mortes (${n(PTS.death * r.d)})`;
+    : `2 × ${r.d} mortes (${n(PTS.deathNoData * r.d)})`;
+  const c1 = r.clutch1v1 ?? 0;
+  const cn = r.clutchNv ?? 0;
+  const clutch = c1 || cn ? ` + clutch (${c1} × 3 + ${cn} × 5 = ${n(c1 * PTS.clutch1v1 + cn * PTS.clutchNv)})` : "";
+  const swing =
+    r.swingRounds != null
+      ? ` ${r.swingRounds < 0 ? "−" : "+"} Swing (5 × ${n(Math.abs(r.swingRounds))} rounds = ${n(
+          Math.abs(r.swingRounds * PTS.swingRound),
+        )})`
+      : "";
+  const total = mixScore(r);
   return `${r.name}: 3 × ${r.k} kills (${n(PTS.kill * r.k)}) + 1,5 × ${r.a} assist. (${n(PTS.assist * r.a)}) + 2 × ${
     r.fk
-  } FK (${n(PTS.firstKill * r.fk)}) + 0,2 × ${n(adr)} ADR (${n(PTS.adr * adr)}) − ${deaths} = ${n(mixScore(r))}`;
+  } FK (${n(PTS.firstKill * r.fk)}) + 0,2 × ${n(adr)} ADR (${n(PTS.adr * adr)}) − ${deaths}${clutch}${swing} = ${n(total)}${
+    total < 0 ? " (na tabela aparece 0)" : ""
+  }`;
 };
 
 const dec = (v: number) => {
@@ -78,7 +90,7 @@ const BASE_COLS: Col[] = [
     value: mixScore,
     render: (r) => (
       <span className="cursor-help font-display font-bold" title={scoreBreakdown(r)}>
-        {fmt(mixScore(r), 1)}
+        {fmt(ptsShown(mixScore(r)), 1)}
       </span>
     ),
   },
@@ -623,7 +635,7 @@ export function MatchStatsTable({
         <summary className="cursor-pointer font-semibold text-fg select-none">Como a PTS é calculada?</summary>
         <div className="mt-2 space-y-2 leading-relaxed">
           <p className="rounded-md bg-surface-2/60 px-3 py-2 font-display text-sm font-bold text-fg">
-            PTS = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte não trocada
+            PTS = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 2,5 × morte não trocada + clutch + Swing
           </p>
           <p>
             Ganha mix quem joga junto. A PTS valoriza quem cria impacto no round e ajuda o time, e não só quem acumula
@@ -647,6 +659,16 @@ export function MatchStatsTable({
                 <b className="text-fg">Dano (ADR):</b> <b className="text-win">× 0,2</b>, para recompensar quem tira
                 vida do inimigo mesmo sem levar a última bala.
               </li>
+              <li>
+                <b className="text-fg">Clutch vencido:</b> <b className="text-win">+3</b> no 1v1 e{" "}
+                <b className="text-win">+5</b> no 1v2 ou mais, porque virar o round sozinho vale mais que as kills.
+                Perder o clutch não tira nada.
+              </li>
+              <li>
+                <b className="text-fg">Swing (GC):</b> <b className="text-win">+5</b> por round que você ganhou para o
+                time (ou <b className="text-loss">−5</b> por round que entregou). Ele mede o quanto você mudou a chance
+                do time ganhar cada round: pega o peek à toa no pós-plant e a kill que não muda nada.
+              </li>
             </ul>
           </div>
           <div>
@@ -657,7 +679,7 @@ export function MatchStatsTable({
                 vingou na hora: sua morte abriu espaço ou entregou a info.
               </li>
               <li>
-                <b className="text-fg">Morte não trocada:</b> <b className="text-loss">−1,5</b>. Você morreu sozinho,
+                <b className="text-fg">Morte não trocada:</b> <b className="text-loss">−2,5</b>. Você morreu sozinho,
                 sem resposta do time, e o time só perdeu um jogador.
               </li>
             </ul>
@@ -668,15 +690,15 @@ export function MatchStatsTable({
           </p>
           <p className="text-subtle italic">
             Em séries com mais de um mapa, kills, assistências, FK e mortes são somados, e o ADR é a média da série. Sem
-            dados de trade no mix, toda morte conta −1,5.
+            dados de trade no mix, toda morte conta −2. Sem Swing ou clutch, eles contam 0. Na tabela, a PTS aparece no
+            mínimo 0.
           </p>
           <details className="rounded-md border border-border px-3 py-2">
             <summary className="cursor-pointer font-semibold text-fg select-none">Mais detalhes</summary>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               <li>
-                <b className="text-fg">Não entra na conta:</b> rating e swing da GC, KDR, KAST, HS%, FA, MK e o placar
-                do time. O KDR aparece só de forma indireta, por kills e mortes. Isso mantém a conta igual para todos os
-                mixes (nem todo mix tem os dados da GC) e evita contar a mesma coisa duas vezes.
+                <b className="text-fg">Não entra na conta:</b> rating da GC, KDR, KAST, HS%, FA, MK e o placar do time.
+                O KDR aparece só de forma indireta, por kills e mortes. Isso evita contar a mesma coisa duas vezes.
               </li>
               <li>
                 <b className="text-fg">Ordem da tabela:</b> maior PTS em 1º (MVP), lanterna sempre por último, o resto

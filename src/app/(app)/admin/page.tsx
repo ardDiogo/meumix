@@ -569,16 +569,18 @@ async function SettingsTab({ canManageAdmins, secao }: { canManageAdmins: boolea
             <Card>
               <CardHeader
                 title={title(UsersRound, "PTS, MVP e ELO")}
-                description="Como a pontuação do mix (PTS) é calculada. Depois da migração 0060, use o botão para preencher as mortes trocadas dos mixes antigos da GC e refazer o MVP e o ELO."
+                description="Como a pontuação do mix (PTS) é calculada. Depois da migração 0063, use o botão para preencher as mortes trocadas, o Swing e os clutches dos mixes da GC e refazer o MVP e o ELO."
                 action={<Scope />}
               />
               <CardContent className="space-y-3">
                 <div className="rounded-md border border-border bg-surface-2/50 px-3 py-2 font-mono text-xs leading-relaxed">
                   <span className="text-brand">PTS</span> = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR
                   <br />
-                  <span className="invisible">PTS</span> − 0,5 × morte trocada − 1,5 × morte não trocada
+                  <span className="invisible">PTS</span> − 0,5 × morte trocada − 2,5 × morte não trocada
+                  <br />
+                  <span className="invisible">PTS</span> + 3 × clutch 1v1 + 5 × clutch 1v2+ + 5 × rounds do Swing
                   <div className="mt-1 font-sans text-[11px] text-subtle">
-                    Sem dados de trade da GC: −1,5 por morte.
+                    Sem dados de trade da GC: −2 por morte. Sem Swing ou clutch: 0. Na tabela, no mínimo 0.
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

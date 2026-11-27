@@ -1,7 +1,7 @@
 "use server";
 
 import { canManageLeagueOf } from "@/services/league";
-import { tradedDeathsLookup } from "@/lib/gc-analysis";
+import { gcExtrasLookup } from "@/lib/gc-analysis";
 import type { GcMapStored } from "@/lib/gc-api";
 import { recomputeBadgesSafely } from "@/services/badge-sync";
 import { revalidatePath } from "next/cache";
@@ -393,8 +393,8 @@ export async function endSuspension(suspensionId: number): Promise<RoleChangeRes
 /* --------------------------- PTS com os trades da GC -------------------------- */
 
 /**
- * Super admin: preenche as mortes trocadas dos mixes antigos com os dados da GC já
- * importados e refaz o MVP e o ELO das ligas (migração 0060).
+ * Super admin: preenche os dados da GC que entram na PTS (mortes trocadas, Swing e clutches)
+ * dos mixes já importados e refaz o MVP e o ELO das ligas (migração 0063).
  */
 export async function recalcPtsFromGc(): Promise<RoleChangeResult> {
   const session = await getSession();
@@ -420,19 +420,29 @@ export async function recalcPtsFromGc(): Promise<RoleChangeResult> {
     .select("id, match_id, user_id, player_name")
     .in("match_id", [...byMatch.keys()]);
   const rows = (records ?? []).flatMap((r) => {
-    const traded = tradedDeathsLookup(byMatch.get(r.match_id as string) ?? [])(
+    const e = gcExtrasLookup(byMatch.get(r.match_id as string) ?? [])(
       (r.user_id as string | null) ?? null,
       r.player_name as string,
     );
-    return traded == null ? [] : [{ record_id: r.id as string, traded }];
+    return e
+      ? [
+          {
+            record_id: r.id as string,
+            traded: e.traded,
+            swing_rounds: e.swingRounds,
+            clutch_1v1: e.clutch1v1,
+            clutch_nv: e.clutchNv,
+          },
+        ]
+      : [];
   });
-  const { data: changed, error: rpcError } = await admin.rpc("set_traded_deaths", { p_rows: rows });
+  const { data: changed, error: rpcError } = await admin.rpc("set_gc_extras", { p_rows: rows });
   if (rpcError)
     return {
       ok: false,
       message:
         rpcError.code === "PGRST202" || rpcError.code === "42883"
-          ? "Rode a migração 0060_pts_trades.sql no Supabase."
+          ? "Rode a migração 0063_pts_clutch_swing.sql no Supabase."
           : "Não foi possível recalcular.",
     };
   await recomputeBadgesSafely();
