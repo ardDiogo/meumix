@@ -9,6 +9,7 @@ import type { TeamSide } from "@/types/domain";
 import { getDataSource } from "@/services";
 import { getCurrentLeague } from "./league";
 import { getGcMaps } from "./gc-maps";
+import { playerBadges } from "./badges";
 import { getAnalysis } from "./match-analysis";
 import { getMatchReport, playerAverages } from "./match-report";
 
@@ -67,6 +68,13 @@ export interface LastMixSummary {
       role: { emoji: string; label: string };
       items: { key: string; emoji: string; label: string; value: string; detail: string; rank: number }[];
     } | null;
+    /** Seu número em cada mapa (GC; sem GC, null em todos) e o índice do melhor mapa. */
+    mapLines: ({ k: number; d: number; kdr: number; rating: number | null } | null)[];
+    bestMap: number | null;
+    /** Insígnias conquistadas neste mix. */
+    badges: { id: string; name: string; icon: string; color: string; reason: string | null }[];
+    /** ELO nos últimos mixes (do mais antigo ao atual), para o mini gráfico. */
+    eloTrend: number[];
     /** Comparado com a própria média (Geral e cada estatística, em %); estreia: null. */
     perf: { value: number; parts: { stat: string; label: string; pct: number; now: string; avg: string }[] } | null;
   } | null;
@@ -217,6 +225,30 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
       const best = items.reduce((a, b) => (b.rank < a.rank ? b : a));
       return { role: ROLE[best.key]!, items };
     };
+    // Seu número em cada mapa (GC), casando pelo mapa e, na falta, pela ordem.
+    const mapLines = mix.maps.map((m, i) => {
+      const g = gcMaps.find((x) => x.mapId === m.mapId) ?? gcMaps[i];
+      const l = mine && g ? aggregateGc([g]).find((x) => x.userId === mine.userId) : undefined;
+      return l ? { k: l.k, d: l.d, kdr: l.k / Math.max(l.d, 1), rating: l.rating } : null;
+    });
+    const scored = mapLines.flatMap((l, i) => (l ? [{ i, v: l.rating ?? l.kdr }] : []));
+    const bestMap = scored.length > 1 ? scored.reduce((a, b) => (b.v > a.v ? b : a)).i : null;
+    // Insígnias do mix (as automáticas começam no dia do mix) e o ELO dos últimos mixes.
+    const [myBadges, history] = mine?.userId
+      ? await Promise.all([
+          playerBadges([mine.userId], { history: true }).catch(() => []),
+          ds.getEloHistory(mine.userId).catch(() => []),
+        ])
+      : [[], []];
+    const date0 = mix.scheduledAt.slice(0, 10);
+    const badges = myBadges
+      .filter((b) => b.createdAt.slice(0, 10) === date0)
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 3)
+      .map((b) => ({ id: b.id, name: b.name, icon: b.icon, color: b.color, reason: b.reason }));
+    const upTo = history.findIndex((h) => h.mixId === mix.id);
+    const recent = (upTo >= 0 ? history.slice(0, upTo + 1) : history).slice(-10);
+    const eloTrend = recent.length > 1 ? [recent[0]!.eloBefore, ...recent.map((h) => h.eloAfter)] : [];
     const winnerSide = seriesWinner(mix);
     const date = mix.scheduledAt.slice(0, 10);
     const roundsOf = (i: number) => (gcMaps[i]?.rounds ?? []).map((x) => x.w);
@@ -278,6 +310,10 @@ export async function getLastMixSummary(viewerId: string | null): Promise<LastMi
             roast: roastOf(mine)?.roast?.trim() || null,
             tip: roastOf(mine)?.tip?.trim() || null,
             perf: myPerf(mine),
+            mapLines,
+            bestMap,
+            badges,
+            eloTrend,
             game: myGame(),
             result: !winnerSide ? "draw" : winnerSide === mine.team ? "win" : "loss",
             teamName: mix.teams.find((t) => t.side === mine.team)?.name ?? "",

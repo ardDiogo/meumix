@@ -5,9 +5,11 @@ import hero from "../../../public/brand/hero.webp";
 import type { LastMixSummary } from "@/services/last-mix";
 import type { MapId } from "@/types/domain";
 import { cn } from "@/lib/utils";
+import { BadgeIcon } from "../badges/badge-icon";
 import { MapIcon } from "../maps/map-icon";
 import { LevelBadge } from "../players/level-badge";
 import { Avatar } from "../ui/avatar";
+import { EloSparkline, LevelProgress } from "./elo-progress";
 
 const DAY = 86_400_000;
 const ago = (date: string) => {
@@ -136,6 +138,21 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
                 </span>
               )}
             </div>
+            {me.badges.length > 0 && (
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {me.badges.map((b) => (
+                  <span
+                    key={b.id}
+                    title={b.reason ? `${b.name}: ${b.reason}` : b.name}
+                    className="inline-flex items-center gap-1 rounded-full border border-border bg-bg/70 py-0.5 pr-2.5 pl-0.5 text-xs font-semibold"
+                  >
+                    <BadgeIcon icon={b.icon} color={b.color} size="xs" />
+                    <span className="max-w-32 truncate">{b.name}</span>
+                  </span>
+                ))}
+                <span className="text-[11px] text-muted">conquistada{me.badges.length > 1 ? "s" : ""} no mix</span>
+              </div>
+            )}
             <div className="mt-0.5 text-sm text-muted">
               {me.teamName} ·{" "}
               <b className="text-fg">
@@ -165,14 +182,27 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
             {data.maps.map((m, i) => {
               const own = side === "A" ? [m.a, m.b] : [m.b, m.a];
               const won = own[0] != null && own[1] != null ? own[0] > own[1] : null;
+              const line = me.mapLines[i];
+              const best = me.bestMap === i;
               return (
                 <span
                   key={`${m.mapId}-${i}`}
+                  title={
+                    line
+                      ? `${best ? "Seu melhor mapa · " : ""}${line.k}K / ${line.d}D · ${num(line.kdr, 2)} KDR${line.rating != null ? ` · rating ${num(line.rating, 2)}` : ""}`
+                      : undefined
+                  }
                   className={cn(
                     "inline-flex items-center gap-1.5 rounded-full border bg-bg/70 px-2.5 py-1 text-xs",
                     won === true ? "border-win/40" : won === false ? "border-loss/40" : "border-border",
+                    best && "border-yellow-400/70 bg-yellow-400/10 shadow-[0_0_12px_-4px] shadow-yellow-400/60",
                   )}
                 >
+                  {best && (
+                    <span className="text-yellow-400" aria-label="Seu melhor mapa">
+                      ★
+                    </span>
+                  )}
                   <MapIcon id={m.mapId as MapId} size={15} />
                   {m.name}
                   <b
@@ -180,6 +210,9 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
                   >
                     {own[0] ?? "-"}–{own[1] ?? "-"}
                   </b>
+                  {best && line && (
+                    <span className="text-[11px] font-semibold text-yellow-300 tabular">{num(line.kdr, 2)} KDR</span>
+                  )}
                 </span>
               );
             })}
@@ -210,7 +243,10 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
                   : "border-loss/40 bg-gradient-to-b from-loss/10",
             )}
           >
-            <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">ELO</div>
+            <div className="flex items-center justify-between gap-1">
+              <div className="text-[10px] font-bold tracking-[0.14em] text-muted uppercase sm:text-[11px]">ELO</div>
+              <EloSparkline values={me.eloTrend} className="shrink-0" />
+            </div>
             <div
               className={cn(
                 "font-display text-xl leading-tight font-bold tabular sm:text-2xl",
@@ -222,6 +258,7 @@ export function MyLastMix({ data, compact = false }: { data: LastMixSummary; com
             <div className="text-[11px] text-muted">
               {eloBefore != null ? `${eloBefore} → ${me.eloAfter}` : (me.eloAfter ?? "")}
             </div>
+            {me.eloAfter != null && <LevelProgress elo={me.eloAfter} />}
           </div>
         </div>
 
