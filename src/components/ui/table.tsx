@@ -2,9 +2,13 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 /** Tabela com rolagem horizontal em telas pequenas. */
-export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
+export function Table({
+  className,
+  wrapperClassName,
+  ...props
+}: React.TableHTMLAttributes<HTMLTableElement> & { wrapperClassName?: string }) {
   return (
-    <div className="w-full overflow-x-auto">
+    <div className={cn("w-full overflow-x-auto", wrapperClassName)}>
       <table className={cn("w-full border-collapse text-sm tabular", className)} {...props} />
     </div>
   );

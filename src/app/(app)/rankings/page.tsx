@@ -8,6 +8,7 @@ import { FilterTabs } from "@/components/ui/filter-tabs";
 import { RankingTable } from "@/components/rankings/ranking-table";
 import { getDataSource } from "@/services";
 import { getRanking, parsePeriod, RANKING_PERIODS } from "@/services/queries";
+import { getSession } from "@/services/auth";
 
 export const metadata: Metadata = { title: "Rankings" };
 
@@ -15,9 +16,10 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
   const sp = await searchParams;
   const period = parsePeriod(sp.periodo);
   const query = typeof sp.q === "string" ? sp.q.slice(0, 64) : "";
-  const [{ kind, rows, total }, community] = await Promise.all([
+  const [{ kind, rows, total }, community, session] = await Promise.all([
     getRanking({ period, query }),
     getDataSource().getCommunity(),
+    getSession().catch(() => null),
   ]);
 
   const href = (p: string) => {
@@ -63,7 +65,7 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
 
       <Card>
         {rows.length ? (
-          <RankingTable rows={rows} />
+          <RankingTable rows={rows} viewerId={session?.id ?? null} />
         ) : (
           <EmptyState
             icon={Trophy}
@@ -77,7 +79,8 @@ export default async function RankingsPage({ searchParams }: PageProps<"/ranking
         )}
       </Card>
       <p className="mt-3 text-xs text-subtle">
-        {total} jogadores classificados. Cada liga tem o seu ranking: troque de liga no topo da página.
+        {total} jogadores classificados. ▲▼ = posições ganhas ou perdidas no período. Números apagados: menos de 3 mixes
+        no período. Cada liga tem o seu ranking: troque de liga no topo da página.
       </p>
     </>
   );

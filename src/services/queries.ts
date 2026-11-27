@@ -63,6 +63,13 @@ export async function getRanking({ period = "30d", query = "" }: { period?: Rank
     .sort((a, b) => b.elo - a.elo || b.stats.winRate - a.stats.winRate)
     .map((r, i) => ({ ...r, position: i + 1 }));
 
+  // Subiu/caiu: a posição pelo ELO do início do período (ELO de hoje menos a variação nele).
+  if (since) {
+    const before = [...rows].sort((a, b) => b.elo - b.eloChange - (a.elo - a.eloChange) || a.position - b.position);
+    const was = new Map(before.map((r, i) => [r.player.id, i + 1]));
+    for (const r of rows) r.positionChange = (was.get(r.player.id) ?? r.position) - r.position;
+  }
+
   const q = normalize(query);
   return {
     kind: ds.kind,

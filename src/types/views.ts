@@ -31,6 +31,8 @@ export interface RankingRow {
   elo: number;
   eloChange: number;
   stats: PlayerAggregate;
+  /** Posições ganhas (+) ou perdidas (−) no período; Geral: null. */
+  positionChange?: number | null;
 }
 
 export type RankingPeriod = "7d" | "30d" | "90d" | "all";
