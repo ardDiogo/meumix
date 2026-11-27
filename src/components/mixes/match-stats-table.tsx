@@ -696,33 +696,107 @@ export function MatchStatsTable({
         <summary className="cursor-pointer font-semibold text-fg select-none">Como o ELO é calculado?</summary>
         <div className="mt-2 space-y-2 leading-relaxed">
           <p className="rounded-md bg-surface-2/60 px-3 py-2 font-display text-sm font-bold text-fg">
-            ELO do mix = resultado + desempenho
+            ELO do mix = resultado + desempenho{" "}
+            <span className="font-sans text-xs font-normal text-muted">(de −60 a +60 por mix)</span>
           </p>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>
-              <b className="text-fg">Resultado</b> (vitória, empate ou derrota na série, pelos mapas): com times
-              parelhos, vitória <b className="text-fg">+20</b>, derrota <b className="text-fg">−20</b> e empate 0. Conta
-              a força dos times pelo ELO médio de cada um: ganhar de um time mais forte vale mais (até +40), e perder
-              para um mais fraco tira mais (até −40). Conta: 40 × (resultado − chance de vitória).
-            </li>
-            <li>
-              <b className="text-fg">Desempenho</b>: a sua PTS comparada com a média da PTS dos 10 jogadores do mix, de{" "}
-              <b className="text-fg">−20 a +20</b>. Conta: 30 × (sua PTS − média) ÷ média. Quem joga acima da média
-              ganha mais (ou perde menos); quem joga abaixo, o contrário. Mix sem estatísticas: 0.
-            </li>
-            <li>
-              O ELO de cada liga é separado (Mix da Lanterna e Mix do Jantinha) e começa no ELO inicial do seu nível da
-              GC. Fica entre 0 e 1600 e define o seu nível (1 a 10), o ranking e o equilíbrio dos times.
-            </li>
-            <li>
-              O ELO da liga é recalculado do histórico inteiro sempre que um mix é finalizado, excluído ou corrigido.
-            </li>
-            <li>
-              <b className="text-fg">RP GC</b>: o RP que a GC informou, só como informação. Não entra no ELO, porque
-              pode vir congelado ou dobrado.
-            </li>
-            <li>Toque no ELO de um jogador para ver a conta dele.</li>
-          </ul>
+          <p>
+            O ELO mede duas coisas: <b className="text-fg">se o seu time ganhou</b> e{" "}
+            <b className="text-fg">o quanto você jogou</b>. Ganhar pesa mais, mas o seu jogo muda o quanto você sobe ou
+            cai.
+          </p>
+          <div>
+            <div className="mb-1 font-semibold text-fg">Resultado: −40 a +40</div>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                Com times parelhos: <b className="text-win">vitória +20</b>, <b className="text-loss">derrota −20</b>,{" "}
+                <b className="text-fg">empate 0</b>.
+              </li>
+              <li>
+                Com times desiguais (pelo ELO médio de cada um): <b className="text-fg">ganhar de um time mais forte</b>{" "}
+                vale mais (até +40), e ganhar sendo o favorito vale menos;{" "}
+                <b className="text-fg">perder para um time mais fraco</b> tira mais (até −40);{" "}
+                <b className="text-fg">empatar com um time mais forte</b> dá pontos, e empatar sendo o favorito tira.
+              </li>
+            </ul>
+            <p className="mt-1 text-subtle italic">
+              Por quê? Vencer quando ninguém esperava merece mais do que vencer quando já era o favorito.
+            </p>
+          </div>
+          <div>
+            <div className="mb-1 font-semibold text-fg">Desempenho: −20 a +20</div>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                A sua <b className="text-fg">PTS</b> é comparada com a{" "}
+                <b className="text-fg">média da PTS dos 10 jogadores</b> do mix.
+              </li>
+              <li>Acima da média, você ganha mais (ou perde menos). Abaixo, o contrário.</li>
+            </ul>
+            <p className="mt-1 text-subtle italic">
+              Por quê? Para o ELO não depender só do time em que você caiu. Quem carrega numa derrota pode até não
+              perder nada.
+            </p>
+          </div>
+          <div>
+            <div className="mb-1 font-semibold text-fg">Exemplos (times parelhos)</div>
+            <table className="w-full max-w-md overflow-hidden rounded-md border border-border text-center tabular">
+              <thead className="bg-surface-2/60 text-[11px] text-muted">
+                <tr>
+                  <th className="px-2 py-1.5" />
+                  <th className="px-2 py-1.5">Jogou 20% acima da média</th>
+                  <th className="px-2 py-1.5">Jogou 20% abaixo da média</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-border">
+                  <th className="px-2 py-1.5 text-left font-semibold text-win">Venceu</th>
+                  <td className="px-2 py-1.5">
+                    +20 + 6 = <b className="text-win">+26</b>
+                  </td>
+                  <td className="px-2 py-1.5">
+                    +20 − 6 = <b className="text-win">+14</b>
+                  </td>
+                </tr>
+                <tr className="border-t border-border">
+                  <th className="px-2 py-1.5 text-left font-semibold text-loss">Perdeu</th>
+                  <td className="px-2 py-1.5">
+                    −20 + 6 = <b className="text-loss">−14</b>
+                  </td>
+                  <td className="px-2 py-1.5">
+                    −20 − 6 = <b className="text-loss">−26</b>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-1">
+              Jogou muito acima da média (desempenho no máximo, +20) e perdeu? <b className="text-fg">−20 + 20 = 0</b>.
+            </p>
+          </div>
+          <p className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2">
+            <b className="text-fg">Resumindo:</b> vencer é o que mais pesa, mas o seu jogo faz diferença nos dois
+            sentidos.
+          </p>
+          <details className="rounded-md border border-border px-3 py-2">
+            <summary className="cursor-pointer font-semibold text-fg select-none">Mais detalhes</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                <b className="text-fg">Contas exatas:</b> resultado = 40 × (resultado − chance de vitória), em que
+                vitória vale 1, empate 0,5 e derrota 0; desempenho = 30 × (sua PTS − média) ÷ média.
+              </li>
+              <li>
+                <b className="text-fg">Cada liga tem o seu ELO</b> (Mix da Lanterna e Mix do Jantinha). Ele começa no
+                ELO inicial do seu nível da GC e fica entre 0 e 1600. Define o seu nível (1 a 10), o ranking e o
+                equilíbrio dos times.
+              </li>
+              <li>
+                <b className="text-fg">O ELO é refeito do histórico inteiro</b> sempre que um mix é finalizado, excluído
+                ou corrigido.
+              </li>
+              <li>
+                <b className="text-fg">RP GC:</b> o RP que a GC informou, só como informação. Não entra no ELO, porque
+                pode vir congelado ou dobrado.
+              </li>
+            </ul>
+          </details>
         </div>
       </details>
       {withGc && (
