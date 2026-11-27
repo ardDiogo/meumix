@@ -1,13 +1,13 @@
 "use client";
 
 import { AlertCircle, Loader2, ShieldAlert, X } from "lucide-react";
-import { useActionState, useEffect, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { createPenalty, deactivatePenalty, type PenaltyState } from "@/app/(app)/admin/actions";
 import { formatDate } from "@/lib/format";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader } from "../ui/card";
-import { EmptyState } from "../ui/empty-state";
 import { Input, Label, Select } from "../ui/input";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 
@@ -39,6 +39,7 @@ export function PenaltiesPanel({
 }) {
   const [state, action, pending] = useActionState<PenaltyState, FormData>(createPenalty, { status: "idle" });
   const [removing, start] = useTransition();
+  const [view, setView] = useState<"active" | "history">("active");
   useEffect(() => {
     if (state.status === "saved") toast.success(state.message);
   }, [state]);
@@ -46,50 +47,113 @@ export function PenaltiesPanel({
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
-        <Card>
+        <Card className="self-start">
           <CardHeader
-            title="Punições ativas"
+            title="Atrasos de inscrição"
             description="Atrasam a liberação da inscrição do jogador. As vencidas são desativadas automaticamente."
-          />
-          {penalties.length ? (
-            <ul className="divide-y divide-border">
-              {penalties.map((p) => (
-                <li key={p.id} className="flex items-start justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 font-medium">
-                      <ShieldAlert className="size-4 animate-pulse text-loss" aria-hidden /> {p.userName}
-                      <span className="text-xs font-semibold text-loss">+{delayLabel(p.delaySeconds)}</span>
-                    </div>
-                    <div className="text-sm text-muted">{p.reason}</div>
-                    <div className="text-xs text-subtle">
-                      Desde {formatDate(p.createdAt)} · {p.expiresAt ? `até ${formatDate(p.expiresAt)}` : "permanente"}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={removing}
-                    onClick={() =>
-                      confirm(`Remover a punição de ${p.userName}?`) &&
-                      start(async () => {
-                        const r = await deactivatePenalty(p.id);
-                        if (r.ok) toast.success(r.message);
-                        else toast.error(r.message);
-                      })
-                    }
+            action={
+              <div role="tablist" aria-label="Punições" className="flex rounded-md border border-border p-0.5 text-xs">
+                {(
+                  [
+                    ["active", `Ativas (${penalties.length})`],
+                    ["history", `Histórico (${history.length})`],
+                  ] as const
+                ).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="tab"
+                    aria-selected={view === v}
+                    onClick={() => setView(v)}
+                    className={cn(
+                      "rounded px-2.5 py-1",
+                      view === v ? "bg-surface-2 font-semibold text-fg" : "text-muted hover:text-fg",
+                    )}
                   >
-                    <X /> Remover
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyState icon={ShieldAlert} title="Nenhuma punição ativa" className="py-8" />
-          )}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            }
+          />
+          {view === "active" &&
+            (penalties.length ? (
+              <ul className="divide-y divide-border">
+                {penalties.map((p) => (
+                  <li key={p.id} className="flex items-start justify-between gap-3 px-4 py-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 font-medium">
+                        <ShieldAlert className="size-4 animate-pulse text-loss" aria-hidden /> {p.userName}
+                        <span className="text-xs font-semibold text-loss">+{delayLabel(p.delaySeconds)}</span>
+                      </div>
+                      <div className="text-sm text-muted">{p.reason}</div>
+                      <div className="text-xs text-subtle">
+                        Desde {formatDate(p.createdAt)} ·{" "}
+                        {p.expiresAt ? `até ${formatDate(p.expiresAt)}` : "permanente"}
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={removing}
+                      onClick={() =>
+                        confirm(`Remover a punição de ${p.userName}?`) &&
+                        start(async () => {
+                          const r = await deactivatePenalty(p.id);
+                          if (r.ok) toast.success(r.message);
+                          else toast.error(r.message);
+                        })
+                      }
+                    >
+                      <X /> Remover
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-4 text-sm text-muted">Nenhum atraso ativo.</p>
+            ))}
+          {view === "history" &&
+            (history.length ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <THead>
+                    <TR>
+                      <TH>Jogador</TH>
+                      <TH>Delay</TH>
+                      <TH>Expirou</TH>
+                      <TH>Motivo</TH>
+                      <TH>Aplicado por</TH>
+                    </TR>
+                  </THead>
+                  <tbody>
+                    {history.map((h) => (
+                      <TR key={h.id}>
+                        <TD className="font-medium">{h.userName}</TD>
+                        <TD className="tabular">{delayLabel(h.delaySeconds)}</TD>
+                        <TD className="text-muted">
+                          {h.isActive
+                            ? h.expiresAt
+                              ? `Ativa até ${formatDate(h.expiresAt)}`
+                              : "Permanente"
+                            : h.expiresAt && new Date(h.expiresAt) < new Date()
+                              ? `Sim (${formatDate(h.expiresAt)})`
+                              : "Removida"}
+                        </TD>
+                        <TD className="text-muted">{h.reason}</TD>
+                        <TD className="text-muted">{h.appliedBy}</TD>
+                      </TR>
+                    ))}
+                  </tbody>
+                </Table>
+              </div>
+            ) : (
+              <p className="px-4 py-4 text-sm text-muted">Nenhum atraso aplicado ainda.</p>
+            ))}
         </Card>
 
         <Card className="self-start">
-          <CardHeader title="Aplicar punição" description="Somente o master pode aplicar punições." />
+          <CardHeader title="Aplicar atraso" description="Somente o super admin pode aplicar." />
           <CardContent>
             <form action={action} className="space-y-3">
               <div>
@@ -129,51 +193,12 @@ export function PenaltiesPanel({
                 </p>
               )}
               <Button type="submit" variant="primary" className="w-full" disabled={pending}>
-                {pending && <Loader2 className="animate-spin" />} Aplicar punição
+                {pending && <Loader2 className="animate-spin" />} Aplicar atraso
               </Button>
             </form>
           </CardContent>
         </Card>
       </div>
-      <Card>
-        <CardHeader title={`Histórico (${history.length})`} />
-        {history.length ? (
-          <div className="overflow-x-auto">
-            <Table>
-              <THead>
-                <TR>
-                  <TH>Jogador</TH>
-                  <TH>Delay</TH>
-                  <TH>Expirou</TH>
-                  <TH>Motivo</TH>
-                  <TH>Aplicado por</TH>
-                </TR>
-              </THead>
-              <tbody>
-                {history.map((h) => (
-                  <TR key={h.id}>
-                    <TD className="font-medium">{h.userName}</TD>
-                    <TD className="tabular">{delayLabel(h.delaySeconds)}</TD>
-                    <TD className="text-muted">
-                      {h.isActive
-                        ? h.expiresAt
-                          ? `Ativa até ${formatDate(h.expiresAt)}`
-                          : "Permanente"
-                        : h.expiresAt && new Date(h.expiresAt) < new Date()
-                          ? `Sim (${formatDate(h.expiresAt)})`
-                          : "Removida"}
-                    </TD>
-                    <TD className="text-muted">{h.reason}</TD>
-                    <TD className="text-muted">{h.appliedBy}</TD>
-                  </TR>
-                ))}
-              </tbody>
-            </Table>
-          </div>
-        ) : (
-          <EmptyState icon={ShieldAlert} title="Nenhuma punição aplicada ainda" className="py-8" />
-        )}
-      </Card>
     </div>
   );
 }

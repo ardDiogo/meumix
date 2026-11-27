@@ -449,3 +449,25 @@ export async function recalcPtsFromGc(): Promise<RoleChangeResult> {
     message: `PTS recalculada em ${byMatch.size} mixes da GC (${(changed as number) ?? rows.length} jogadores atualizados). MVP e ELO refeitos.`,
   };
 }
+
+/** Admin: manda um aviso de teste só para os aparelhos de quem pediu. */
+export async function sendTestPush(): Promise<RoleChangeResult> {
+  const session = await getSession();
+  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores." };
+  const { sendPush } = await import("@/services/push");
+  const n = await sendPush(
+    { userIds: [session!.id] },
+    {
+      title: "🔔 Aviso de teste do MeuMix",
+      body: "Se chegou, os avisos estão funcionando.",
+      url: "/dashboard",
+      tag: "teste",
+    },
+  );
+  return n > 0
+    ? { ok: true, message: `Aviso enviado para ${n} aparelho${n === 1 ? "" : "s"} seu${n === 1 ? "" : "s"}.` }
+    : {
+        ok: false,
+        message: "Nenhum aparelho seu recebeu: ative os avisos em Configurações (no celular) e tente de novo.",
+      };
+}

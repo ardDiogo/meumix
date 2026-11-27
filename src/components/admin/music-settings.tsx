@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Play, Square } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { saveMusic } from "@/app/(app)/admin/config-actions";
@@ -11,6 +11,7 @@ import { Switch } from "../ui/switch";
 export function MusicSettings({ enabled, url }: { enabled: boolean; url: string | null }) {
   const [on, setOn] = useState(enabled);
   const [link, setLink] = useState(url ?? "");
+  const [preview, setPreview] = useState<HTMLAudioElement | null>(null);
   const [pending, start] = useTransition();
   const save = (nextOn: boolean) =>
     start(async () => {
@@ -42,6 +43,26 @@ export function MusicSettings({ enabled, url }: { enabled: boolean; url: string 
             placeholder="https://…/musica.mp3"
             autoComplete="off"
           />
+          <Button
+            variant="secondary"
+            disabled={!/^https?:\/\//.test(link.trim())}
+            title="Ouvir o arquivo antes de ligar para todo mundo"
+            onClick={() => {
+              if (preview) {
+                preview.pause();
+                setPreview(null);
+                return;
+              }
+              const audio = new Audio(link.trim());
+              audio.onended = () => setPreview(null);
+              audio.play().then(
+                () => setPreview(audio),
+                () => toast.error("Não foi possível tocar esse link. Confira se é um arquivo de áudio direto."),
+              );
+            }}
+          >
+            {preview ? <Square /> : <Play />} {preview ? "Parar" : "Ouvir"}
+          </Button>
           <Button variant="outline" disabled={pending || link === (url ?? "")} onClick={() => save(on)}>
             {pending && <Loader2 className="animate-spin" />} Salvar link
           </Button>

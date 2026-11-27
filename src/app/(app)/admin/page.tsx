@@ -1,4 +1,5 @@
 import { MixTimeline } from "@/components/admin/mix-timeline";
+import { PushTestButton } from "@/components/admin/push-test-button";
 import {
   Award,
   Bell,
@@ -12,7 +13,6 @@ import {
   LockKeyhole,
   LogIn,
   Settings,
-  ShieldAlert,
   Swords,
   Trophy,
   Network,
@@ -226,7 +226,12 @@ export default async function AdminPage({ searchParams }: PageProps<"/admin">) {
           <UsersPanel canManageAdmins={canManageAdmins} currentUserId={session!.id} />
         </div>
       )}
-      {tab === "configuracoes" && <SettingsTab canManageAdmins={canManageAdmins} />}
+      {tab === "configuracoes" && (
+        <SettingsTab
+          canManageAdmins={canManageAdmins}
+          secao={typeof params.secao === "string" ? params.secao : undefined}
+        />
+      )}
     </>
   );
 }
@@ -441,95 +446,178 @@ async function LogsTab({
   );
 }
 
-async function SettingsTab({ canManageAdmins }: { canManageAdmins: boolean }) {
-  const [features, musicUrl, maps, levels] = await Promise.all([
+const SETTINGS_SECTIONS = {
+  mix: "Mix",
+  punicoes: "Punições",
+  mapas: "Mapas",
+  niveis: "Níveis",
+  integracoes: "Integrações",
+} as const;
+type SettingsSection = keyof typeof SETTINGS_SECTIONS;
+
+/** Onde a configuração vale (todas as configurações daqui são da plataforma, não de uma liga). */
+function Scope({ children = "Todas as ligas" }: { children?: React.ReactNode }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted normal-case">
+      Vale para: {children}
+    </span>
+  );
+}
+
+async function SettingsTab({ canManageAdmins, secao }: { canManageAdmins: boolean; secao?: string }) {
+  // Punições: só o super admin (as outras seções aparecem para os admins da plataforma).
+  const sections = (Object.keys(SETTINGS_SECTIONS) as SettingsSection[]).filter(
+    (k) => k !== "punicoes" || canManageAdmins,
+  );
+  const section: SettingsSection = sections.includes(secao as SettingsSection) ? (secao as SettingsSection) : "mix";
+  const [features, musicUrl, maps, levels, elos] = await Promise.all([
     getFeatures(),
-    getAppSetting("music_url"),
-    listAllMaps(),
-    getLevels(),
+    section === "mix" ? getAppSetting("music_url") : Promise.resolve(null),
+    section === "mapas" ? listAllMaps() : Promise.resolve([]),
+    section === "niveis" ? getLevels() : Promise.resolve([]),
+    section === "niveis" ? getDataSource().getElos() : Promise.resolve(new Map<string, number>()),
   ]);
   const title = (Icon: typeof Settings, text: string, className?: string) => (
-    <span className="flex items-center gap-2">
+    <span className="flex flex-wrap items-center gap-2">
       <Icon className={className ?? "size-4 text-muted"} aria-hidden /> {text}
     </span>
   );
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader
-          title={title(UsersRound, "Funcionalidades do mix")}
-          description="Ative ou desative funcionalidades do mix."
-        />
-        <FeatureToggles values={features} />
-      </Card>
-      <Card>
-        <CardHeader
-          title={title(Music, "Música de fundo")}
-          description="Toca automaticamente uma música ao abrir o site. Alguns navegadores exigem um clique inicial antes de liberar o áudio."
-        />
-        <MusicSettings enabled={features.background_music} url={musicUrl} />
-      </Card>
-      {canManageAdmins && (
-        <Card>
-          <CardHeader
-            title={title(UsersRound, "PTS, MVP e ELO")}
-            description="PTS = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte não trocada (sem dados de trade da GC: −1,5 por morte). Depois da migração 0060, use o botão para preencher as mortes trocadas dos mixes antigos da GC e refazer o MVP e o ELO."
-          />
-          <CardContent>
-            <RecalcPtsButton />
-          </CardContent>
-        </Card>
+      <FilterTabs
+        label="Seção das configurações"
+        current={section}
+        options={sections.map((value) => ({
+          value,
+          label: SETTINGS_SECTIONS[value],
+          href: value === "mix" ? "/admin?aba=configuracoes" : `/admin?aba=configuracoes&secao=${value}`,
+        }))}
+      />
+
+      {section === "mix" && (
+        <>
+          <Card>
+            <CardHeader
+              title={title(UsersRound, "Funcionalidades do mix")}
+              description="Ative ou desative funcionalidades do mix."
+              action={<Scope />}
+            />
+            <FeatureToggles values={features} />
+          </Card>
+          <Card>
+            <CardHeader
+              title={title(Music, "Música de fundo")}
+              description="Toca automaticamente uma música ao abrir o site. Alguns navegadores exigem um clique inicial antes de liberar o áudio."
+              action={<Scope />}
+            />
+            <MusicSettings enabled={features.background_music} url={musicUrl} />
+          </Card>
+          {canManageAdmins && (
+            <Card>
+              <CardHeader
+                title={title(UsersRound, "PTS, MVP e ELO")}
+                description="Como a pontuação do mix (PTS) é calculada. Depois da migração 0060, use o botão para preencher as mortes trocadas dos mixes antigos da GC e refazer o MVP e o ELO."
+                action={<Scope />}
+              />
+              <CardContent className="space-y-3">
+                <div className="rounded-md border border-border bg-surface-2/50 px-3 py-2 font-mono text-xs leading-relaxed">
+                  <span className="text-brand">PTS</span> = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR
+                  <br />
+                  <span className="invisible">PTS</span> − 0,5 × morte trocada − 1,5 × morte não trocada
+                  <div className="mt-1 font-sans text-[11px] text-subtle">
+                    Sem dados de trade da GC: −1,5 por morte.
+                  </div>
+                </div>
+                <RecalcPtsButton />
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
-      {canManageAdmins && (
-        <div>
-          <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-bold">
-            <ShieldAlert className="size-5 text-loss" aria-hidden /> Punições
-          </h2>
-          <p className="mb-3 text-sm text-muted">
-            Regras automáticas de falta e suspensão, e o atraso de inscrição aplicado à mão.
+
+      {section === "punicoes" && canManageAdmins && (
+        <>
+          <p className="text-sm text-muted">
+            Regras automáticas de falta e suspensão, e o atraso de inscrição aplicado à mão.{" "}
+            <Scope>todas as ligas (as faltas contam por liga)</Scope>
           </p>
-          <div className="space-y-4">
-            <PunishmentRulesSection features={features} />
-            <PenaltiesSection />
-          </div>
-        </div>
+          <PunishmentRulesSection features={features} />
+          <PenaltiesSection />
+        </>
       )}
-      <Card>
-        <CardHeader
-          title={title(MapIcon, "Gerenciamento de mapas")}
-          description="Configure os mapas disponíveis para votação nos mixes. Arraste para reordenar."
-        />
-        {maps.length ? (
-          <MapsManager maps={maps} />
-        ) : (
-          <CardContent>
-            <p className="text-sm text-muted">Banco de dados não configurado.</p>
-          </CardContent>
-        )}
-      </Card>
-      <Card>
-        <CardHeader
-          title={title(Trophy, "Configuração de níveis")}
-          description="Configure os níveis de ELO e suas faixas de pontuação. Os jogadores são classificados automaticamente com base no ELO acumulado nos resultados dos mixes."
-        />
-        <LevelsEditor levels={levels} canEdit={canManageAdmins} />
-      </Card>
-      {canManageAdmins && (
+
+      {section === "mapas" && (
         <Card>
           <CardHeader
-            title={title(Bell, "Avisos no celular")}
-            description="Notificações do MeuMix (lista abrindo, PICK, bolão, resultado e lives). Cada jogador ativa em Configurações."
+            title={title(MapIcon, "Gerenciamento de mapas")}
+            description="Configure os mapas disponíveis para votação nos mixes. Arraste para reordenar."
+            action={<Scope />}
           />
-          <PushAdminStatus />
+          {maps.length ? (
+            <MapsManager maps={maps} />
+          ) : (
+            <CardContent>
+              <p className="text-sm text-muted">Banco de dados não configurado.</p>
+            </CardContent>
+          )}
         </Card>
       )}
-      <Card>
-        <CardHeader
-          title={title(Plug, "API do CSRep")}
-          description="Diagnóstico da integração: busca a especificação da API e testa endpoints usando a chave salva na Vercel."
-        />
-        <CsrepApiPanel configured={csrepApiConfigured()} />
-      </Card>
+
+      {section === "niveis" && (
+        <Card>
+          <CardHeader
+            title={title(Trophy, "Configuração de níveis")}
+            description="Faixas de ELO de cada nível. O mínimo de cada nível é o máximo do anterior + 1. A contagem de jogadores é da liga escolhida no topo."
+            action={<Scope />}
+          />
+          <LevelsEditor levels={levels} canEdit={canManageAdmins} elos={[...elos.values()]} />
+        </Card>
+      )}
+
+      {section === "integracoes" && (
+        <>
+          {canManageAdmins && (
+            <Card>
+              <CardHeader
+                title={title(Bell, "Avisos no celular")}
+                description="Notificações do MeuMix (lista abrindo, PICK, bolão, resultado e lives). Cada jogador ativa em Configurações."
+                action={<Scope />}
+              />
+              <PushAdminStatus />
+            </Card>
+          )}
+          {/* Ferramenta de desenvolvedor: só o super admin, recolhida. */}
+          {canManageAdmins && (
+            <Card>
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2 [&::-webkit-details-marker]:hidden">
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 font-display text-sm font-semibold tracking-wide uppercase">
+                      <Plug className="size-4 text-muted" aria-hidden /> API do CSRep
+                      <span className="text-[10px] font-normal tracking-normal text-subtle normal-case">avançado</span>
+                    </span>
+                    <span className="mt-0.5 block text-xs text-muted">
+                      Diagnóstico da integração: busca a especificação da API e testa endpoints com a chave salva na
+                      Vercel.
+                    </span>
+                  </span>
+                  <span className="text-muted transition-transform group-open:rotate-90">▸</span>
+                </summary>
+                <div className="border-t border-border">
+                  <CsrepApiPanel configured={csrepApiConfigured()} />
+                </div>
+              </details>
+            </Card>
+          )}
+          {!canManageAdmins && (
+            <Card>
+              <p className="px-4 py-6 text-center text-sm text-muted">
+                As integrações são configuradas pelo super admin.
+              </p>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -570,6 +658,7 @@ async function PushAdminStatus() {
         Avisos por horário (inscrições abrindo, vagas, bolão fechando e lives) dependem do agendador chamando{" "}
         <code>/api/cron/avisos</code> a cada 5 minutos.
       </p>
+      {!error && <PushTestButton />}
     </CardContent>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useState, useTransition, Fragment } from "react";
 import { toast } from "sonner";
 import { addMap, deleteMap, reorderMaps, setMapActive } from "@/app/(app)/admin/config-actions";
 import type { ManagedMap } from "@/services/maps";
@@ -97,88 +97,103 @@ export function MapsManager({ maps }: { maps: ManagedMap[] }) {
       </form>
 
       <ul className="space-y-2">
-        {list.map((m, i) => (
-          <li
-            key={m.id}
-            draggable
-            onDragStart={() => setDragId(m.id)}
-            onDragEnd={() => setDragId(null)}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (!dragId || dragId === m.id) return;
-              const next = list.filter((x) => x.id !== dragId);
-              next.splice(
-                i,
-                0,
-                list.find((x) => x.id === dragId)!,
-              );
-              setDragId(null);
-              commitOrder(next);
-            }}
-            className={cn(
-              "flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
-              m.active ? "border-border bg-surface-2" : "border-border/60 bg-surface",
-              dragId === m.id && "opacity-50",
-            )}
-          >
-            <GripVertical className="size-4 shrink-0 cursor-grab text-subtle" aria-hidden />
-            <MapIcon id={m.id as MapId} size={28} className={cn(!m.active && "opacity-50 grayscale")} />
-            <div className={cn("min-w-0 flex-1", !m.active && "text-muted")}>
-              <span className="font-semibold">{m.name}</span>
-              {m.shortName && <span className="ml-1.5 text-sm text-muted">({m.shortName})</span>}
-            </div>
-            <div className="flex items-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`Subir ${m.name}`}
-                disabled={pending || i === 0}
-                onClick={() => move(i, -1)}
-                className="px-1.5"
+        {/* Ativos primeiro; os inativos num grupo no fim (a ordem salva continua a mesma). */}
+        {[...list.filter((m) => m.active), ...list.filter((m) => !m.active)].map((m, shownAt, shown) => {
+          const i = list.indexOf(m);
+          const firstInactive = !m.active && (shownAt === 0 || shown[shownAt - 1]!.active);
+          return (
+            <Fragment key={m.id}>
+              {firstInactive && (
+                <li className="pt-2 text-[11px] font-semibold tracking-wider text-muted uppercase">
+                  Inativos ({list.length - active})
+                </li>
+              )}
+              <li
+                draggable
+                onDragStart={() => setDragId(m.id)}
+                onDragEnd={() => setDragId(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (!dragId || dragId === m.id) return;
+                  const next = list.filter((x) => x.id !== dragId);
+                  next.splice(
+                    i,
+                    0,
+                    list.find((x) => x.id === dragId)!,
+                  );
+                  setDragId(null);
+                  commitOrder(next);
+                }}
+                className={cn(
+                  "group/map flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors",
+                  m.active ? "border-border bg-surface-2" : "border-border/60 bg-surface",
+                  dragId === m.id && "opacity-50",
+                )}
               >
-                <ArrowUp />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`Descer ${m.name}`}
-                disabled={pending || i === list.length - 1}
-                onClick={() => move(i, 1)}
-                className="px-1.5"
-              >
-                <ArrowDown />
-              </Button>
-            </div>
-            <span className={cn("hidden w-12 text-right text-sm font-medium sm:block", !m.active && "text-muted")}>
-              {m.active ? "Ativo" : "Inativo"}
-            </span>
-            <Switch
-              label={`${m.name} ativo`}
-              checked={m.active}
-              pending={busy === `toggle-${m.id}`}
-              disabled={pending}
-              onChange={(next) => {
-                setList((l) => l.map((x) => (x.id === m.id ? { ...x, active: next } : x)));
-                run(
-                  `toggle-${m.id}`,
-                  () => setMapActive(m.id, next),
-                  () => setList((l) => l.map((x) => (x.id === m.id ? { ...x, active: !next } : x))),
-                );
-              }}
-            />
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Excluir ${m.name}`}
-              disabled={pending}
-              className="px-1.5 text-loss hover:text-loss"
-              onClick={() => confirm(`Excluir o mapa ${m.name}?`) && run(`del-${m.id}`, () => deleteMap(m.id))}
-            >
-              {busy === `del-${m.id}` ? <Loader2 className="animate-spin" /> : <Trash2 />}
-            </Button>
-          </li>
-        ))}
+                <GripVertical className="size-4 shrink-0 cursor-grab text-subtle" aria-hidden />
+                <MapIcon id={m.id as MapId} size={28} className={cn(!m.active && "opacity-50 grayscale")} />
+                <div className={cn("min-w-0 flex-1", !m.active && "text-muted")}>
+                  <span className="font-semibold">{m.name}</span>
+                  {m.shortName && <span className="ml-1.5 text-sm text-muted">({m.shortName})</span>}
+                </div>
+                <div className="flex items-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Subir ${m.name}`}
+                    disabled={pending || i === 0}
+                    onClick={() => move(i, -1)}
+                    className="px-1.5"
+                  >
+                    <ArrowUp />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Descer ${m.name}`}
+                    disabled={pending || i === list.length - 1}
+                    onClick={() => move(i, 1)}
+                    className="px-1.5"
+                  >
+                    <ArrowDown />
+                  </Button>
+                </div>
+                <span className={cn("hidden w-12 text-right text-sm font-medium sm:block", !m.active && "text-muted")}>
+                  {m.active ? "Ativo" : "Inativo"}
+                </span>
+                <Switch
+                  label={`${m.name} ativo`}
+                  checked={m.active}
+                  pending={busy === `toggle-${m.id}`}
+                  disabled={pending}
+                  onChange={(next) => {
+                    setList((l) => l.map((x) => (x.id === m.id ? { ...x, active: next } : x)));
+                    run(
+                      `toggle-${m.id}`,
+                      () => setMapActive(m.id, next),
+                      () => setList((l) => l.map((x) => (x.id === m.id ? { ...x, active: !next } : x))),
+                    );
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Excluir ${m.name}`}
+                  disabled={pending}
+                  // Discreta: no computador só aparece ao passar o mouse.
+                  className="px-1.5 text-subtle transition-opacity hover:text-loss focus-visible:opacity-100 sm:opacity-0 sm:group-hover/map:opacity-100"
+                  onClick={() =>
+                    confirm(`Excluir o mapa ${m.name}? Para só tirar da votação, desative.`) &&
+                    run(`del-${m.id}`, () => deleteMap(m.id))
+                  }
+                >
+                  {busy === `del-${m.id}` ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                </Button>
+              </li>
+            </Fragment>
+          );
+        })}
       </ul>
       <p className="text-sm text-muted">
         <span className="font-semibold text-fg">{active}</span> mapas ativos de {list.length} cadastrados

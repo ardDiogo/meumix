@@ -4,16 +4,29 @@ import { Loader2, Save } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { saveLevels } from "@/app/(app)/admin/config-actions";
-import { validateLevels, type LevelDef } from "@/lib/levels";
+import { levelForElo, validateLevels, type LevelDef } from "@/lib/levels";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Table, TD, TH, THead, TR } from "../ui/table";
 
-export function LevelsEditor({ levels, canEdit }: { levels: LevelDef[]; canEdit: boolean }) {
+export function LevelsEditor({
+  levels,
+  canEdit,
+  elos = [],
+}: {
+  levels: LevelDef[];
+  canEdit: boolean;
+  /** ELO dos jogadores (para contar quantos há em cada nível e quantos mudariam). */
+  elos?: number[];
+}) {
   const [rows, setRows] = useState(levels);
   const [pending, start] = useTransition();
   const changed = JSON.stringify(rows) !== JSON.stringify(levels);
   const error = changed ? validateLevels(rows) : null;
+  const countIn = (lv: number, table: LevelDef[]) => elos.filter((e) => levelForElo(e, table).level === lv).length;
+  // Quem muda de nível com a tabela editada (antes de salvar).
+  const moved =
+    changed && !error ? elos.filter((e) => levelForElo(e, levels).level !== levelForElo(e, rows).level) : [];
 
   const update = (i: number, patch: Partial<LevelDef>) =>
     setRows((list) =>
@@ -32,9 +45,10 @@ export function LevelsEditor({ levels, canEdit }: { levels: LevelDef[]; canEdit:
           <THead>
             <TR>
               <TH>Nível</TH>
-              <TH>ELO mínimo</TH>
+              <TH title="Calculado: o máximo do nível anterior + 1">ELO mínimo</TH>
               <TH>ELO máximo</TH>
               <TH>GAP</TH>
+              {elos.length > 0 && <TH title="Jogadores neste nível (liga atual)">Jogadores</TH>}
               <TH>Cor</TH>
             </TR>
           </THead>
@@ -42,17 +56,8 @@ export function LevelsEditor({ levels, canEdit }: { levels: LevelDef[]; canEdit:
             {rows.map((l, i) => (
               <TR key={l.level}>
                 <TD className="font-display font-bold">{l.level}</TD>
-                <TD>
-                  <Input
-                    aria-label={`ELO mínimo do nível ${l.level}`}
-                    type="number"
-                    inputMode="numeric"
-                    value={l.min}
-                    disabled={!canEdit || i === 0}
-                    onChange={(e) => update(i, { min: Number(e.target.value) })}
-                    className="w-24 tabular"
-                  />
-                </TD>
+                {/* O mínimo acompanha o máximo do nível anterior (não se edita). */}
+                <TD className="text-muted tabular">{l.min}</TD>
                 <TD>
                   <Input
                     aria-label={`ELO máximo do nível ${l.level}`}
@@ -65,6 +70,22 @@ export function LevelsEditor({ levels, canEdit }: { levels: LevelDef[]; canEdit:
                   />
                 </TD>
                 <TD className="text-muted tabular">{l.max - l.min}</TD>
+                {elos.length > 0 && (
+                  <TD className="tabular">
+                    {(() => {
+                      const now = countIn(l.level, levels);
+                      const next = countIn(l.level, rows);
+                      return (
+                        <span>
+                          {now}
+                          {changed && next !== now && (
+                            <span className={next > now ? "text-win" : "text-loss"}> → {next}</span>
+                          )}
+                        </span>
+                      );
+                    })()}
+                  </TD>
+                )}
                 <TD>
                   <div className="flex items-center gap-2">
                     <input
@@ -90,6 +111,12 @@ export function LevelsEditor({ levels, canEdit }: { levels: LevelDef[]; canEdit:
           </tbody>
         </Table>
       </div>
+      {moved.length > 0 && (
+        <p className="text-sm text-yellow-400">
+          Ao salvar, {moved.length} jogador{moved.length === 1 ? "" : "es"} muda{moved.length === 1 ? "" : "m"} de
+          nível.
+        </p>
+      )}
       {error && (
         <p role="alert" className="text-sm text-loss">
           {error}
@@ -99,7 +126,7 @@ export function LevelsEditor({ levels, canEdit }: { levels: LevelDef[]; canEdit:
         <p className="text-xs text-subtle">
           {canEdit
             ? "Ao salvar, o nível de todos os jogadores é recalculado pelo ELO atual."
-            : "Somente o master pode alterar os níveis."}
+            : "Somente o super admin pode alterar os níveis."}
         </p>
         {canEdit && (
           <div className="flex gap-2">
