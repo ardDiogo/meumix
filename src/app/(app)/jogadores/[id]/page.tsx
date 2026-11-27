@@ -41,7 +41,9 @@ import { PlayerForm } from "@/components/players/player-form";
 import { formSeries, mapRecords } from "@/lib/player-form";
 import { toClipViews } from "@/services/clips";
 import { mapName } from "@/lib/maps";
-import { aggregatePlayer, seriesScore } from "@/lib/stats";
+import { aggregatePlayer, playerResult, playerSide, seriesScore } from "@/lib/stats";
+import { getGcCareer } from "@/services/gc-maps";
+import type { CompareSide } from "@/components/players/compare-players";
 import { mixesInPeriod, parsePlayerPeriod, playerPeriods } from "@/lib/player-period";
 import { PeriodSelect } from "@/components/players/period-select";
 import { getDataSource } from "@/services";
@@ -131,6 +133,74 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
     feed.highlights.filter((h) => h.playerId === player.id),
     { players: feed.players, mixes: feed.mixes, viewerId: session?.id ?? null, canManage: canManageMixes },
   );
+
+  // Comparação: ELO, dados da GC, PTS média, frente a frente e mapas em comum.
+  const compareExtra = other
+    ? await (async () => {
+        const gc = kind === "supabase" ? await getGcCareer().catch(() => []) : [];
+        const sideOf = (pid: string, elo: number, mixes: typeof playedMixes): CompareSide => {
+          const line = gc.find((l) => l.userId === pid);
+          const pts = mixes.map((m) => {
+            const a = aggregatePlayer(pid, [m]);
+            return mvpScore({
+              kills: a.kills,
+              deaths: a.deaths,
+              assists: a.assists,
+              firstKills: a.firstKills,
+              adr: a.adr,
+            });
+          });
+          return {
+            elo,
+            rating: line?.rating ?? null,
+            hsRate: line?.hsRate ?? null,
+            ptsAvg: pts.length ? pts.reduce((x, y) => x + y, 0) / pts.length : null,
+          };
+        };
+        const otherMixes = other.recentMixes.map((r) => r.mix);
+        // Mixes em que os dois jogaram: no mesmo time ou um contra o outro.
+        const together = { played: 0, won: 0, lost: 0 };
+        const against = { played: 0, mine: 0, theirs: 0 };
+        for (const m of playedMixes) {
+          const a = playerSide(m, player.id);
+          const b = playerSide(m, other.player.id);
+          if (!a || !b) continue;
+          const res = playerResult(m, player.id);
+          if (a === b) {
+            together.played++;
+            if (res === "win") together.won++;
+            if (res === "loss") together.lost++;
+          } else {
+            against.played++;
+            if (res === "win") against.mine++;
+            if (res === "loss") against.theirs++;
+          }
+        }
+        const mine = mapRecords(playedMixes, player.id);
+        const theirs = mapRecords(otherMixes, other.player.id);
+        const maps = mine
+          .flatMap((r) => {
+            const t = theirs.find((x) => x.mapId === r.mapId);
+            return t
+              ? [
+                  {
+                    mapId: r.mapId,
+                    a: { played: r.played, winRate: r.winRate },
+                    b: { played: t.played, winRate: t.winRate },
+                  },
+                ]
+              : [];
+          })
+          .sort((x, y) => y.a.played + y.b.played - (x.a.played + x.b.played));
+        return {
+          a: sideOf(player.id, elo, playedMixes),
+          b: sideOf(other.player.id, other.elo, otherMixes),
+          together,
+          against,
+          maps,
+        };
+      })()
+    : null;
 
   // ±ELO de cada mix e a posição pela PTS entre os jogadores do mix.
   const eloOfMix = new Map(eloHistory.filter((h) => h.mixId).map((h) => [h.mixId, h.eloAfter - h.eloBefore]));
@@ -441,6 +511,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         player={player}
         stats={stats}
         other={other && { player: other.player, stats: other.stats }}
+        extra={compareExtra}
         options={allPlayers
           .filter((p) => p.player.id !== player.id)
           .map((p) => ({ id: p.player.id, label: `${p.player.nickname} (ELO ${p.elo})` }))}
