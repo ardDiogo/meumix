@@ -33,9 +33,12 @@ import { formatDate, formatDecimal, formatPercent } from "@/lib/format";
 import { steamProfileUrl } from "@/lib/integrations/steam";
 import { allstarProfileUrl } from "@/lib/allstar";
 import { ClipCard } from "@/components/clips/clip-card";
-import { MapRecords, RecentMatches } from "@/components/players/map-records";
+import { MapRecords } from "@/components/players/map-records";
+import { LevelProgress } from "@/components/dashboard/elo-progress";
+import { mvpScore } from "@/lib/match-rules";
+import { cn } from "@/lib/utils";
 import { PlayerForm } from "@/components/players/player-form";
-import { formSeries, mapRecords, mapTimeline } from "@/lib/player-form";
+import { formSeries, mapRecords } from "@/lib/player-form";
 import { toClipViews } from "@/services/clips";
 import { mapName } from "@/lib/maps";
 import { aggregatePlayer, seriesScore } from "@/lib/stats";
@@ -109,7 +112,6 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
     period.value === "geral" ? stats : aggregatePlayer(player.id, mixesInPeriod(playedMixes, period.value, ds.now()));
   const formPoints = formSeries(playedMixes, player.id);
   const mapRecs = mapRecords(playedMixes, player.id);
-  const timeline = mapTimeline(playedMixes, player.id);
   const [{ session, canManageMixes }, csrep, allBadges, feed, twitchLogin, live, catalog, progress] = await Promise.all(
     [
       getPermissions(),
@@ -129,6 +131,22 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
     feed.highlights.filter((h) => h.playerId === player.id),
     { players: feed.players, mixes: feed.mixes, viewerId: session?.id ?? null, canManage: canManageMixes },
   );
+
+  // ±ELO de cada mix e a posição pela PTS entre os jogadores do mix.
+  const eloOfMix = new Map(eloHistory.filter((h) => h.mixId).map((h) => [h.mixId, h.eloAfter - h.eloBefore]));
+  const positionOf = (mix: (typeof playedMixes)[number]): [number, number] | null => {
+    const ids = [...new Set(mix.teams.flatMap((t) => t.playerIds))];
+    const pts = ids.map((pid) => {
+      const a = aggregatePlayer(pid, [mix]);
+      return {
+        pid,
+        v: mvpScore({ kills: a.kills, deaths: a.deaths, assists: a.assists, firstKills: a.firstKills, adr: a.adr }),
+      };
+    });
+    const mine = pts.find((x) => x.pid === player.id);
+    if (!mine || pts.length < 2 || pts.every((x) => x.v === 0)) return null;
+    return [1 + pts.filter((x) => x.v > mine.v).length, pts.length];
+  };
 
   return (
     <>
@@ -167,10 +185,6 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
               </ul>
             )}
             <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-              <div className="flex gap-1.5">
-                <dt className="text-muted">Steam ID</dt>
-                <dd className="tabular">{player.steamId ?? <span className="text-subtle">não vinculado</span>}</dd>
-              </div>
               <div className="flex gap-1.5">
                 <dt className="text-muted">Membro desde</dt>
                 <dd>{formatDate(player.createdAt)}</dd>
@@ -226,6 +240,9 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 </div>
                 <Delta value={recentChange} className="mt-0.5" />
                 <div className="text-[10px] text-subtle">em 30 dias</div>
+                <div className="mt-1 w-36 sm:ml-auto">
+                  <LevelProgress elo={elo} />
+                </div>
               </div>
               <div>
                 <div className="text-[11px] font-semibold tracking-wider text-muted uppercase">Ranking</div>
@@ -241,7 +258,31 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
         <LeagueTabs tabs={leagueTabs.tabs} active={leagueTabs.active} basePath={playerHref(player)} compare={otherId} />
       )}
 
-      <Card aria-label="Resumo do período">
+      {/* Atalhos para as seções (a página é longa). */}
+      <nav
+        aria-label="Seções do perfil"
+        className="sticky top-16 z-20 -mx-4 mb-4 flex gap-1 overflow-x-auto border-y border-border bg-bg/90 px-4 py-2 text-sm backdrop-blur sm:mx-0 sm:rounded-lg sm:border"
+      >
+        {[
+          ["resumo", "Resumo"],
+          ["mapas", "Mapas"],
+          ["insignias", "Insígnias"],
+          ["forma", "Forma"],
+          ...(clips.length > 0 || allstarUrl ? [["clipes", "Clipes"]] : []),
+          ...(csrep ? [["csrep", "CSRep"]] : []),
+          ["historico", "Histórico"],
+        ].map(([id, label]) => (
+          <a
+            key={id}
+            href={`#${id}`}
+            className="shrink-0 rounded-md px-2.5 py-1 text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+          >
+            {label}
+          </a>
+        ))}
+      </nav>
+
+      <Card aria-label="Resumo do período" id="resumo" className="scroll-mt-32">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div>
             <h2 className="font-display text-sm font-semibold tracking-wide uppercase">Resumo do período</h2>
@@ -265,7 +306,13 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 value={
                   <>
                     <span className="text-win">{periodStats.wins}V</span>
-                    <span className="text-subtle"> / </span>
+                    {periodStats.draws > 0 && (
+                      <>
+                        <span className="text-subtle"> · </span>
+                        <span className="text-draw">{periodStats.draws}E</span>
+                      </>
+                    )}
+                    <span className="text-subtle"> · </span>
                     <span className="text-loss">{periodStats.losses}D</span>
                   </>
                 }
@@ -329,18 +376,28 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
             )}
           </CardContent>
           <div className="border-t border-border p-4">
-            <div className="mb-2 text-[11px] font-semibold tracking-wider text-muted uppercase">Últimos resultados</div>
+            <div className="mb-2 flex flex-wrap items-baseline gap-x-2 text-[11px] font-semibold tracking-wider text-muted uppercase">
+              Últimos resultados
+              <span className="font-normal tracking-normal text-subtle normal-case">mais recente à direita →</span>
+            </div>
             <FormStrip
               results={recentMixes
                 .slice(0, 15)
                 .reverse()
                 .map((r) => r.result)}
+              titles={recentMixes
+                .slice(0, 15)
+                .reverse()
+                .map((r) => `${r.mix.name} · ${r.kills}/${r.assists}/${r.deaths}`)}
             />
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="Destaques individuais" description="Últimos 10 mixes" />
+          <CardHeader
+            title="Destaques individuais"
+            description={`Últimos ${Math.min(10, recentMixes.length)} ${Math.min(10, recentMixes.length) === 1 ? "mix" : "mixes"}`}
+          />
           <dl className="grid grid-cols-2 gap-px bg-border">
             <Highlight icon={Trophy} label="MVPs (total)" value={stats.mvps} />
             <Highlight
@@ -350,6 +407,13 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 highlights.bestRecent
                   ? `${highlights.bestRecent.kills}/${highlights.bestRecent.assists}/${highlights.bestRecent.deaths}`
                   : "—"
+              }
+              detail={
+                highlights.bestRecent && (
+                  <Link href={mixHref(highlights.bestRecent.mix)} className="hover:text-brand">
+                    {highlights.bestRecent.mix.name}
+                  </Link>
+                )
               }
             />
             <Highlight icon={ShieldCheck} label="Clutches" value={highlights.clutchesWon} />
@@ -369,8 +433,9 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
       </div>
 
       {/* Partidas e mapas logo abaixo de ELO e destaques; insígnias depois. */}
-      <RecentMatches timeline={timeline} />
-      <MapRecords records={mapRecs} />
+      <div id="mapas" className="scroll-mt-32">
+        <MapRecords records={mapRecs} />
+      </div>
 
       <ComparePlayers
         player={player}
@@ -383,12 +448,16 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
 
       {liveItems.length > 0 && <TwitchStreams className="mt-4" title="Ao vivo agora" items={liveItems} />}
 
-      <PlayerBadgesCard badges={allBadges} catalog={catalog ?? []} progress={progress} />
+      <div id="insignias" className="scroll-mt-32">
+        <PlayerBadgesCard badges={allBadges} catalog={catalog ?? []} progress={progress} />
+      </div>
 
-      <PlayerForm points={formPoints} />
+      <div id="forma" className="scroll-mt-32">
+        <PlayerForm points={formPoints} />
+      </div>
 
       {(clips.length > 0 || allstarUrl) && (
-        <Card className="mt-4">
+        <Card className="mt-4 scroll-mt-32" id="clipes">
           <CardHeader
             title="Clipes"
             description={
@@ -421,15 +490,20 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
       )}
 
       {csrep && (
-        <CsrepCard
-          userId={player.id}
-          view={csrep}
-          canEdit={!!session && (session.id === player.id || canManageMixes)}
-        />
+        <div id="csrep" className="scroll-mt-32">
+          <CsrepCard
+            userId={player.id}
+            view={csrep}
+            canEdit={!!session && (session.id === player.id || canManageMixes)}
+          />
+        </div>
       )}
 
-      <Card className="mt-4">
-        <CardHeader title="Histórico de mixes" description={`${recentMixes.length} partidas`} />
+      <Card className="mt-4 scroll-mt-32" id="historico">
+        <CardHeader
+          title="Histórico de mixes"
+          description={`${recentMixes.length} partidas · placar de cada mapa, ±ELO e a sua posição pela PTS no mix`}
+        />
         {recentMixes.length ? (
           <Table>
             <THead>
@@ -443,12 +517,20 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                 <TH className="text-right">A</TH>
                 <TH className="text-right">D</TH>
                 <TH className="text-right">ADR</TH>
+                <TH className="text-right" title="ELO ganho ou perdido no mix">
+                  ELO
+                </TH>
+                <TH className="text-right" title="Posição pela PTS entre os jogadores do mix">
+                  Posição
+                </TH>
               </TR>
             </THead>
             <tbody>
               {recentMixes.map((r) => {
                 const score = seriesScore(r.mix);
                 const own = score && (r.side === "A" ? score : [score[1], score[0]]);
+                const delta = eloOfMix.get(r.mix.id);
+                const pos = positionOf(r.mix);
                 return (
                   <TR key={r.mix.id} className="hover:bg-surface-2/50">
                     <TD className="text-muted">{formatDate(r.mix.scheduledAt)}</TD>
@@ -468,12 +550,26 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                     </TD>
                     <TD className="text-muted">
                       <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        {r.mix.maps.map((m) => (
-                          <span key={m.order} className="inline-flex items-center gap-1">
-                            <MapIcon id={m.mapId} size={16} />
-                            {mapName(m.mapId)}
-                          </span>
-                        ))}
+                        {r.mix.maps.map((m) => {
+                          const ms = r.side === "A" ? [m.scoreA, m.scoreB] : [m.scoreB, m.scoreA];
+                          const known = ms[0] != null && ms[1] != null;
+                          return (
+                            <span key={m.order} className="inline-flex items-center gap-1">
+                              <MapIcon id={m.mapId} size={16} />
+                              {mapName(m.mapId)}
+                              {known && (
+                                <b
+                                  className={cn(
+                                    "font-display tabular",
+                                    ms[0]! > ms[1]! ? "text-win/80" : ms[0]! < ms[1]! ? "text-loss/80" : "",
+                                  )}
+                                >
+                                  {ms[0]}–{ms[1]}
+                                </b>
+                              )}
+                            </span>
+                          );
+                        })}
                       </span>
                     </TD>
                     <TD className="text-center font-semibold">{own ? `${own[0]}–${own[1]}` : "—"}</TD>
@@ -484,6 +580,15 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                     <TD className="text-right text-muted">{r.assists}</TD>
                     <TD className="text-right text-muted">{r.deaths}</TD>
                     <TD className="text-right">{formatDecimal(r.adr, 1)}</TD>
+                    <TD
+                      className={cn(
+                        "text-right font-semibold tabular",
+                        delta == null ? "text-subtle" : delta >= 0 ? "text-win" : "text-loss",
+                      )}
+                    >
+                      {delta == null ? "—" : `${delta > 0 ? "+" : delta < 0 ? "−" : ""}${Math.abs(delta)}`}
+                    </TD>
+                    <TD className="text-right text-muted tabular">{pos ? `${pos[0]}º de ${pos[1]}` : "—"}</TD>
                   </TR>
                 );
               })}
@@ -505,10 +610,12 @@ function Highlight({
   icon: Icon,
   label,
   value,
+  detail,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: React.ReactNode;
+  detail?: React.ReactNode;
 }) {
   return (
     <div className="bg-surface p-4">
@@ -516,6 +623,7 @@ function Highlight({
         <Icon className="size-3.5" /> {label}
       </dt>
       <dd className="mt-1 font-display text-xl font-bold tabular">{value}</dd>
+      {detail && <dd className="mt-0.5 truncate text-xs text-muted">{detail}</dd>}
     </div>
   );
 }

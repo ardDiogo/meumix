@@ -1,5 +1,5 @@
 import { CheckCircle2, ExternalLink, Sparkles, Target, TriangleAlert } from "lucide-react";
-import { CSREP_METRICS, type AnalysisItem } from "@/lib/csrep";
+import { CSREP_METRICS, csrepPeriodPt, csrepTone, type AnalysisItem } from "@/lib/csrep";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CsrepView } from "@/services/csrep";
@@ -10,6 +10,15 @@ import { CsrepLinkForm, CsrepUpload } from "./csrep-actions";
 
 const fmt = (n: number, digits: number) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+const DAY = 86_400_000;
+const daysSince = (iso: string) => Math.floor((Date.now() - Date.parse(iso)) / DAY);
+const ageText = (iso: string) => {
+  const d = daysSince(iso);
+  return d <= 0 ? "hoje" : d === 1 ? "ontem" : `há ${d} dias`;
+};
+/** Mais de 30 dias: a análise já não reflete o jogo de agora. */
+const stale = (iso: string) => daysSince(iso) > 30;
 
 function ItemList({
   title,
@@ -70,20 +79,64 @@ export function CsrepCard({ userId, view, canEdit }: { userId: string; view: Csr
         {latest ? (
           <>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-              <Badge variant="neutral">{latest.metrics.period || "Período do print"}</Badge>
-              Analisado em {formatDate(latest.createdAt)}
+              <Badge variant="neutral">{csrepPeriodPt(latest.metrics.period)}</Badge>
+              Analisado em {formatDate(latest.createdAt)} ({ageText(latest.createdAt)})
+              {stale(latest.createdAt) && (
+                <Badge variant="neutral" className="border-yellow-500/40 bg-yellow-500/10 text-yellow-300">
+                  desatualizada{canEdit ? " · envie um print novo" : ""}
+                </Badge>
+              )}
             </div>
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {CSREP_METRICS.filter((m) => latest.metrics[m.key] != null).map((m) => (
-                <li key={m.key} className="min-w-0 rounded-lg border border-border bg-surface-2/50 px-3 py-2.5">
-                  <div className="text-[10px] font-semibold tracking-wider text-muted uppercase">{m.label}</div>
-                  <div className="font-display text-2xl font-bold tabular">
-                    {fmt(latest.metrics[m.key]!, m.digits)}
-                    {m.unit && <span className="ml-0.5 text-sm text-muted">{m.unit}</span>}
-                  </div>
-                </li>
-              ))}
+              {CSREP_METRICS.filter((m) => latest.metrics[m.key] != null).map((m) => {
+                const v = latest.metrics[m.key]!;
+                const tone = csrepTone(m, v);
+                return (
+                  <li
+                    key={m.key}
+                    title={`${m.label} no CSRep${m.kind === "stat" ? " — de todas as partidas do período, não só dos mixes" : ""}`}
+                    className={cn(
+                      "min-w-0 rounded-lg border px-3 py-2.5",
+                      tone === "good"
+                        ? "border-win/30 bg-win/5"
+                        : tone === "near"
+                          ? "border-yellow-500/30 bg-yellow-500/5"
+                          : tone === "bad"
+                            ? "border-loss/30 bg-loss/5"
+                            : "border-border bg-surface-2/50",
+                    )}
+                  >
+                    <div className="truncate text-[10px] font-semibold tracking-wider text-muted uppercase">{m.pt}</div>
+                    <div
+                      className={cn(
+                        "font-display text-2xl font-bold tabular",
+                        tone === "good"
+                          ? "text-win"
+                          : tone === "near"
+                            ? "text-yellow-300"
+                            : tone === "bad"
+                              ? "text-loss"
+                              : "",
+                      )}
+                    >
+                      {fmt(v, m.digits)}
+                      {m.unit && <span className="ml-0.5 text-sm text-muted">{m.unit}</span>}
+                    </div>
+                    {m.ref != null && (
+                      <div className="text-[11px] text-subtle">
+                        bom: {m.better === "low" ? "<" : ">"} {fmt(m.ref, m.ref % 1 ? 1 : 0)}
+                        {m.unit}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
+            <p className="text-xs text-subtle">
+              K/D, ADR, rating e KAST aqui são do CSRep ({csrepPeriodPt(latest.metrics.period)}, todas as partidas na
+              plataforma), por isso diferem do resumo do MeuMix, que conta só os mixes. Verde: dentro da referência;
+              amarelo: perto; vermelho: longe.
+            </p>
             <p className="rounded-lg border border-brand/30 bg-brand/5 p-4 text-sm break-words">
               {latest.analysis.summary}
             </p>

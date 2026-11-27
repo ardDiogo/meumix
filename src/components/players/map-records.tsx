@@ -83,106 +83,63 @@ export function RecentMatches({ timeline }: { timeline: TimelineMix[] }) {
   );
 }
 
-/** Rosca (pizza) de vitórias e derrotas com o emblema do mapa no centro. */
-function MapDonut({ record }: { record: MapRecord }) {
-  const size = 104;
-  const stroke = 10;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const lost = record.played - record.won;
-  // 2px de folga entre as fatias quando há as duas.
-  const gap = record.won && lost ? 2 : 0;
-  const winLen = Math.max((record.won / record.played) * c - gap, 0);
-  const lossLen = Math.max((lost / record.played) * c - gap, 0);
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div
-        className="relative"
-        style={{ width: size, height: size }}
-        role="img"
-        aria-label={`${mapName(record.mapId)}: ${record.won} vitórias e ${lost} derrotas`}
-      >
-        <svg width={size} height={size} className="-rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-surface-2)" strokeWidth={stroke} />
-          {record.won > 0 && (
-            <circle
-              cx={size / 2}
-              cy={size / 2}
-              r={r}
-              fill="none"
-              stroke="var(--color-win)"
-              strokeWidth={stroke}
-              strokeDasharray={`${winLen} ${c}`}
-              strokeDashoffset={-gap / 2}
-            />
-          )}
-          {lost > 0 && (
-            <circle
-              cx={size / 2}
-              cy={size / 2}
-              r={r}
-              fill="none"
-              stroke="var(--color-loss)"
-              strokeWidth={stroke}
-              strokeDasharray={`${lossLen} ${c}`}
-              strokeDashoffset={-(winLen + gap * 1.5)}
-            />
-          )}
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center">
-          <MapIcon id={record.mapId} size={58} />
-        </span>
-      </div>
-      <div className="text-center">
-        <div className="text-sm font-medium">{mapName(record.mapId)}</div>
-        <div className="text-xs tabular">
-          <span className="font-semibold text-fg">{record.winRate}%</span>{" "}
-          <span className="text-subtle">
-            {record.won}V {lost}D
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Mapas mais jogados e melhor aproveitamento por mapa. */
+/**
+ * Mapas: um card só, com os jogos de cada mapa (barra dividida em vitórias e
+ * derrotas) e o aproveitamento ao lado. Mais jogados primeiro.
+ */
 export function MapRecords({ records }: { records: MapRecord[] }) {
   if (!records.length) return null;
-  const mostPlayed = [...records].sort((a, b) => b.played - a.played || b.winRate - a.winRate).slice(0, 5);
-  const best = [...records].sort((a, b) => b.winRate - a.winRate || b.played - a.played).slice(0, 5);
+  const list = [...records].sort((a, b) => b.played - a.played || b.winRate - a.winRate);
   const maxPlayed = Math.max(...records.map((r) => r.played));
   return (
-    <div className="mt-4 grid gap-4 md:grid-cols-2">
-      <Card>
-        <CardHeader title="Mapas mais jogados" description="Cada mapa da série conta uma vez" />
-        <ul className="space-y-3 px-4 pt-3 pb-4">
-          {mostPlayed.map((r) => (
-            <li key={r.mapId}>
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-2 font-medium">
-                  <MapIcon id={r.mapId} size={22} />
-                  {mapName(r.mapId)}
-                </span>
-                <span className="text-muted tabular">{r.played}</span>
-              </div>
-              <div className="mt-1 h-1.5 rounded-full bg-surface-2">
-                <div className="h-full rounded-full bg-brand" style={{ width: `${(r.played / maxPlayed) * 100}%` }} />
-              </div>
+    <Card className="mt-4">
+      <CardHeader
+        title="Mapas"
+        description="Jogos em cada mapa (cada mapa da série conta uma vez) e o aproveitamento."
+      />
+      <ul className="space-y-3 px-4 pt-3 pb-4">
+        {list.map((r) => {
+          const lost = r.played - r.won;
+          return (
+            <li
+              key={r.mapId}
+              className="grid grid-cols-[minmax(0,9rem)_1fr_auto] items-center gap-3 text-sm"
+              title={`${mapName(r.mapId)}: ${r.won}V ${lost}D em ${r.played} ${r.played === 1 ? "jogo" : "jogos"}`}
+            >
+              <span className="flex min-w-0 items-center gap-2 font-medium">
+                <MapIcon id={r.mapId} size={24} />
+                <span className="truncate">{mapName(r.mapId)}</span>
+              </span>
+              <span className="flex h-2.5 gap-0.5" aria-hidden>
+                {r.won > 0 && (
+                  <span
+                    className="rounded-l-sm bg-win last:rounded-r-sm"
+                    style={{ width: `${(r.won / maxPlayed) * 100}%` }}
+                  />
+                )}
+                {lost > 0 && (
+                  <span
+                    className="rounded-r-sm bg-loss first:rounded-l-sm"
+                    style={{ width: `${(lost / maxPlayed) * 100}%` }}
+                  />
+                )}
+              </span>
+              <span className="w-32 text-right text-xs whitespace-nowrap text-muted tabular">
+                <span className="text-fg">{r.played}</span> {r.played === 1 ? "jogo" : "jogos"} ·{" "}
+                <b className={r.winRate >= 50 ? "text-win" : "text-loss"}>{r.winRate}%</b>
+              </span>
             </li>
-          ))}
-        </ul>
-      </Card>
-      <Card>
-        <CardHeader title="Vitórias por mapa" description="Verde = vitórias, vermelho = derrotas" />
-        <ul className="grid grid-cols-2 gap-4 px-4 pt-4 pb-4 sm:grid-cols-3">
-          {best.map((r) => (
-            <li key={r.mapId}>
-              <MapDonut record={r} />
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </div>
+          );
+        })}
+      </ul>
+      <p className="flex items-center gap-3 px-4 pb-4 text-xs text-subtle">
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2 rounded-full bg-win" /> Vitórias
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2 rounded-full bg-loss" /> Derrotas
+        </span>
+      </p>
+    </Card>
   );
 }

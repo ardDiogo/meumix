@@ -64,12 +64,20 @@ export function PlayerForm({ points }: { points: FormPoint[] }) {
   const shown = range ? points.slice(-range) : points;
   const values = shown.map((p) => p[metric]).filter((v): v is number => v != null);
   const average = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+  // Quantos mixes há antes dos últimos 5 (pode ser menos que 5).
+  const prevCount = Math.max(0, Math.min(WINDOW, points.length - WINDOW));
+  // Com menos de 3 anteriores, a comparação engana: fica apagada.
+  const weak = prevCount > 0 && prevCount < 3;
 
   return (
     <Card className="mt-4">
       <CardHeader
         title="Forma do jogador"
-        description={`Últimos ${WINDOW} mixes comparados aos ${WINDOW} anteriores. Toque num indicador para ver a evolução.`}
+        description={
+          prevCount
+            ? `Últimos ${Math.min(WINDOW, points.length)} mixes comparados aos ${prevCount} anteriores${weak ? " (poucos mixes: comparação só indicativa)" : ""}. Toque num indicador para ver a evolução.`
+            : "Toque num indicador para ver a evolução."
+        }
       />
       <div className="grid gap-3 px-4 pt-4 sm:grid-cols-2 lg:grid-cols-5">
         {METRICS.map((m) => {
@@ -91,7 +99,7 @@ export function PlayerForm({ points }: { points: FormPoint[] }) {
               )}
             >
               <div className="text-xs font-semibold tracking-wide text-muted uppercase">{m.title}</div>
-              <div className="mt-1 flex items-end gap-2">
+              <div className={cn("mt-1 flex items-end gap-2", weak && "[&>svg]:opacity-40")}>
                 <span className="font-display text-2xl font-bold tabular">{m.format(c.current)}</span>
                 {trend === "up" && <ArrowUpRight className="mb-1 size-4 text-win" aria-label="Melhorando" />}
                 {trend === "down" && <ArrowDownRight className="mb-1 size-4 text-loss" aria-label="Caindo" />}
@@ -100,7 +108,8 @@ export function PlayerForm({ points }: { points: FormPoint[] }) {
               <div className="mt-1 text-xs text-subtle">
                 {c.previousCount ? (
                   <>
-                    Anteriores: <span className="text-muted tabular">{m.format(c.previous)}</span>
+                    {c.previousCount} anterior{c.previousCount === 1 ? "" : "es"}:{" "}
+                    <span className="text-muted tabular">{m.format(c.previous)}</span>
                   </>
                 ) : (
                   "Sem mixes anteriores para comparar"
@@ -199,12 +208,33 @@ export function PlayerForm({ points }: { points: FormPoint[] }) {
                   }}
                 />
                 <Line
-                  type="monotone"
+                  type="linear"
                   dataKey={metric}
                   stroke="var(--color-brand)"
                   strokeWidth={2}
                   connectNulls
-                  dot={{ r: 4, fill: "var(--color-brand)", stroke: "var(--color-surface)", strokeWidth: 2 }}
+                  // Ponto na cor do resultado do mix.
+                  dot={(props: { cx?: number; cy?: number; index?: number; payload?: FormPoint }) =>
+                    props.cx == null || props.cy == null ? (
+                      <g key={props.index} />
+                    ) : (
+                      <circle
+                        key={props.index}
+                        cx={props.cx}
+                        cy={props.cy}
+                        r={4}
+                        fill={
+                          props.payload?.result === "win"
+                            ? "var(--color-win)"
+                            : props.payload?.result === "loss"
+                              ? "var(--color-loss)"
+                              : "var(--color-draw)"
+                        }
+                        stroke="var(--color-surface)"
+                        strokeWidth={2}
+                      />
+                    )
+                  }
                   activeDot={{ r: 5, fill: "var(--color-brand)", stroke: "var(--color-bg)", strokeWidth: 2 }}
                   isAnimationActive={false}
                 />
