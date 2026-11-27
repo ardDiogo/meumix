@@ -625,33 +625,71 @@ export function MatchStatsTable({
           <p className="rounded-md bg-surface-2/60 px-3 py-2 font-display text-sm font-bold text-fg">
             PTS = 3 × K + 1,5 × A + 2 × FK + 0,2 × ADR − 0,5 × morte trocada − 1,5 × morte não trocada
           </p>
-          <ul className="list-disc space-y-1 pl-5">
-            <li>
-              <b className="text-fg">Entra na conta:</b> kills (+3 cada), assistências (+1,5 cada), first kills — a
-              primeira kill do round (+2 cada), ADR (dano médio por round × 0,2) e mortes. Com mais de um mapa, tudo é
-              somado e o ADR é a média pelos rounds.
-            </li>
-            <li>
-              <b className="text-fg">Mortes:</b> a morte <b className="text-fg">trocada</b> (você morreu e um colega
-              matou quem te matou, na hora — a morte de quem abre o round) tira só <b className="text-fg">0,5</b>; a
-              morte <b className="text-fg">não trocada</b> (morreu sozinho) tira <b className="text-fg">1,5</b>. Os
-              trades vêm dos dados da GC; mix sem esses dados: toda morte tira 1,5.
-            </li>
-            <li>
-              <b className="text-fg">Não entra:</b> rating e swing da GC, KDR, KAST, HS%, FA, MK e o placar do time. O
-              KDR aparece só de forma indireta, pelas kills e pelas mortes.
-            </li>
-            <li>
-              <b className="text-fg">Ordem da tabela:</b> o MVP (maior PTS da partida) vem primeiro, o lanterna por
-              último e o resto pela PTS. Se empatar, quem tem mais kills fica na frente, depois mais assistências.
-            </li>
-            <li>
-              <b className="text-fg">Lanterna</b> tem conta própria: o menor valor de kills + ADR ÷ 100 + KDR × 10.
-            </li>
-            <li>
-              A PTS define o MVP e a ordem da tabela e também entra no <b className="text-fg">ELO</b> (veja abaixo).
-            </li>
-          </ul>
+          <p>
+            Ganha mix quem joga junto. A PTS valoriza quem cria impacto no round e ajuda o time, e não só quem acumula
+            kill sem contexto.
+          </p>
+          <div>
+            <div className="mb-1 font-semibold text-win">Ganha pontos</div>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                <b className="text-fg">Kill (K):</b> <b className="text-win">+3</b> por abate.
+              </li>
+              <li>
+                <b className="text-fg">Primeira kill do round (FK):</b> <b className="text-win">+2</b> extras, porque
+                abrir vantagem no round é o mais difícil.
+              </li>
+              <li>
+                <b className="text-fg">Assistência (A):</b> <b className="text-win">+1,5</b>, porque ajudar o colega a
+                finalizar também conta.
+              </li>
+              <li>
+                <b className="text-fg">Dano (ADR):</b> <b className="text-win">× 0,2</b>, para recompensar quem tira
+                vida do inimigo mesmo sem levar a última bala.
+              </li>
+            </ul>
+          </div>
+          <div>
+            <div className="mb-1 font-semibold text-loss">Perde pontos</div>
+            <ul className="list-disc space-y-1 pl-5">
+              <li>
+                <b className="text-fg">Morte trocada:</b> <b className="text-loss">−0,5</b>. Você morreu, mas o time
+                vingou na hora: sua morte abriu espaço ou entregou a info.
+              </li>
+              <li>
+                <b className="text-fg">Morte não trocada:</b> <b className="text-loss">−1,5</b>. Você morreu sozinho,
+                sem resposta do time, e o time só perdeu um jogador.
+              </li>
+            </ul>
+          </div>
+          <p className="rounded-md border border-brand/30 bg-brand/5 px-3 py-2">
+            <b className="text-fg">Resumindo:</b> quem joga junto perde pouco quando morre. Quem fica para trás
+            esperando (<i>baiter</i>) não abre round e, quando morre, costuma morrer sozinho, então perde mais.
+          </p>
+          <p className="text-subtle italic">
+            Em séries com mais de um mapa, kills, assistências, FK e mortes são somados, e o ADR é a média da série. Sem
+            dados de trade no mix, toda morte conta −1,5.
+          </p>
+          <details className="rounded-md border border-border px-3 py-2">
+            <summary className="cursor-pointer font-semibold text-fg select-none">Mais detalhes</summary>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              <li>
+                <b className="text-fg">Não entra na conta:</b> rating e swing da GC, KDR, KAST, HS%, FA, MK e o placar
+                do time. O KDR aparece só de forma indireta, por kills e mortes. Isso mantém a conta igual para todos os
+                mixes (nem todo mix tem os dados da GC) e evita contar a mesma coisa duas vezes.
+              </li>
+              <li>
+                <b className="text-fg">Ordem da tabela:</b> maior PTS em 1º (MVP), lanterna sempre por último, o resto
+                pela PTS.
+              </li>
+              <li>
+                <b className="text-fg">Desempate:</b> mais kills e, se empatar, mais assistências.
+              </li>
+              <li>
+                <b className="text-fg">Lanterna:</b> o menor valor de Kills + (ADR ÷ 100) + (KDR × 10).
+              </li>
+            </ul>
+          </details>
         </div>
       </details>
       <details className="group border-t border-border px-4 py-3 text-xs text-muted">
