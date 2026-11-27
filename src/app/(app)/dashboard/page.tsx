@@ -116,7 +116,31 @@ export default async function DashboardPage() {
     player.id,
     recent.map((r) => r.mix),
   );
-  const levels = await getLevels();
+  const [levels, elos, players] = await Promise.all([getLevels(), ds.getElos(), ds.listPlayers()]);
+  const nowMs = ds.now().getTime();
+  // Quem está logo acima e logo abaixo no ranking da liga.
+  const nickOf = new Map(players.map((p) => [p.id, p.nickname]));
+  const ranked = [...elos.entries()].sort((x, y) => y[1] - x[1]);
+  const at = ranked.findIndex(([id]) => id === player.id);
+  const neighbor = (i: number) => {
+    const r = at >= 0 ? ranked[i] : undefined;
+    return r ? { position: i + 1, name: nickOf.get(r[0]) ?? "Jogador", gap: Math.abs(r[1] - elo) } : null;
+  };
+  const above = neighbor(at - 1);
+  const below = neighbor(at + 1);
+  const curLevel = levelForElo(elo, levels);
+  const nextLevel = levels.find((l) => l.level === curLevel.level + 1) ?? null;
+  // Seu K/A/D e o ±ELO em cada mix da lista.
+  const eloOfMix = new Map(eloHistory.filter((h) => h.mixId).map((h) => [h.mixId, h.eloAfter - h.eloBefore]));
+  const lines = new Map(
+    recentMixes.map((r) => [
+      r.mix.id,
+      { k: r.kills, a: r.assists, d: r.deaths, eloDelta: eloOfMix.get(r.mix.id) ?? null },
+    ]),
+  );
+  // Com a janela cobrindo todos os mixes, "vs. geral" seria sempre zero.
+  const compareRecent = recent.length < stats.mixes;
+  const lastMvpLine = highlights.lastMvp ? recentMixes.find((r) => r.mix.id === highlights.lastMvp!.mix.id) : null;
   const elo30d = eloChangeSince(eloHistory, new Date(ds.now().getTime() - 30 * 86_400_000));
 
   return (
@@ -163,8 +187,12 @@ export default async function DashboardPage() {
           }
         />
         <StatCard label="Ranking" value={position ? `#${position}` : "—"} hint={`de ${totalPlayers} jogadores`} />
-        <StatCard label="Win rate" value={formatPercent(stats.winRate)} hint={`${stats.wins}V · ${stats.losses}D`} />
-        <StatCard label="Mixes" value={stats.mixes} hint={`${stats.mvps} MVPs`} />
+        <StatCard
+          label="Win rate"
+          value={formatPercent(stats.winRate)}
+          hint={`${stats.wins}V${stats.draws ? ` · ${stats.draws}E` : ""} · ${stats.losses}D`}
+        />
+        <StatCard label="Mixes" value={stats.mixes} hint={`${stats.mvps} ${stats.mvps === 1 ? "MVP" : "MVPs"}`} />
         <StatCard label="K/D" value={formatDecimal(stats.kd)} hint={`${stats.kills} K · ${stats.deaths} D`} />
         <StatCard
           label="ADR"
@@ -182,27 +210,35 @@ export default async function DashboardPage() {
             action={<DemoBadge kind={kind} />}
           />
           <CardContent className="pb-2">
-            <EloChart data={series} />
+            <EloChart data={series} nextLevel={nextLevel} />
           </CardContent>
           <div className="grid gap-4 border-t border-border p-4 sm:grid-cols-[1fr_auto]">
             <div>
-              <div className="mb-2 text-[11px] font-semibold tracking-wider text-muted uppercase">
+              <div className="mb-2 flex flex-wrap items-baseline gap-x-2 text-[11px] font-semibold tracking-wider text-muted uppercase">
                 Últimos {recent.length} resultados
+                <span className="font-normal tracking-normal text-subtle normal-case">mais recente à direita →</span>
               </div>
-              <FormStrip results={[...recent].reverse().map((r) => r.result)} />
+              <FormStrip
+                results={[...recent].reverse().map((r) => r.result)}
+                titles={[...recent].reverse().map((r) => `${r.mix.name} · ${r.kills}/${r.assists}/${r.deaths}`)}
+              />
             </div>
             <dl className="grid grid-cols-3 gap-4 text-right sm:gap-6">
               <RecentStat
                 label="Win rate"
                 value={formatPercent(recentAgg.winRate)}
-                diff={recentAgg.winRate - stats.winRate}
+                diff={compareRecent ? recentAgg.winRate - stats.winRate : null}
                 unit="pp"
               />
-              <RecentStat label="K/D" value={formatDecimal(recentAgg.kd)} diff={recentAgg.kd - stats.kd} />
+              <RecentStat
+                label="K/D"
+                value={formatDecimal(recentAgg.kd)}
+                diff={compareRecent ? recentAgg.kd - stats.kd : null}
+              />
               <RecentStat
                 label="ADR"
                 value={formatDecimal(recentAgg.adr, 1)}
-                diff={recentAgg.adr != null && stats.adr != null ? recentAgg.adr - stats.adr : null}
+                diff={compareRecent && recentAgg.adr != null && stats.adr != null ? recentAgg.adr - stats.adr : null}
               />
             </dl>
           </div>
@@ -216,7 +252,13 @@ export default async function DashboardPage() {
               icon={Trophy}
               label="Último MVP"
               value={highlights.lastMvp ? highlights.lastMvp.mix.name : "Nenhum ainda"}
-              detail={highlights.lastMvp ? formatDate(highlights.lastMvp.mix.scheduledAt) : undefined}
+              detail={
+                lastMvpLine
+                  ? `${lastMvpLine.kills}/${lastMvpLine.assists}/${lastMvpLine.deaths} · ${formatDate(lastMvpLine.mix.scheduledAt)}`
+                  : highlights.lastMvp
+                    ? formatDate(highlights.lastMvp.mix.scheduledAt)
+                    : undefined
+              }
               href={highlights.lastMvp ? mixHref(highlights.lastMvp.mix) : undefined}
               accent={!!highlights.lastMvp}
             />
@@ -239,13 +281,17 @@ export default async function DashboardPage() {
               icon={ShieldCheck}
               label="Clutches vencidos"
               value={String(highlights.clutchesWon)}
-              detail="Nos últimos 10 mixes (dados da GC)"
+              detail={`Nos últimos ${recent.length} ${recent.length === 1 ? "mix" : "mixes"} (placar e GC)`}
             />
             <HighlightItem
               icon={Crosshair}
               label="Primeiros abates"
               value={String(highlights.firstKills)}
-              detail="Quando registrados"
+              detail={
+                recent.length
+                  ? `Nos últimos ${recent.length} ${recent.length === 1 ? "mix" : "mixes"} · ${formatDecimal(highlights.firstKills / recent.length, 1)} por mix`
+                  : undefined
+              }
             />
           </ul>
         </Card>
@@ -260,11 +306,17 @@ export default async function DashboardPage() {
               </Button>
             }
           />
-          <MixList mixes={recentMixes.slice(0, 6).map((r) => r.mix)} perspectiveId={player.id} compact />
+          <MixList
+            mixes={recentMixes.slice(0, 6).map((r) => r.mix)}
+            perspectiveId={player.id}
+            lines={lines}
+            now={nowMs}
+            compact
+          />
         </Card>
 
         {/* Nível */}
-        <LevelCard elo={elo} levels={levels} />
+        <LevelCard elo={elo} levels={levels} above={above} below={below} />
       </div>
     </>
   );
@@ -341,7 +393,19 @@ function HighlightItem({
   );
 }
 
-function LevelCard({ elo, levels }: { elo: number; levels: LevelDef[] }) {
+type Neighbor = { position: number; name: string; gap: number } | null;
+
+function LevelCard({
+  elo,
+  levels,
+  above,
+  below,
+}: {
+  elo: number;
+  levels: LevelDef[];
+  above: Neighbor;
+  below: Neighbor;
+}) {
   const current = levelForElo(elo, levels);
   const next = levels.find((l) => l.level === current.level + 1);
   const progress = next ? Math.round(((elo - current.min) / (next.min - current.min)) * 100) : 100;
@@ -365,6 +429,54 @@ function LevelCard({ elo, levels }: { elo: number; levels: LevelDef[] }) {
           <span>{current.min}</span>
           <span>{next ? next.min : ELO_CAP}</span>
         </div>
+        {(above || below) && (
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="mb-2 text-[11px] font-semibold tracking-wider text-muted uppercase">No ranking</div>
+            <ul className="space-y-2 text-sm">
+              {above && (
+                <li className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">
+                    <span className="text-muted tabular">#{above.position}</span> {above.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted tabular">
+                    {above.gap === 0 ? (
+                      "empatado com você"
+                    ) : (
+                      <>
+                        <b className="text-loss">{above.gap}</b> de ELO acima
+                      </>
+                    )}
+                  </span>
+                </li>
+              )}
+              <li className="flex items-center justify-between gap-2 rounded-md bg-brand/10 px-2 py-1 font-semibold text-brand">
+                <span>#{(above?.position ?? 0) + 1} Você</span>
+                <span className="text-xs tabular">{elo}</span>
+              </li>
+              {below && (
+                <li className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">
+                    <span className="text-muted tabular">#{below.position}</span> {below.name}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted tabular">
+                    {below.gap === 0 ? (
+                      "empatado com você"
+                    ) : (
+                      <>
+                        <b className="text-win">{below.gap}</b> de ELO abaixo
+                      </>
+                    )}
+                  </span>
+                </li>
+              )}
+            </ul>
+            {above && above.gap > 0 && (
+              <p className="mt-3 text-xs text-muted">
+                Mais <b className="text-fg">{above.gap + 1}</b> de ELO e você passa {above.name}.
+              </p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

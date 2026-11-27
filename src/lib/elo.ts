@@ -20,7 +20,7 @@ export function average(values: number[]) {
 
 /** Converte o histórico em pontos para gráficos (ordem cronológica). */
 export function toEloSeries(
-  history: { date: string; eloBefore: number; eloAfter: number; mixId: string }[],
+  history: { date: string; eloBefore: number; eloAfter: number; mixId: string; result?: "win" | "loss" | "draw" }[],
   mixNames: Map<string, string>,
 ) {
   return history.map((h) => ({
@@ -28,6 +28,8 @@ export function toEloSeries(
     elo: h.eloAfter,
     delta: h.eloAfter - h.eloBefore,
     label: mixNames.get(h.mixId) ?? "Mix",
+    // Ajustes do admin não têm mix: sem cor de resultado.
+    result: h.mixId ? (h.result ?? null) : null,
   }));
 }
 

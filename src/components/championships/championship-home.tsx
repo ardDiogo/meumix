@@ -52,7 +52,8 @@ function ChampionshipCard({ item, loggedIn }: { item: HomeChampionship; loggedIn
           ) : (
             <Trophy className="absolute top-1/2 left-1/2 size-10 -translate-x-1/2 -translate-y-1/2 text-brand/70" />
           )}
-          <span className="absolute top-2 left-2">
+          {/* Fundo sólido: a etiqueta fica legível sobre qualquer banner. */}
+          <span className="absolute top-2 left-2 rounded-md bg-bg/90 shadow-md ring-1 ring-black/40 backdrop-blur-sm">
             <ChampionshipStatusBadge status={c.status} />
           </span>
         </Link>
