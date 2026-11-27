@@ -39,5 +39,5 @@ export const NAV_ADMIN: NavItem = {
 };
 
 export const NAV_SECONDARY: NavItem[] = [
-  { href: "/configuracoes", label: "Configurações", icon: Settings, description: "Conta e integrações" },
+  { href: "/conta", label: "Minha conta", icon: Settings, description: "Perfil, avisos e senha" },
 ];

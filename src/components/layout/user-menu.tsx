@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Loader2, LogIn, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import { ChevronDown, Loader2, LogIn, LogOut, ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useTransition } from "react";
 import { signOut } from "@/app/entrar/actions";
@@ -61,11 +61,6 @@ export function UserMenu({ user, showAdmin }: { user: MenuUser | null; showAdmin
         <DropdownMenuItem asChild>
           <Link href="/conta">
             <UserRound /> Minha conta
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/configuracoes">
-            <Settings /> Configurações
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />

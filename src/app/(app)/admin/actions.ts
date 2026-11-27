@@ -468,6 +468,6 @@ export async function sendTestPush(): Promise<RoleChangeResult> {
     ? { ok: true, message: `Aviso enviado para ${n} aparelho${n === 1 ? "" : "s"} seu${n === 1 ? "" : "s"}.` }
     : {
         ok: false,
-        message: "Nenhum aparelho seu recebeu: ative os avisos em Configurações (no celular) e tente de novo.",
+        message: "Nenhum aparelho seu recebeu: ative os avisos em Minha conta → Avisos (no celular) e tente de novo.",
       };
 }

@@ -184,7 +184,7 @@ export default async function PlayerProfilePage({ params, searchParams }: PagePr
                   </a>
                 </Button>
               ) : (
-                <Badge variant="neutral" title="Vincule a Steam em Configurações → Perfil">
+                <Badge variant="neutral" title="Vincule a Steam em Minha conta → Perfil">
                   <Link2 aria-hidden /> Steam não vinculada
                 </Badge>
               )}

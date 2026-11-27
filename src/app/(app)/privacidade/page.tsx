@@ -49,7 +49,7 @@ export default function PrivacyPage() {
           <li>
             <strong>Avisos no celular (opcional):</strong> o endereço de entrega e as chaves de criptografia que o
             navegador do seu aparelho gera ao ativar os avisos, o navegador usado e os tipos de aviso escolhidos. Você
-            desativa em Configurações. <em>Base legal: consentimento (art. 7º, I).</em>
+            desativa em Minha conta → Avisos. <em>Base legal: consentimento (art. 7º, I).</em>
           </li>
           <li>
             <strong>Registros de segurança:</strong> endereço IP, navegador, tipo de aparelho e horários das inscrições,
@@ -114,7 +114,7 @@ export default function PrivacyPage() {
         <ul className="list-disc space-y-1 pl-5">
           <li>baixa uma cópia dos seus dados (arquivo JSON);</li>
           <li>exclui a sua conta;</li>
-          <li>altera a senha e, em Configurações, desvincula Steam, Twitch e CSRep.</li>
+          <li>altera a senha e, em Minha conta, desvincula Steam, Twitch e CSRep.</li>
         </ul>
         <p>
           Outros pedidos: <ContactEmail />. Respondemos em até 15 dias. Você também pode reclamar à Autoridade Nacional

@@ -91,7 +91,7 @@ export async function sendTestPush(): Promise<PushResult> {
     {
       title: "MeuMix",
       body: `Tudo certo, ${session.displayName}! Os avisos estão chegando.`,
-      url: "/configuracoes",
+      url: "/conta?aba=avisos",
       tag: "teste",
     },
   );

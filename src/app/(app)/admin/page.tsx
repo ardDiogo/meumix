@@ -1,4 +1,6 @@
 import { MixTimeline } from "@/components/admin/mix-timeline";
+import { Badge } from "@/components/ui/badge";
+import { INTEGRATIONS } from "@/lib/integrations";
 import { PushTestButton } from "@/components/admin/push-test-button";
 import {
   Award,
@@ -631,7 +633,7 @@ async function SettingsTab({ canManageAdmins, secao }: { canManageAdmins: boolea
             <Card>
               <CardHeader
                 title={title(Bell, "Avisos no celular")}
-                description="Notificações do MeuMix (lista abrindo, PICK, bolão, resultado e lives). Cada jogador ativa em Configurações."
+                description="Notificações do MeuMix (lista abrindo, PICK, bolão, resultado e lives). Cada jogador ativa em Minha conta → Avisos."
                 action={<Scope />}
               />
               <PushAdminStatus />
@@ -658,6 +660,41 @@ async function SettingsTab({ canManageAdmins, secao }: { canManageAdmins: boolea
                   <CsrepApiPanel configured={csrepApiConfigured()} />
                 </div>
               </details>
+            </Card>
+          )}
+          {canManageAdmins && (
+            <Card>
+              <CardHeader
+                title={title(Plug, "Integrações e dados")}
+                description="Status das integrações externas e de onde vêm os dados do site."
+                action={<Scope />}
+              />
+              <ul className="divide-y divide-border">
+                {INTEGRATIONS.map((i) => (
+                  <li key={i.provider} className="flex items-start justify-between gap-4 px-4 py-3">
+                    <div>
+                      <div className="font-medium">{i.name}</div>
+                      <div className="text-sm text-muted">{i.description}</div>
+                    </div>
+                    <Badge variant={i.status === "available" ? "win" : "neutral"} className="shrink-0">
+                      {i.status === "available" ? "Ativa" : "Não implementada"}
+                    </Badge>
+                  </li>
+                ))}
+                <li className="flex items-start justify-between gap-4 px-4 py-3">
+                  <div>
+                    <div className="font-medium">Fonte de dados</div>
+                    <div className="text-sm text-muted">
+                      {getDataSource().kind === "demo"
+                        ? "Dados de demonstração gerados localmente. Configure o Supabase nas variáveis de ambiente (veja o README.md)."
+                        : "Banco PostgreSQL (Supabase) da comunidade."}
+                    </div>
+                  </div>
+                  <Badge variant="neutral" className="shrink-0">
+                    {getDataSource().kind === "demo" ? "Demonstração" : "Supabase"}
+                  </Badge>
+                </li>
+              </ul>
             </Card>
           )}
           {!canManageAdmins && (

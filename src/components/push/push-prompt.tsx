@@ -44,7 +44,7 @@ export function PushPrompt() {
         <span className="text-muted">lista abrindo, PICK, bolão e seu ELO depois do mix.</span>
       </p>
       <Button variant="primary" size="sm" asChild>
-        <Link href="/configuracoes#avisos">Ativar</Link>
+        <Link href="/conta?aba=avisos">Ativar</Link>
       </Button>
       <button type="button" onClick={close} aria-label="Fechar" className="rounded-md p-1 text-subtle hover:text-fg">
         <X className="size-4" />
