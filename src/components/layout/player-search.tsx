@@ -2,9 +2,21 @@ import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Busca de jogadores — envia para /jogadores?q=... (funciona sem JavaScript). */
-export function PlayerSearch({ className, defaultValue }: { className?: string; defaultValue?: string }) {
+export function PlayerSearch({
+  className,
+  defaultValue,
+  keep,
+}: {
+  className?: string;
+  defaultValue?: string;
+  /** Outros filtros da página que a busca mantém (ex.: ordem e nível). */
+  keep?: Record<string, string>;
+}) {
   return (
     <form action="/jogadores" role="search" className={cn("relative", className)}>
+      {Object.entries(keep ?? {}).map(([k, v]) => (
+        <input key={k} type="hidden" name={k} value={v} />
+      ))}
       <label htmlFor="player-search" className="sr-only">
         Buscar jogadores
       </label>
