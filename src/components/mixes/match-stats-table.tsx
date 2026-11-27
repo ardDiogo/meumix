@@ -726,10 +726,20 @@ export function MatchStatsTable({
             <div className="mb-1 font-semibold text-fg">Desempenho: −20 a +20</div>
             <ul className="list-disc space-y-1 pl-5">
               <li>
-                A sua <b className="text-fg">PTS</b> é comparada com a{" "}
-                <b className="text-fg">média da PTS dos 10 jogadores</b> do mix.
+                É <b className="text-fg">calculado pela sua PTS</b>, comparada com a{" "}
+                <b className="text-fg">média da PTS dos 10 jogadores</b> do mix: quanto mais acima da média, mais
+                pontos; quanto mais abaixo, mais perde. <b className="text-fg">±20 é só o limite</b>, a conta nunca
+                passa disso.
               </li>
-              <li>Acima da média, você ganha mais (ou perde menos). Abaixo, o contrário.</li>
+              <li>
+                Ex.: média do mix 150. Sua PTS 180 (20% acima) dá <b className="text-win">+6</b>; 200 (33% acima),{" "}
+                <b className="text-win">+10</b>; 250 ou mais, <b className="text-win">+20</b>. Sua PTS 120 (20% abaixo)
+                dá <b className="text-loss">−6</b>.
+              </li>
+              <li>
+                Acima da média, você ganha mais numa vitória (ou perde menos numa derrota). Abaixo, o contrário: ganha
+                menos numa vitória e perde mais numa derrota.
+              </li>
             </ul>
             <p className="mt-1 text-subtle italic">
               Por quê? Para o ELO não depender só do time em que você caiu. Quem carrega numa derrota pode até não
