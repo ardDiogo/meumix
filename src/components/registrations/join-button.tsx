@@ -52,6 +52,36 @@ function countdown(ms: number) {
   return d > 0 ? `${d}d ${hh}:${mm}:${ss}` : `${hh}:${mm}:${ss}`;
 }
 
+/** A barra enche ao longo da semana antes da abertura (o mix é semanal). */
+const BAR_WINDOW_MS = 7 * 86_400_000;
+
+/**
+ * Contagem até a abertura das inscrições como uma barra laranja que enche aos
+ * poucos (anda a cada segundo, com transição suave e um brilho correndo).
+ */
+function OpeningBar({ opensAt, now, children }: { opensAt: number; now: number; children: React.ReactNode }) {
+  const pct = Math.min(100, Math.max(0, (1 - (opensAt - now) / BAR_WINDOW_MS) * 100));
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.round(pct)}
+      aria-label="Tempo até as inscrições abrirem"
+      className="relative flex h-10 w-full items-center justify-center overflow-hidden rounded-md border border-border bg-surface-2 text-sm font-medium tabular"
+    >
+      <div
+        className="absolute inset-y-0 left-0 overflow-hidden bg-gradient-to-r from-brand/70 to-brand transition-[width] duration-1000 ease-linear"
+        style={{ width: `${pct}%` }}
+        aria-hidden
+      >
+        <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+      </div>
+      <span className="relative z-10 px-3 text-fg drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{children}</span>
+    </div>
+  );
+}
+
 export function JoinButton({
   scheduleId,
   date,
@@ -307,11 +337,11 @@ export function JoinButton({
 
   if (msToOpen > EARLY_TOLERANCE_MS) {
     const button = (
-      <Button variant="secondary" size="lg" className="w-full tabular" disabled>
+      <OpeningBar opensAt={opensAt} now={serverNow}>
         Inscrições abrem em {countdown(opensAt - serverNow)}
         {penaltyDelay ? ` (+${penaltyDelay}s de punição)` : ""}
         {starterDelay ? " para os titulares" : ""}
-      </Button>
+      </OpeningBar>
     );
     if (suspension || starterDelay)
       return (
