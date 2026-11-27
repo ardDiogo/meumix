@@ -4,6 +4,8 @@
  * Allstar mudar ou exigir login, a importação falha e o envio manual continua.
  * `ALLSTAR_API_URL` permite trocar o endereço (testes).
  */
+import { kindFromTitle } from "@/lib/clip-meta";
+
 const DEFAULT_URL = "https://api.prod.allstar.dev/graphql";
 const TIMEOUT_MS = 15_000;
 
@@ -138,10 +140,27 @@ export async function fetchAllstarMatch(matchId: string, playerGameId: string): 
 }
 
 /** Tipo do clipe pelo título/etiquetas do Allstar ("Ace", "3K", "1V2 Clutch"…). */
-export function clipKindFromAllstar(title: string, tags: string[] = []): "ace" | "clutch" | "multikill" | "clip" {
-  const text = `${title} ${tags.join(" ")}`;
-  if (/\bace\b|\b5k\b/i.test(text)) return "ace";
-  if (/clutch|\b1v[1-5]\b/i.test(text)) return "clutch";
-  if (/\b[2-4]k\b|multi/i.test(text)) return "multikill";
-  return "clip";
+export const clipKindFromAllstar = kindFromTitle;
+
+/**
+ * Miniatura de um clipe enviado pelo link: a imagem de prévia (og:image) da página
+ * pública do clipe. Melhor esforço: se o Allstar mudar a página, fica sem miniatura.
+ */
+export async function fetchAllstarThumbnail(shareId: string): Promise<string | null> {
+  try {
+    const res = await fetch(`https://allstar.gg/clip/${encodeURIComponent(shareId)}`, {
+      headers: { "user-agent": "MeuMix/1.0 (+https://meumix.vercel.app)", accept: "text/html" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 300_000);
+    const tag =
+      html.match(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]*>/i)?.[0] ??
+      html.match(/<meta[^>]+name=["']twitter:image["'][^>]*>/i)?.[0];
+    const url = tag?.match(/content=["']([^"']+)["']/i)?.[1]?.replace(/&amp;/g, "&");
+    return httpsUrl(url);
+  } catch {
+    return null;
+  }
 }

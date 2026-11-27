@@ -3,9 +3,15 @@
 import { canManageLeagueOf } from "@/services/league";
 import { revalidatePath } from "next/cache";
 import { parseAllstarClip } from "@/lib/allstar";
-import { clipKindFromAllstar, fetchAllstarMatch, parseAllstarMatchUrl } from "@/lib/integrations/allstar-api";
+import {
+  clipKindFromAllstar,
+  fetchAllstarMatch,
+  fetchAllstarThumbnail,
+  parseAllstarMatchUrl,
+} from "@/lib/integrations/allstar-api";
+import { kindFromTitle } from "@/lib/clip-meta";
 import { canManageMixes } from "@/lib/auth/permissions";
-import { getClips, getTwitchUsers, twitchConfigured } from "@/lib/integrations/twitch-api";
+import { getClipThumbnails, getClips, getTwitchUsers, twitchConfigured } from "@/lib/integrations/twitch-api";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { mixBroadcastWindow, parseTwitchClip } from "@/lib/twitch";
 import { audit } from "@/services/audit";
@@ -50,7 +56,9 @@ export async function addClip(input: ClipInput): Promise<ClipResult> {
   }
   const title = input.title.trim().replace(/\s+/g, " ");
   if (title.length < 2 || title.length > 80) return { ok: false, message: "Título: de 2 a 80 caracteres." };
-  const kind = (KINDS as readonly string[]).includes(input.kind) ? input.kind : "clip";
+  const chosen = (KINDS as readonly string[]).includes(input.kind) ? input.kind : "clip";
+  // "Clipe" (o padrão): o tipo vem do título ("4K", "1v3 Clutch", "Ace").
+  const kind = chosen === "clip" ? kindFromTitle(title) : chosen;
   const userId = input.userId && input.userId !== session.id ? input.userId : session.id;
   if (userId !== session.id && !canManageMixes(session)) {
     return { ok: false, message: "Só administradores enviam clipes em nome de outro jogador." };
@@ -59,6 +67,8 @@ export async function addClip(input: ClipInput): Promise<ClipResult> {
     return { ok: false, message: "Dados inválidos." };
   }
 
+  // Miniatura (melhor esforço: sem ela, o cartão usa o emblema do mapa).
+  const thumbnail = await clipThumbnail(twitchId ? "twitch" : "allstar", clipId);
   const { error } = await admin.from("clips").insert({
     user_id: userId,
     match_id: input.matchId || null,
@@ -66,6 +76,7 @@ export async function addClip(input: ClipInput): Promise<ClipResult> {
     clip_id: clipId,
     title,
     kind,
+    ...(thumbnail ? { thumbnail_url: thumbnail } : {}),
     created_by: session.id,
   });
   if (error) {
@@ -83,6 +94,66 @@ export async function addClip(input: ClipInput): Promise<ClipResult> {
   });
   refresh();
   return { ok: true, message: "Clipe enviado!" };
+}
+
+async function clipThumbnail(provider: "twitch" | "allstar", id: string) {
+  try {
+    return provider === "twitch" ? ((await getClipThumbnails([id])).get(id) ?? null) : await fetchAllstarThumbnail(id);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Admin: completa os clipes antigos — busca a miniatura dos que estão sem e
+ * corrige o tipo dos salvos como "Clipe" pelo título (ex.: "4K" vira Multikill).
+ */
+export async function fillClips(): Promise<ClipResult> {
+  const session = await getSession();
+  if (!canManageMixes(session)) return { ok: false, message: "Apenas administradores." };
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "O banco de dados não está configurado no servidor." };
+  const { data, error } = await admin
+    .from("clips")
+    .select("id, provider, clip_id, title, kind, thumbnail_url")
+    .or("thumbnail_url.is.null,kind.eq.clip")
+    .limit(200);
+  if (error) return { ok: false, message: "Não foi possível ler os clipes." };
+  const rows = data ?? [];
+  const twitchIds = rows.filter((r) => r.provider === "twitch" && !r.thumbnail_url).map((r) => r.clip_id as string);
+  const twitchThumbs = twitchIds.length ? await getClipThumbnails(twitchIds).catch(() => new Map()) : new Map();
+  let thumbs = 0;
+  let kinds = 0;
+  for (const r of rows) {
+    const patch: Record<string, string> = {};
+    if (!r.thumbnail_url) {
+      const t =
+        r.provider === "twitch"
+          ? (twitchThumbs.get(r.clip_id as string) ?? null)
+          : await fetchAllstarThumbnail(r.clip_id as string);
+      if (t) {
+        patch.thumbnail_url = t;
+        thumbs++;
+      }
+    }
+    if (r.kind === "clip") {
+      const k = kindFromTitle(r.title as string);
+      if (k !== "clip") {
+        patch.kind = k;
+        kinds++;
+      }
+    }
+    if (Object.keys(patch).length) await admin.from("clips").update(patch).eq("id", r.id);
+  }
+  await audit({ action: "clip.fill", outcome: "success", actorId: session!.id, detail: { thumbs, kinds } });
+  refresh();
+  const missing = rows.filter((r) => !r.thumbnail_url).length - thumbs;
+  return {
+    ok: true,
+    message:
+      `${thumbs} miniatura(s) e ${kinds} tipo(s) atualizados.` +
+      (missing > 0 ? ` ${missing} sem miniatura disponível (o cartão usa o emblema do mapa).` : ""),
+  };
 }
 
 /** Exclui um clipe: quem enviou, o dono ou um administrador. */
@@ -288,7 +359,7 @@ export async function importTwitchClips(matchId: string): Promise<ImportResult> 
           provider: "twitch",
           clip_id: c.id,
           title,
-          kind: "clip",
+          kind: kindFromTitle(title),
           thumbnail_url: c.thumbnailUrl,
           video_url: null,
           created_by: session!.id,

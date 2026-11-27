@@ -177,6 +177,16 @@ export interface TwitchClip {
   durationSec: number;
 }
 
+/** Miniaturas de clipes pelo ID (até 100 por chamada). */
+export async function getClipThumbnails(ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const part of chunks(ids)) {
+    const list = await helix<{ id: string; thumbnail_url?: string }>("clips", { id: part }, false);
+    for (const c of list) if (c.thumbnail_url) out.set(c.id, c.thumbnail_url);
+  }
+  return out;
+}
+
 /** Clipes criados no canal dentro do período (sem cache). */
 export async function getClips(broadcasterId: string, start: Date, end: Date): Promise<TwitchClip[]> {
   const list = await helix<{
